@@ -123,6 +123,7 @@ int mpe_t_mig_boundary_rotated_part (void);
 int mpe_t_mig_spec_roundtrip (void);
 int mpe_t_mig_editor_roundtrip (void);
 int mpe_t_mig_hull_point_collection (void);
+int mpe_t_mig_hull_2d_proof (void);
 typedef struct {
     const char *name;
     int (*fn) (void);
@@ -270,6 +271,7 @@ static const mpe_entry_t mpe_registry [] = {
      * and terminal compose identical bodies, WP2 physics checks pass. */
     {"mig_editor_roundtrip", mpe_t_mig_editor_roundtrip, 0},
     {"mig_hull_point_collection", mpe_t_mig_hull_point_collection, 0},
+    {"mig_hull_2d_proof", mpe_t_mig_hull_2d_proof, 0},
 };
 #define MPE_NTESTS ((int) (sizeof (mpe_registry) / sizeof (mpe_registry [0])))
 /* Returns 0 pass, 1 fail, 2 skipped.

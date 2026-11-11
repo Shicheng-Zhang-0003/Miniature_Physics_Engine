@@ -84,3 +84,48 @@ mig_hull_err mig_hull_point_set_validate (const mig_hull_point_set *set) {
     }
     return mig_hull_ok;
 }
+
+/* ---- WP2.5 2.5.2: the 2D proof ----
+ * Green's theorem on a plane polygon, edge by edge. Each edge
+ * i -> i+1 contributes the signed trapezoid weight
+ * c_i = x_i·y_{i+1} − x_{i+1}·y_i, and the divergence-theorem field
+ * choices give the moments:
+ *   area      = 1/2  Σ c_i                              (F = (−y/2, x/2))
+ *   ∫∫ x  dA  = 1/6  Σ (x_i + x_{i+1}) c_i              (F = (x²/2, 0))
+ *   ∫∫ x² dA  = 1/12 Σ (x_i² + x_i x_{i+1} + x_{i+1}²) c_i
+ *   ∫∫ xy dA  = 1/24 Σ (2x_i y_i + x_i y_{i+1} + x_{i+1} y_i
+ *                      + 2x_{i+1} y_{i+1}) c_i
+ * (y-moments mirror the x ones with x↔y swapped). Verified against the
+ * unit right triangle (area 1/2, ∫x = 1/6, ∫x² = 1/12, ∫xy = 1/24) and
+ * the rectangle [−a,a]×[−b,b] closed forms (4ab, 0, (4/3)a³b, 0). */
+mig_hull_err mig_hull_polygon_props (const mig_hull_point *verts, int count,
+                                     mig_hull_area2 *out) {
+    if ((!verts) || (!out)) { return mig_hull_null; }
+    if (count < 3) { return mig_hull_bad_count; }
+    for (int i = 0; i < count; i++) {
+        if (!isfinite (verts [i].x) || !isfinite (verts [i].y)) {
+            return mig_hull_bad_point;
+        }
+    }
+    double area = 0.0, mx = 0.0, my = 0.0, sxx = 0.0, syy = 0.0, sxy = 0.0;
+    for (int i = 0; i < count; i++) {
+        const mig_hull_point *p = &verts [i];
+        const mig_hull_point *q = &verts [(i + 1) % count];
+        const double c = p -> x * q -> y - q -> x * p -> y;
+        area += c;
+        mx  += (p -> x + q -> x) * c;
+        my  += (p -> y + q -> y) * c;
+        sxx += (p -> x * p -> x + p -> x * q -> x + q -> x * q -> x) * c;
+        syy += (p -> y * p -> y + p -> y * q -> y + q -> y * q -> y) * c;
+        sxy += (2.0 * p -> x * p -> y + p -> x * q -> y +
+                q -> x * p -> y + 2.0 * q -> x * q -> y) * c;
+    }
+    if (!isfinite (area)) { return mig_hull_bad_point; }
+    out -> area      = 0.5 * area;
+    out -> moment_x  = mx / 6.0;
+    out -> moment_y  = my / 6.0;
+    out -> second_xx = sxx / 12.0;
+    out -> second_yy = syy / 12.0;
+    out -> second_xy = sxy / 24.0;
+    return mig_hull_ok;
+}

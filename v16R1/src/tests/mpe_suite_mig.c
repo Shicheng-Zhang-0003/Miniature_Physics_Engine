@@ -2687,3 +2687,106 @@ int mpe_t_mig_hull_point_collection (void) {
     mpe_test_end (&t);
     return t.failures;
 }
+
+/* WP2.5 2.5.2 gate (plan §8.5): the 2D proof — divergence theorem on plane
+ * polygons vs closed forms. Oracles are hand-integrated, never calls into
+ * the implementation:
+ *  - rectangle [-a,a]×[-b,b] (CCW): area 4ab, first moments 0,
+ *    ∫∫x² = (4/3)a³b, ∫∫y² = (4/3)ab³, ∫∫xy = 0;
+ *  - unit right triangle (0,0),(1,0),(0,1): area 1/2, ∫x = 1/6,
+ *    ∫x² = 1/12, ∫xy = 1/24 (y-moments mirror x);
+ *  - clockwise winding yields the NEGATIVE of every integral (signed);
+ *  - error contracts: NULL, count < 3, non-finite vertex. */
+int mpe_t_mig_hull_2d_proof (void) {
+    mpe_test_t t;
+    mpe_test_begin (&t, "mig_hull_2d_proof");
+
+    /* ---- 1. rectangle [-1,1]×[-2,2] (a=1, b=2), CCW from corner (-1,-2) ----
+     * area 4ab = 4·1·2 = 8; ∫∫x = ∫∫y = 0 (symmetric);
+     * ∫∫x² = (4/3)a³b = (4/3)·1·2 = 8/3; ∫∫y² = (4/3)ab³ = (4/3)·8 = 32/3;
+     * ∫∫xy = 0. */
+    {
+        mig_hull_point quad [4] = {
+            {-1.0, -2.0, 0.0}, {1.0, -2.0, 0.0}, {1.0, 2.0, 0.0}, {-1.0, 2.0, 0.0}
+        };
+        mig_hull_area2 a;
+        MPE_CHECK (&t, mig_hull_polygon_props (quad, 4, &a) == mig_hull_ok);
+        MPE_CHECK_NEAR (&t, a.area, 8.0, 1e-9, "rect area 4ab");
+        MPE_CHECK_NEAR (&t, a.moment_x, 0.0, 1e-9, "rect moment x");
+        MPE_CHECK_NEAR (&t, a.moment_y, 0.0, 1e-9, "rect moment y");
+        MPE_CHECK_NEAR (&t, a.second_xx, 8.0 / 3.0, 1e-9, "rect second xx");
+        MPE_CHECK_NEAR (&t, a.second_yy, 32.0 / 3.0, 1e-9, "rect second yy");
+        MPE_CHECK_NEAR (&t, a.second_xy, 0.0, 1e-9, "rect second xy");
+    }
+
+    /* ---- 2. unit right triangle (0,0),(1,0),(0,1), CCW ----
+     * area 1/2; ∫x = 1/6; ∫y = 1/6; ∫x² = 1/12; ∫y² = 1/12; ∫xy = 1/24. */
+    {
+        mig_hull_point tri [3] = {
+            {0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}
+        };
+        mig_hull_area2 a;
+        MPE_CHECK (&t, mig_hull_polygon_props (tri, 3, &a) == mig_hull_ok);
+        MPE_CHECK_NEAR (&t, a.area, 0.5, 1e-12, "tri area");
+        MPE_CHECK_NEAR (&t, a.moment_x, 1.0 / 6.0, 1e-12, "tri moment x");
+        MPE_CHECK_NEAR (&t, a.moment_y, 1.0 / 6.0, 1e-12, "tri moment y");
+        MPE_CHECK_NEAR (&t, a.second_xx, 1.0 / 12.0, 1e-12, "tri second xx");
+        MPE_CHECK_NEAR (&t, a.second_yy, 1.0 / 12.0, 1e-12, "tri second yy");
+        MPE_CHECK_NEAR (&t, a.second_xy, 1.0 / 24.0, 1e-12, "tri second xy");
+        /* Centroid = (∫x/area, ∫y/area) = (1/3, 1/3) — the classic. */
+        MPE_CHECK_NEAR (&t, a.moment_x / a.area, 1.0 / 3.0, 1e-12, "tri centroid x");
+        MPE_CHECK_NEAR (&t, a.moment_y / a.area, 1.0 / 3.0, 1e-12, "tri centroid y");
+    }
+
+    /* ---- 3. clockwise winding = exact negation (signed integrals) ----
+     * Same triangle, reversed: every result must negate bitwise-close. */
+    {
+        mig_hull_point tri [3] = {
+            {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {1.0, 0.0, 0.0}
+        };
+        mig_hull_area2 a;
+        MPE_CHECK (&t, mig_hull_polygon_props (tri, 3, &a) == mig_hull_ok);
+        MPE_CHECK_NEAR (&t, a.area, -0.5, 1e-12, "cw area negated");
+        MPE_CHECK_NEAR (&t, a.moment_x, -1.0 / 6.0, 1e-12, "cw moment x negated");
+        MPE_CHECK_NEAR (&t, a.second_xx, -1.0 / 12.0, 1e-12, "cw second xx negated");
+        MPE_CHECK_NEAR (&t, a.second_xy, -1.0 / 24.0, 1e-12, "cw second xy negated");
+    }
+
+    /* ---- 4. error contracts ----
+     * NULL verts / NULL out → mig_hull_null; count < 3 → bad_count;
+     * non-finite vertex (NaN or ±Inf in x or y) → bad_point. */
+    {
+        mig_hull_point tri [3] = {
+            {0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}
+        };
+        mig_hull_point bad [3] = {
+            {0.0, 0.0, 0.0}, {1.0, 0.0 / 0.0, 0.0}, {0.0, 1.0, 0.0}
+        };
+        mig_hull_point inf [3] = {
+            {0.0, 0.0, 0.0}, {1.0 / 0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}
+        };
+        mig_hull_area2 a;
+        MPE_CHECK (&t, mig_hull_polygon_props (NULL, 3, &a) == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_polygon_props (tri, 3, NULL) == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_polygon_props (tri, 2, &a) == mig_hull_bad_count);
+        MPE_CHECK (&t, mig_hull_polygon_props (tri, 0, &a) == mig_hull_bad_count);
+        MPE_CHECK (&t, mig_hull_polygon_props (bad, 3, &a) == mig_hull_bad_point);
+        MPE_CHECK (&t, mig_hull_polygon_props (inf, 3, &a) == mig_hull_bad_point);
+        /* z is IGNORED in the 2D proof: a NaN z must not poison the result. */
+        mig_hull_point znan [3] = {
+            {0.0, 0.0, 0.0 / 0.0}, {1.0, 0.0, 0.0 / 0.0}, {0.0, 1.0, 0.0 / 0.0}
+        };
+        MPE_CHECK (&t, mig_hull_polygon_props (znan, 3, &a) == mig_hull_ok);
+        MPE_CHECK_NEAR (&t, a.area, 0.5, 1e-12, "z ignored area");
+    }
+
+    if (t.failures == 0) {
+        printf ("[PASS] mig WP2.5 2.5.2: the 2D proof — divergence theorem on "
+                "plane polygons vs closed forms\n");
+        MPE_INFO ("rect [-1,1]×[-2,2]: 8, 0, 8/3, 32/3, 0; unit right tri: "
+                  "1/2, 1/6, 1/12, 1/24; CW = exact negation; z ignored; "
+                  "NULL/bad_count/bad_point contracts");
+    }
+    mpe_test_end (&t);
+    return t.failures;
+}

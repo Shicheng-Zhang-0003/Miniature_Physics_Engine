@@ -29,6 +29,9 @@ typedef enum {
     mig_hull_null = 1,       /* NULL set / NULL buf / NULL out */
     mig_hull_bad_count = 2,  /* count <= 0 or exceeds capacity */
     mig_hull_bad_point = 3,  /* non-finite coordinate (garbage rejection) */
+    mig_hull_bad_index = 4,  /* APPENDED 2.5.3: face index outside the vertex array */
+    mig_hull_bad_mesh = 5    /* APPENDED 2.5.3: non-finite density, degenerate
+                              * or non-positive-volume (open/inward-wound) mesh */
 } mig_hull_err;
 
 /* Initialise a point set over a caller-owned buffer (no malloc).
@@ -57,5 +60,26 @@ mig_hull_err mig_hull_build_tetra (double scale,
 /* Validate every point in the set is finite. Returns mig_hull_ok or
  * mig_hull_bad_point on the first non-finite coordinate. */
 mig_hull_err mig_hull_point_set_validate (const mig_hull_point_set *set);
+
+/* ---- WP2.5 2.5.2: the 2D proof (divergence theorem on polygons) ----
+ * The lowest-dimension validation of the divergence-theorem machinery
+ * 2.5.3 builds on: per-edge signed contributions (Green's theorem),
+ * double accumulation in edge order, no trig, no pow. */
+
+typedef struct {
+    double area;       /* ∫∫ 1 dA (signed: positive for CCW winding) */
+    double moment_x;   /* ∫∫ x dA */
+    double moment_y;   /* ∫∫ y dA */
+    double second_xx;  /* ∫∫ x² dA */
+    double second_yy;  /* ∫∫ y² dA */
+    double second_xy;  /* ∫∫ x·y dA */
+} mig_hull_area2;
+
+/* Mass properties of a plane polygon in the x-y plane (the z coordinate
+ * of each vertex is IGNORED), counterclockwise winding for positive
+ * area. Vertices must be finite; count >= 3. All results are SIGNED
+ * integrals — the caller divides by `area` for centroid and densities. */
+mig_hull_err mig_hull_polygon_props (const mig_hull_point *verts, int count,
+                                     mig_hull_area2 *out);
 
 #endif /* mig_hull_h */
