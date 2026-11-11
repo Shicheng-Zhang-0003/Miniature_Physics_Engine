@@ -5,5 +5,5 @@
  * and validation need the version string without the GUI. */
 #define a3_version_string "v16R1-dev"
 #define a3_release_freeze 0
-#define a3_release_freeze_note "v16R1 development head (ex-v15S release train)"
+#define a3_release_freeze_note "v16R1 development head (ex-v15S release train); v16S charter: MIG composite bodies + spec grammar + editor (WP4-5), doc sweep + release policy (WP6 6.1-6.2)"
 #endif /* mpe_version_h */

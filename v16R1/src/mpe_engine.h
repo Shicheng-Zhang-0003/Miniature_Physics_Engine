@@ -103,9 +103,8 @@ bool physics_is_halted (void);
 bool physics_halt_tick_update (void); /* MFS_PHASE_A */
 void physics_halt_step_once (void); /* SANDBOX S1: run exactly one tick, then re-halt */
 /* MPE_TASK_V15R2_PHYSICS_HALT_EXTERN_END */
-#define a3_version_string "v16R1-dev" /* v16R1 development head */
-/* MPE_RELEASE_FREEZE_BEGIN */
-#define a3_release_freeze 0
-#define a3_release_freeze_note "v16R1 development head (ex-v15S release train)"
-/* MPE_RELEASE_FREEZE_END */
+/* Version/release-freeze macros live in core/mpe_version.h (GUI-free;
+   mpe_engine.h pulls gtk/gtk.h). Single definition: mpe_engine.h
+   includes mpe_version.h, headless code includes it directly. */
+#include "core/mpe_version.h"
 #endif // mpe_engine_h

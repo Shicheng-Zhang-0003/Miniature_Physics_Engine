@@ -1,6 +1,6 @@
 # MPE Release Policy (v15R3 record + v16R1 head)
 
-This tree carries the v15R3 release record in git history (tagged there with `a3_release_freeze = 1`). The v16R1 head has `a3_release_freeze = 0` (`v16R1/src/mpe_engine.h:108`, "v16R1 development head (ex-v15S release train)").
+This tree carries the v15R3 release record in git history (tagged there with `a3_release_freeze = 1`). The v16R1 head has `a3_release_freeze = 0` (`v16R1/src/mpe_engine.h:108`, "v16R1 development head (ex-v15S release train); v16S charter: MIG composite bodies + spec grammar + editor (WP4-5), doc sweep + release policy (WP6 6.1-6.2)"). Version macros stay `v16R1-dev` until the v16S cut.
 Accepted changes from here on: correctness, stability, validation,
 documentation, and hygiene only — no new features.
 
@@ -8,12 +8,9 @@ documentation, and hygiene only — no new features.
 system (MPI hot-plug), per-world config, data-structure upgrades
 (growable pools, O(1) caches), kernel global-state removal, and the TUI
 stress suite. It keeps the v15R3 physics-truth contract (defaults
-bit-identical unless noted) and extends the suite to 45 registered / 43 blocking
-green (41 physics + 2 diag-informational; 2026-10-09 added `diag_naming` and
-raised the floor 44 -> 45; DESPOT-2026-10-03: floor raised 42 -> 44;
-DESPOT-2026-10-01: was stale 32/32). The "29 physics + 3 diag" split that used to
-appear here was a v15R3-era figure contradicting the total in the same sentence;
-it is gone rather than restated.
+bit-identical unless noted) and extends the suite to 61 registered / 61 blocking green (41 physics +
+2 diag-informational + 18 MIG/composite gates; 2026-11-11 raised the
+floor 46 -> 61).
 
 ## What v15 Delivered
 
@@ -29,7 +26,7 @@ The v15 series introduced the centralised configuration system:
 Under the v15R3 freeze:
 
 1. Correctness fixes with headless proof (new or extended tests).
-2. Stability fixes required by validation (F5–F11, 45-case suite (43 blocking)).
+2. Stability fixes required by validation (F5–F11, 61-case suite (61 blocking)).
 3. Build and repository hygiene.
 4. Documentation updates to match the architecture.
 5. Validation improvements (tests, TUI snapshot scenes, gates).
