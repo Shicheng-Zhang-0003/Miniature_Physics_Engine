@@ -25,6 +25,10 @@
 #include <stdbool.h>
 extern camera main_camera_fov;
 extern mesh cube_mesh;
+extern bool mig_editor_is_active (void);
+extern bool mig_editor_com_position (vector3 *out);
+/* MIG WP4 4.4: COM marker — forward declaration (defined at end of file). */
+static void render_com_marker (math4 view_matrix, math4 projection_matrix);
 static GLuint instanced_shader_program = 0;
 static GLuint utility_shader_program = 0;
 static struct {
@@ -59,6 +63,11 @@ static traj_line_mesh main_traj;
 static float *sphere_instances = NULL;
 static float *cube_instances = NULL;
 static float *cylinder_instances = NULL;
+/* MIG WP4 4.4: COM marker cross (cyan, 3 axis-aligned lines at the edited
+ * spec's COM). Static VAO/VBO initialized on first use. */
+static GLuint com_cross_vao = 0;
+static GLuint com_cross_vbo = 0;
+static bool com_cross_gl_ready = false;
 /* MIG WP2 2.7 (build plan §4): pack ONE instance for a composite part into
  * the per-type instance buffer through the same T*R*S composition the
  * primitive path uses (M[c][r] = R[c][r]*s[c], M[3][r] = t[r]). The part
@@ -483,6 +492,9 @@ void render_scene_current (int widget_width, int widget_height) {
      * its recent positions, drawn ONLY while something is selected
      * (trail_note_tick fills it once per simulated tick). */
     trail_render (utility_shader_program, view_matrix, projection_matrix);
+    /* MIG WP4 4.4: COM marker — cyan cross at the edited spec's COM,
+     * drawn when the editor is open and has a valid spec. */
+    render_com_marker (view_matrix, projection_matrix);
     wireframe_render_selected_object (utility_shader_program, view_matrix, projection_matrix);
     if (dropped_instances > 0) {
         /* Mesh instance count guard overflow (build plan §4 2.7): name the
@@ -504,4 +516,65 @@ void render_scene_current (int widget_width, int widget_height) {
             }
         }
     }
+}
+
+/* MIG WP4 4.4: COM marker — a 3-axis cross at the edited spec's COM,
+ * drawn with the utility shader when the editor is open and valid.
+ * X=red, Y=green, Z=blue; 0.15 m arm length. */
+static void render_com_marker (math4 view_matrix, math4 projection_matrix) {
+    if (!mig_editor_is_active ()) { return; }
+    vector3 com;
+    if (!mig_editor_com_position (&com)) { return; }
+    /* Lazy GL object init: one VAO + VBO holding 3 axis-aligned lines
+     * crossing at the origin (local space). */
+    if (!com_cross_gl_ready) {
+        float size = 0.15f;
+        float verts [18] = {
+            -size, 0.0f, 0.0f,   size, 0.0f, 0.0f,   /* X axis */
+             0.0f, -size, 0.0f,  0.0f,  size, 0.0f,   /* Y axis */
+             0.0f, 0.0f, -size,  0.0f,  0.0f,  size    /* Z axis */
+        };
+        glGenVertexArrays (1, &com_cross_vao);
+        glGenBuffers (1, &com_cross_vbo);
+        glBindVertexArray (com_cross_vao);
+        glBindBuffer (GL_ARRAY_BUFFER, com_cross_vbo);
+        glBufferData (GL_ARRAY_BUFFER, sizeof (verts), verts, GL_STATIC_DRAW);
+        glEnableVertexAttribArray (0);
+        glVertexAttribPointer (0, 3, GL_FLOAT, GL_FALSE, 0, (void *) 0);
+        glEnableVertexAttribArray (1);
+        glVertexAttribPointer (1, 3, GL_FLOAT, GL_FALSE, 0, (void *) 0);
+        glBindVertexArray (0);
+        com_cross_gl_ready = true;
+    }
+    math4 model = math4_translation (com);
+    float model_flat [16];
+    math4_to_flat_array (model, model_flat);
+    float normal_flat [9] = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+    float view_flat [16], proj_flat [16];
+    math4_to_flat_array (view_matrix, view_flat);
+    math4_to_flat_array (projection_matrix, proj_flat);
+    glUseProgram (utility_shader_program);
+    glUniformMatrix4fv (utility_uniforms.model_matrix_location, 1, GL_FALSE, model_flat);
+    glUniformMatrix4fv (utility_uniforms.view_matrix_location, 1, GL_FALSE, view_flat);
+    glUniformMatrix4fv (utility_uniforms.projection_matrix_location, 1, GL_FALSE, proj_flat);
+    glUniformMatrix3fv (utility_uniforms.normal_matrix_location, 1, GL_FALSE, normal_flat);
+    glUniform3f (utility_uniforms.camera_position_location,
+                 main_camera_fov.position.x, main_camera_fov.position.y, main_camera_fov.position.z);
+    glUniform3f (utility_uniforms.light_position_location,
+                 g_cfg.render.light_x, g_cfg.render.light_y, g_cfg.render.light_z);
+    glUniform1f (utility_uniforms.ambient_strength_location, g_cfg.render.ambient_strength);
+    glUniform1f (utility_uniforms.specular_coeff_location, g_cfg.render.specular_coeff);
+    glUniform1f (utility_uniforms.specular_exponent_location, g_cfg.render.specular_exponent);
+    glBindVertexArray (com_cross_vao);
+    const vector3 axis_colours [3] = {
+        {1.0f, 0.0f, 0.0f}, /* X: red */
+        {0.0f, 1.0f, 0.0f}, /* Y: green */
+        {0.0f, 0.0f, 1.0f}  /* Z: blue */
+    };
+    for (int axis = 0; axis < 3; axis++) {
+        glUniform3f (utility_uniforms.object_colour_location,
+                     axis_colours [axis].x, axis_colours [axis].y, axis_colours [axis].z);
+        glDrawArrays (GL_LINES, axis * 2, 2);
+    }
+    glBindVertexArray (0);
 }

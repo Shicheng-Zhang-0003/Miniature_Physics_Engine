@@ -14,6 +14,7 @@
 #include <stdint.h>
 #include "term_posix.h" /* POSIX command-logic helpers (no libglib) */
 #include "../core/rigidbody.h"
+#include "../core/mig_spec.h"
 #include "../config/mpe_constants.h"
 /* alias table dimensions (storage lives in debug_terminal.c) */
 #define term_alias_max 64
@@ -178,6 +179,12 @@ void cmd_vi (int argc, char **argv);
 void cmd_mod (int argc, char **argv);
 void cmd_mig (int argc, char **argv);
 void mig_edit_on_exit (void);
+/* MIG WP4 4.4: spec store accessors for the GTK editor panel. */
+int mig_spec_store_count (void);
+const char *mig_spec_store_name_at (int index);
+const mig_spec *mig_spec_store_spec_at (int index);
+int mig_spec_store_find (const char *name);
+int mig_spec_store_add (const char *name, const mig_spec *spec);
 void cmd_diag (int argc, char **argv);
 void cmd_modinfo (int argc, char **argv);
 void cmd_eco (int argc, char **argv);

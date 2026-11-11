@@ -14,6 +14,7 @@
 #include <time.h>
 #include "core/mig_spec.h"
 #include "microvim.h"
+#include "mig_editor.h"
 const char *term_object_type_name (rigidbody *rigid_body) {
     if (!rigid_body) { return "?"; }
     if (rigid_body -> type == object_sphere) { return "sph"; }
@@ -254,7 +255,37 @@ typedef struct {
 } mig_spec_store_entry;
 static mig_spec_store_entry mig_spec_store [MIG_SPEC_STORE_MAX];
 
-static int mig_spec_store_find (const char *name) {
+/* ---- MIG WP4 4.4: spec store accessors (exported for the GTK editor) ----
+ * The GTK editor panel (ui_input/mig_editor.c) reads and writes the store
+ * through these functions. No GTK types appear here — only core types and
+ * C strings — so new_render.c can include mig_editor.h without pulling in
+ * GUI headers (the "zero GUI headers in render" rule). */
+int mig_spec_store_count (void) {
+    int n = 0;
+    for (int i = 0; i < MIG_SPEC_STORE_MAX; i++) {
+        if (mig_spec_store [i].used) { n++; }
+    }
+    return n;
+}
+const char *mig_spec_store_name_at (int index) {
+    int seen = 0;
+    for (int i = 0; i < MIG_SPEC_STORE_MAX; i++) {
+        if (!mig_spec_store [i].used) { continue; }
+        if (seen == index) { return mig_spec_store [i].name; }
+        seen++;
+    }
+    return NULL;
+}
+const mig_spec *mig_spec_store_spec_at (int index) {
+    int seen = 0;
+    for (int i = 0; i < MIG_SPEC_STORE_MAX; i++) {
+        if (!mig_spec_store [i].used) { continue; }
+        if (seen == index) { return &mig_spec_store [i].spec; }
+        seen++;
+    }
+    return NULL;
+}
+int mig_spec_store_find (const char *name) {
     for (int i = 0; i < MIG_SPEC_STORE_MAX; i++) {
         if (mig_spec_store [i].used && strcmp (mig_spec_store [i].name, name) == 0) {
             return i;
@@ -262,8 +293,7 @@ static int mig_spec_store_find (const char *name) {
     }
     return -1;
 }
-
-static int mig_spec_store_add (const char *name, const mig_spec *spec) {
+int mig_spec_store_add (const char *name, const mig_spec *spec) {
     int idx = mig_spec_store_find (name);
     if (idx >= 0) { /* replace existing */ {
         mig_spec_store [idx].spec = *spec;
@@ -280,12 +310,8 @@ static int mig_spec_store_add (const char *name, const mig_spec *spec) {
     return -1; /* store full */
 }
 
-/* ---- MIG WP4 4.3: mig edit — microvim editing of a spec --------------
- * mig edit <name> writes the stored spec to ./<name>.spec, opens it in
- * microvim, and on editor exit re-parses the file and stages it back into
- * the spec store. The editor's own save writes the file (:w / :wq / :x);
- * this layer only re-parses after microvim has closed. Write-on-success:
- * a rejected re-parse leaves the store entry unchanged. */
+/* ---- MIG WP4 4.3: mig edit state (used by cmd_mig "edit" and
+ * mig_edit_on_exit) -------------------------------------------------- */
 static bool mig_edit_in_progress = false;
 static char mig_edit_spec_name [MIG_SPEC_NAME_LEN];
 
@@ -321,7 +347,7 @@ void mig_edit_on_exit (void) {
 
 void cmd_mig (int argc, char **argv) {
     if (argc < 2) {
-        term_err ("mpe: mig: usage: mig load <file> | save <name> | show <name> | list\n");
+        term_err ("mpe: mig: usage: mig load <file> | save <name> | show <name> | list | edit <name> | editor\n");
         return;
     }
     if (term_str_eq (argv [1], "load")) {
@@ -412,6 +438,9 @@ void cmd_mig (int argc, char **argv) {
         term_out (argv [2]);
         term_out (" — :wq to save and stage, :q! to abandon\n");
         if (terminal_output_buffer) { microvim_render (terminal_output_buffer); }
+    } else if (term_str_eq (argv [1], "editor")) {
+        /* Open the GTK spec editor panel (WP4 4.4). No arguments. */
+        mig_editor_toggle ();
     } else {
         term_err ("mpe: mig: unknown subcommand ");
         term_err (argv [1]);

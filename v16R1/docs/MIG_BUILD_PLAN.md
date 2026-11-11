@@ -1033,12 +1033,20 @@ the editor is a window onto it; no editor-only truth exists.
   debug_terminal.c; `vi` stays blocked while an edit is active. GUI-only
   (microvim is suite-unlinked); no gate bump; engine build 0 under
   -Werror.
-- [ ] **4.4 GTK panel** (`ui_input/mig_editor.c`, new): part-list panel +
-  per-part fields (type, dims, pose, material, mass-or-density, colour)
-  in the `config_menu`/`editor_dialog` construction style; two-axis
-  translate gizmo first, rotate fields numeric; live COM marker rendered
-  in the 3D view plus total-mass readout; principal-axis display is a
-  named TODO, not v16S scope. Grammar frozen at 4.1 governs both paths.
+- [x] **4.4 GTK editor panel (LANDED 2026-11-10, `ui_input/mig_editor.c`):**
+  part-list panel + per-part fields (type, dims per-type subset, pose
+  w-first quaternion, material mu_s/mu_k/rest, mass XOR density, colour)
+  in the config_menu/editor_dialog construction style; `mig editor`
+  terminal command opens the panel (plain GtkWindow, transient, CSS
+  keyed on #mpe-mig-editor, Esc closes); Save re-parses through
+  mig_spec_parse_file and stages into the spec store (write-on-success);
+  two-axis ground-plane translate gizmo via numeric X/Z position fields
+  (mouse drag gizmo is post-v16S); live COM marker rendered in the 3D
+  view (utility-shader cyan cross, X=red/Y=green/Z=blue) plus total-mass
+  readout; principal-axis display is a named TODO, not v16S scope.
+  Grammar frozen at 4.1 governs both paths (editor + terminal).
+  GUI-only (suite-unlinked); no gate bump; engine + suite builds 0 under
+  -Werror.
 - [ ] **4.5 Gate:** editor panel edits → spec save → load from disk →
   bitwise identity, PLUS the WP2 physics gates re-run with editor-created
   bodies (editor and terminal create the same objects through the same
