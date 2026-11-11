@@ -219,6 +219,25 @@
   world frame (`pos = body_pos + R_body·local_pos`,
   `ori = q_body ⊗ q_local`). GUI-only; welded composites won't
   scene-persist yet (WP3 scope).
+- [x] **S4c audit hardening (LANDED 2026-11-10, mig_reviews.txt):** four
+  rulings, all pre-flight refusals that keep BOTH originals —
+  (1) NO TRUNCATING WELDS: the total ACTIVE part count of both sources
+  is counted before anything is built; over the 16-part engine cap the
+  weld refuses with a terminal note (the old flow welded a truncated 16
+  and then deleted both sources — silent geometry destruction, the
+  16-part-composite-plus-sphere case); (2) the weld trigger uses
+  `broadphase_bounding_radius` (the covering sphere) instead of
+  `rb->radius` — a cylinder's `radius` is its DISC radius, so
+  interpenetrating coaxial cylinders used to refuse; (3) custom/plugin
+  bodies refuse the weld (no primitive part mapping — never guessed into
+  a cube); (4) MOMENTUM SEMANTICS PINNED: the fused body is born AT
+  REST — the weld is an authoring act (the carried body's velocity is
+  zeroed every held frame anyway), not an impact event; conservation-
+  based fusion would be a different, named feature. Plus the 9.4 tail
+  usability ruling: the target search skips static/kinematic overlaps
+  and welds the nearest DYNAMIC overlap (a refusal note prints only when
+  every overlapping candidate was static/kinematic). GUI-only, no gate;
+  engine build 0 under -Werror.
 - [ ] **S4 reserve:** candidates after a live review: a slow-motion
   time scale knob, a step-N-ticks variant, an object list overlay,
   trail length/style options, a K-key explicit weld as an alternative

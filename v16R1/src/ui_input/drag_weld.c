@@ -18,11 +18,33 @@
  * material fields. Statics/kinematics refuse the weld — one rigid
  * composite has a single static_state, so welding to an infinite-mass
  * anchor would have to bring the anchor to life; the Situation screen
- * toggles that first. */
+ * toggles that first.
+ *
+ * 2026-11-10 audit rulings (mig_reviews.txt):
+ *  - NO TRUNCATING WELDS: the total ACTIVE part count of both sources is
+ *    checked BEFORE anything is built; over the engine cap the weld is
+ *    REFUSED and both originals survive. The old collector kept its
+ *    first 16 parts and the weld then DELETED both sources — silent
+ *    geometry destruction (a 16-part composite plus a dropped sphere
+ *    lost the sphere).
+ *  - WELD TRIGGER USES THE COVERING SPHERE: broadphase_bounding_radius,
+ *    not rb->radius — a cylinder's rb->radius is its DISC radius, so two
+ *    deep-interpenetrating coaxial cylinders used to refuse the weld.
+ *  - NO CUSTOM-BODY GUESSING: object_custom has no primitive part
+ *    mapping; the weld refuses instead of pretending its half-extents
+ *    are a cube.
+ *  - MOMENTUM SEMANTICS PINNED: the fused body is born AT REST. The weld
+ *    is an AUTHORING act — assemble an object from carried pieces (the
+ *    carried body's velocity is zeroed every frame while held anyway) —
+ *    not an impact event. Conservation-based fusion (v = Σmv/M plus
+ *    angular-momentum bookkeeping about the new COM) would be a
+ *    different, named feature; it is deliberately not half-added here. */
 #include "drag_weld.h"
 #include "../mpe_engine.h"
+#include "../physics/broadphase.h"
 #include "object_selector.h"
 #include <math.h>
+#include <stdbool.h>
 #include <stdio.h>
 
 #define WELD_PART_CAP 16        /* the engine's composite part cap */
@@ -34,6 +56,24 @@ static uint32_t dragged_id = 0;
 
 static int weld_type_to_mig (object_type t) {
     return t == object_sphere ? mig_part_sphere : t == object_cylinder ? mig_part_cylinder : mig_part_cube;
+}
+/* Pre-flight: count the ACTIVE parts a source would contribute and flag
+ * unsupported types (object_custom has no primitive part mapping). Nothing
+ * is mutated here — the weld refuses BEFORE any array is built. */
+static int weld_count_parts (physics_world *w, rigidbody *src, bool *unsupported) {
+    if (src -> type != object_composite) {
+        if ((src -> type != object_sphere) && (src -> type != object_cube) && (src -> type != object_cylinder)) {
+            *unsupported = true;
+        }
+        return 1;
+    }
+    int n = 0;
+    for (int pi = 0; pi < src -> composite_part_count; pi++) {
+        long slot = (long) src -> part_base + (long) pi;
+        if ((slot < 0) || (slot >= (long) w -> composite_part_count)) { continue; }
+        if (w -> composite_parts [slot].active) { n++; }
+    }
+    return n;
 } /* Expand one source body into world-frame mig_parts appended to the
    * caller's array. fr_* run parallel to the part array so the materials
    * can be carried post-hoc (the add path stamps body_defaults). */
@@ -83,19 +123,33 @@ static void weld_collect_parts (physics_world *w, rigidbody *src, mig_part parts
         rest [*count] = cp -> restitution;
         *count += 1;
     }
-} static int weld_find_target (physics_world *w, int dragged_idx) {
+} static int weld_find_target (physics_world *w, int dragged_idx, bool *static_overlap) {
     rigidbody *a = &w -> bodies [dragged_idx];
     int best = -1;
     float best_d = 1e30f;
+    /* Covering spheres, not the raw radius: a cylinder's rb->radius is
+     * its DISC radius (the covering sphere is sqrt(r^2 + hl^2)), so the
+     * old test refused welds between visibly interpenetrating cylinders.
+     * broadphase_bounding_radius is the authored covering bound for
+     * composites and the honest envelope for every primitive. */
+    const float ra = broadphase_bounding_radius (a);
+    bool saw_static = false;
     for (int i = 0; i < w -> body_count; i++) {
         if (i == dragged_idx) { continue; }
         rigidbody *b = &w -> bodies [i];
         float d = vector3_length (vector3_subtraction (b -> position, a -> position));
-        if (d < ((a -> radius + b -> radius) - WELD_OVERLAP_EPS) && d < best_d) {
-            best_d = d;
-            best = i;
-        }
-    } return best;
+        if (d >= ((ra + broadphase_bounding_radius (b)) - WELD_OVERLAP_EPS)) { continue; }
+        if (b -> static_state || b -> kinematic) { saw_static = true; continue; }
+        if (d < best_d) { best_d = d; best = i; }
+    }
+    /* Usability ruling (review 9.4 tail): the nearest overlapping body is
+     * not weldable while it is static/kinematic, but a DYNAMIC overlapping
+     * body behind it still is — the search skips the refusal candidates
+     * instead of dying on the nearest hit. *static_overlap reports that
+     * some overlap existed but every candidate was static/kinematic, so
+     * the caller can explain the plain drop. */
+    *static_overlap = saw_static;
+    return best;
 } static void weld_try (int dragged_idx) {
     physics_world *w = physics_world_get_primary ();
     if ((!w) || (dragged_idx < 0) || (dragged_idx >= w -> body_count)) { return; }
@@ -104,11 +158,28 @@ static void weld_collect_parts (physics_world *w, rigidbody *src, mig_part parts
         printf ("[weld] refused: carried body is static/kinematic (toggle its Situation first)\n");
         return;
     }
-    int target_idx = weld_find_target (w, dragged_idx);
-    if (target_idx < 0) { return; } /* plain drop, nothing overlapped */
+    bool static_overlap = false;
+    int target_idx = weld_find_target (w, dragged_idx, &static_overlap);
+    if (target_idx < 0) {
+        if (static_overlap) {
+            printf ("[weld] refused: overlapping body is static/kinematic (toggle its Situation first)\n");
+        }
+        return; /* plain drop, nothing weldable overlapped */
+    }
     rigidbody *b = &w -> bodies [target_idx];
-    if (b -> static_state || b -> kinematic) {
-        printf ("[weld] refused: target body is static/kinematic (toggle its Situation first)\n");
+    /* 2026-11-10 audit (review 9.1): count BEFORE building — a weld that
+     * would exceed the engine cap is REFUSED with both originals kept.
+     * The old flow collected through the truncating collector, welded the
+     * truncated 16, and then DELETED both sources: silent geometry loss. */
+    bool unsupported = false;
+    const int total_parts = weld_count_parts (w, a, &unsupported) + weld_count_parts (w, b, &unsupported);
+    if (unsupported) {
+        printf ("[weld] refused: custom/plugin bodies have no primitive part mapping\n");
+        return;
+    }
+    if (total_parts > WELD_PART_CAP) {
+        printf ("[weld] refused: %d active parts exceed the %d-part cap — both bodies kept\n",
+                total_parts, WELD_PART_CAP);
         return;
     }
     mig_part parts [WELD_PART_CAP];
@@ -117,6 +188,8 @@ static void weld_collect_parts (physics_world *w, rigidbody *src, mig_part parts
     weld_collect_parts (w, a, parts, &count, fr_s, fr_k, rest);
     weld_collect_parts (w, b, parts, &count, fr_s, fr_k, rest);
     if (count < 2) { return; }
+    /* MOMENTUM SEMANTICS (pinned 2026-11-10, review 9.5): the fused body
+     * is born AT REST — an authoring act, not an impact event. */
     /* Body-level materials of the carrier, captured before removals. */
     float a_fs = a -> friction_static, a_fk = a -> friction_kinetic, a_r = a -> restitution;
     int new_index = physics_world_add_composite (w, parts, count);
