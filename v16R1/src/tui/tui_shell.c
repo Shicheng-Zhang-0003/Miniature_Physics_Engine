@@ -17,6 +17,8 @@
 #include "../core/mpe_diag.h"
 #include "../core/rigidbody.h"
 #include "../core/det_math.h"
+#include "../core/mig_mass.h"
+#include "../core/mig_spec.h"
 #include "../physics/constraint.h"
 #include "../physics/spring_joint.h"
 #include "../ecosystem/mpe_ecosystem.h"
@@ -44,6 +46,45 @@ float tui_cam_yaw = 0.0f, tui_cam_pitch = 0.0f;
 
 static unsigned long tui_tick = 0;
 static float tui_dt = 1.0f / 60.0f;
+
+/* ------------------------------------------------------------------ */
+/* MIG spec store (WP4 headless parity) — per-session named table of
+ * parsed specs, mirroring the GUI terminal's spec store. Zero GTK
+ * coupling: pure mig_spec parser/emitter. */
+/* MIG_SPEC_STORE_MAX */
+#define TUI_MIG_STORE_MAX 64
+typedef struct {
+    char name [MIG_SPEC_NAME_LEN];
+    mig_spec spec;
+    int used;
+} tui_mig_store_entry;
+static tui_mig_store_entry tui_mig_store [TUI_MIG_STORE_MAX];
+
+static int tui_mig_store_find (const char *name) {
+    for (int i = 0; i < TUI_MIG_STORE_MAX; i++) {
+        if (tui_mig_store [i].used && strcmp (tui_mig_store [i].name, name) == 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+static int tui_mig_store_add (const char *name, const mig_spec *spec) {
+    int idx = tui_mig_store_find (name);
+    if (idx >= 0) {
+        tui_mig_store [idx].spec = *spec;
+        return idx;
+    }
+    for (int i = 0; i < TUI_MIG_STORE_MAX; i++) {
+        if (!tui_mig_store [i].used) {
+            tui_mig_store [i].used = 1;
+            snprintf (tui_mig_store [i].name, sizeof (tui_mig_store [i].name), "%s", name);
+            tui_mig_store [i].spec = *spec;
+            return i;
+        }
+    }
+    return -1; /* store full */
+}
 
 void tui_camera_forward (vector3 *out) {
     float cy = cosf (tui_cam_yaw * 0.0174532925f);
@@ -142,6 +183,7 @@ static void cmd_help (physics_world *w, int argc, char **argv) {
     printf ("  module : mod ls|load|unload|attach|detach|use-broadphase|use-solver <name|builtin>\n");
     printf ("  eco    : eco attach|detach|command\n");
     printf ("  ftc    : ftc spawn [x y z [preset]] | telemetry | drive <l> <r> | mec <f> <s> <r> | select <i>\n");
+    printf ("  mig    : mig load <file> | save <name> | show <name> | list\n");
     printf ("  sim    : step [N] | run [N] | tick | halt | resume | status\n");
     printf ("  diag   : diag [tail N|sources|on|off|clear|status]\n");
 }
@@ -729,6 +771,77 @@ static void cmd_ftc (physics_world *w, int argc, char **argv) {
 }
 
 /* ------------------------------------------------------------------ */
+/* MIG spec authoring (WP4 headless parity with the GUI terminal)       */
+/* ------------------------------------------------------------------ */
+static void cmd_mig_load (physics_world *w, int argc, char **argv) {
+    (void)w;
+    if (argc < 3) { printf ("mig load: usage: mig load <file>\n"); return; }
+    mig_spec spec;
+    int rc = mig_spec_parse_file (argv [2], 16, &spec);
+    if (rc != mig_spec_ok) {
+        printf ("mig: load rejected (code %d)\n", rc);
+        return;
+    }
+    if (tui_mig_store_add (spec.name, &spec) < 0) {
+        printf ("mig: spec store full\n");
+        return;
+    }
+    printf ("mig: loaded spec '%s' (%d parts)\n", spec.name, spec.count);
+}
+
+static void cmd_mig_save (physics_world *w, int argc, char **argv) {
+    (void)w;
+    if (argc < 3) { printf ("mig save: usage: mig save <name>\n"); return; }
+    int idx = tui_mig_store_find (argv [2]);
+    if (idx < 0) { printf ("mig: no such spec '%s'\n", argv [2]); return; }
+    char path [512];
+    snprintf (path, sizeof (path), "./%s.spec", argv [2]);
+    char buf [8192];
+    size_t n = mig_spec_emit_normalized (&tui_mig_store [idx].spec, buf, sizeof (buf));
+    FILE *f = fopen (path, "w");
+    if (!f) { printf ("mig: cannot open '%s'\n", path); return; }
+    fwrite (buf, 1, n, f);
+    fclose (f);
+    printf ("mig: saved spec '%s' -> %s (%d parts)\n", argv [2], path,
+            tui_mig_store [idx].spec.count);
+}
+
+static void cmd_mig_show (physics_world *w, int argc, char **argv) {
+    (void)w;
+    if (argc < 3) { printf ("mig show: usage: mig show <name>\n"); return; }
+    int idx = tui_mig_store_find (argv [2]);
+    if (idx < 0) { printf ("mig: no such spec '%s'\n", argv [2]); return; }
+    char buf [8192];
+    size_t n = mig_spec_emit_normalized (&tui_mig_store [idx].spec, buf, sizeof (buf));
+    if (n > 0 && buf [n - 1] != '\n') { buf [n++] = '\n'; buf [n] = '\0'; }
+    fputs (buf, stdout);
+}
+
+static void cmd_mig_list (physics_world *w, int argc, char **argv) {
+    (void)w;(void)argc;(void)argv;
+    int any = 0;
+    for (int i = 0; i < TUI_MIG_STORE_MAX; i++) {
+        if (!tui_mig_store [i].used) { continue; }
+        any = 1;
+        printf ("  %s (%d parts)\n", tui_mig_store [i].name,
+                tui_mig_store [i].spec.count);
+    }
+    if (!any) { printf ("(no specs)\n"); }
+}
+
+static void cmd_mig (physics_world *w, int argc, char **argv) {
+    if (argc < 2) {
+        printf ("mig: usage: mig load <file> | save <name> | show <name> | list\n");
+        return;
+    }
+    if (strcmp(argv[1],"load")==0) { cmd_mig_load(w,argc,argv); return; }
+    if (strcmp(argv[1],"save")==0) { cmd_mig_save(w,argc,argv); return; }
+    if (strcmp(argv[1],"show")==0) { cmd_mig_show(w,argc,argv); return; }
+    if (strcmp(argv[1],"list")==0) { cmd_mig_list(w,argc,argv); return; }
+    printf ("mig: unknown subcommand '%s'\n", argv[1]);
+}
+
+/* ------------------------------------------------------------------ */
 /* Diagnostics                                                        */
 /* ------------------------------------------------------------------ */
 static void cmd_diag (physics_world *w, int argc, char **argv) {
@@ -879,6 +992,7 @@ static shell_cmd g_cmds[] = {
     {"netstat","netstat","joint network topology",cmd_netstat},
     {"eco","eco attach|detach|command","ecosystem bundle commands",cmd_eco},
     {"ftc","ftc spawn|telemetry|drive|mec|aim|select","FTC robotics",cmd_ftc},
+    {"mig","mig load|save|show|list","MIG spec authoring (WP4)",cmd_mig},
     {"step","step [N]","advance N ticks (default 1)",cmd_step},
     {"run","run [N]","advance N ticks (default 600)",cmd_run},
     {"tick","tick","advance one tick",cmd_tick},

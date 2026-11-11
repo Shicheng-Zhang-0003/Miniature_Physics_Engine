@@ -45,14 +45,11 @@
 /* ------------------------------------------------------------------ */
 static const char *tui_type_str (object_type t) {
     switch (t) {
-        case object_sphere:
-        return "SPH";
-        case object_cube:
-        return "CUB";
-        case object_cylinder:
-        return "CYL";
-        default:
-        return "???";
+        case object_sphere:   return "SPH";
+        case object_cube:     return "CUB";
+        case object_cylinder: return "CYL";
+        case object_composite:return "CMP";
+        default:              return "???";
     }
 }
 static const char *tui_state_str (const rigidbody *rb) {
@@ -510,6 +507,23 @@ void tui_render_object_detail (tui_debugger_t *dbg) {
     } tui_format_vector3 (b0, sizeof (b0), rb -> cached_axes [0], "axX=");
     tui_format_vector3 (b1, sizeof (b1), rb -> cached_axes [1], "axY=");
     if (r < h) { mvwprintw (dbg -> main_win, r++, 0, "%.*s %.*s", w - 1, b0, (int) (w - 1), b1); }
+    /* Composite parts (WP4): per-part slice of an object_composite body. */
+    if (rb -> type == object_composite && rb -> composite_part_count > 0) {
+        if (r < h) {
+            mvwprintw (dbg -> main_win, r++, 0, "COMPOSITE parts=%d part_base=%d",
+                       rb -> composite_part_count, rb -> part_base);
+        }
+        static const char *pt_names [] = {"sphere", "cube", "cylinder"};
+        for (int p = 0; p < rb -> composite_part_count && r < h; p++) {
+            long slot = (long) rb -> part_base + (long) p;
+            if (slot < 0 || slot >= (long) world -> composite_part_count) { continue; }
+            composite_part *cp = &world -> composite_parts [slot];
+            const char *pt = (cp -> type >= 0 && cp -> type <= 2) ? pt_names [cp -> type] : "?";
+            mvwprintw (dbg -> main_win, r++, 0,
+                       "  part %d %s idx=%d mass=%.3f active=%d",
+                       p, pt, cp -> part_index, cp -> mass, cp -> active);
+        }
+    }
     (void) h;
     wrefresh (dbg -> main_win);
 } /* Count active joints of both pools. */

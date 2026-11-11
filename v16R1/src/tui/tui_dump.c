@@ -12,6 +12,7 @@
 #include "tui_debugger.h"
 #include "../config/mpe_config.h"
 #include "../config/mpe_constants.h"
+#include "../core/mig_mass.h"
 #include "../physics/broadphase.h"
 #include "../physics/islands.h"
 #include <math.h>
@@ -182,6 +183,41 @@ int tui_dump_snapshot (FILE *out, physics_world *world, unsigned long tick, floa
                  rb -> cached_axes [1].y, rb -> cached_axes [1].z, rb -> cached_axes [2].x, rb -> cached_axes [2].y,
                  rb -> cached_axes [2].z);
     }
+    /* ---- composites: per-part slices of object_composite bodies ---- */
+    int composites = 0;
+    for (int i = 0; i < world -> body_count; i++) {
+        rigidbody *rb = &world -> bodies [i];
+        if (rb -> type != object_composite || rb -> composite_part_count <= 0) { continue; }
+        composites++;
+        fprintf (out, "[composite %d] id=%u parts=%d part_base=%d\n", i, rb -> object_id,
+                 rb -> composite_part_count, rb -> part_base);
+        for (int p = 0; p < rb -> composite_part_count; p++) {
+            long slot = (long) rb -> part_base + (long) p;
+            if (slot < 0 || slot >= (long) world -> composite_part_count) { continue; }
+            composite_part *cp = &world -> composite_parts [slot];
+            static const char *pt_names [] = {"sphere", "cube", "cylinder"};
+            const char *pt = (cp -> type >= 0 && cp -> type <= 2) ? pt_names [cp -> type] : "?";
+            fprintf (out, "  part %d type=%s index=%d active=%d mass=%.4f\n", p, pt,
+                     cp -> part_index, cp -> active, cp -> mass);
+            fprintf (out, "    local_pos=(%+.4f,%+.4f,%+.4f) local_quat=(%+.4f,%+.4f,%+.4f,%+.4f)\n",
+                     cp -> local_position.x, cp -> local_position.y, cp -> local_position.z,
+                     cp -> local_orientation.w, cp -> local_orientation.x, cp -> local_orientation.y,
+                     cp -> local_orientation.z);
+            if (cp -> type == object_sphere) {
+                fprintf (out, "    radius=%.4f\n", cp -> radius);
+            } else if (cp -> type == object_cylinder) {
+                fprintf (out, "    radius=%.4f half_len=%.4f (axle X)\n",
+                         cp -> radius, cp -> cylinder_half_length);
+            } else {
+                fprintf (out, "    halfExt=(%.4f,%.4f,%.4f)\n",
+                         cp -> half_extensions.x, cp -> half_extensions.y,
+                         cp -> half_extensions.z);
+            }
+            fprintf (out, "    fr=(%.3f,%.3f) rest=%.3f\n",
+                     cp -> friction_static, cp -> friction_kinetic, cp -> restitution);
+        }
+    }
+    fprintf (out, "[composites] active=%d\n", composites);
     /* ---- springs ---- */
     int springs = 0;
     for (int i = 0; i < mpe_max_joints; i++) {
