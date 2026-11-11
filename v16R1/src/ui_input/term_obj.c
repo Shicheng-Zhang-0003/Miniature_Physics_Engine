@@ -13,6 +13,7 @@
 #include <math.h>
 #include <time.h>
 #include "core/mig_spec.h"
+#include "microvim.h"
 const char *term_object_type_name (rigidbody *rigid_body) {
     if (!rigid_body) { return "?"; }
     if (rigid_body -> type == object_sphere) { return "sph"; }
@@ -279,6 +280,45 @@ static int mig_spec_store_add (const char *name, const mig_spec *spec) {
     return -1; /* store full */
 }
 
+/* ---- MIG WP4 4.3: mig edit — microvim editing of a spec --------------
+ * mig edit <name> writes the stored spec to ./<name>.spec, opens it in
+ * microvim, and on editor exit re-parses the file and stages it back into
+ * the spec store. The editor's own save writes the file (:w / :wq / :x);
+ * this layer only re-parses after microvim has closed. Write-on-success:
+ * a rejected re-parse leaves the store entry unchanged. */
+static bool mig_edit_in_progress = false;
+static char mig_edit_spec_name [MIG_SPEC_NAME_LEN];
+
+/* Called from debug_terminal.c when microvim exits. If a mig edit session
+ * was in progress, re-parse the saved file and stage it in the spec store.
+ * Safe to call when no edit is active (no-op). */
+void mig_edit_on_exit (void) {
+    if (!mig_edit_in_progress) { return; }
+    mig_edit_in_progress = false;
+    char path [512];
+    char n [16];
+    snprintf (path, sizeof (path), "./%s.spec", mig_edit_spec_name);
+    mig_spec spec;
+    int rc = mig_spec_parse_file (path, 16, &spec);
+    if (rc != mig_spec_ok) {
+        term_err ("mpe: mig edit: saved spec rejected (code ");
+        snprintf (n, sizeof (n), "%d", rc);
+        term_out (n);
+        term_err (") — edits discarded, store unchanged\n");
+        return;
+    }
+    if (mig_spec_store_add (mig_edit_spec_name, &spec) < 0) {
+        term_err ("mpe: mig edit: spec store full\n");
+        return;
+    }
+    term_ok ("mpe: mig edit: spec ");
+    term_out (mig_edit_spec_name);
+    term_out (" re-parsed and staged (");
+    snprintf (n, sizeof (n), "%d", spec.count);
+    term_out (n);
+    term_out (" parts)\n");
+}
+
 void cmd_mig (int argc, char **argv) {
     if (argc < 2) {
         term_err ("mpe: mig: usage: mig load <file> | save <name> | show <name> | list\n");
@@ -345,6 +385,33 @@ void cmd_mig (int argc, char **argv) {
             term_out (n);
         }
         if (!any) { term_out ("(no specs)\n"); }
+    } else if (term_str_eq (argv [1], "edit")) {
+        if (argc < 3) { term_err ("mpe: mig edit: missing <name>\n"); return; }
+        int idx = mig_spec_store_find (argv [2]);
+        if (idx < 0) { term_err ("mpe: mig edit: no such spec\n"); return; }
+        /* Write the spec to a .spec file for the editor to open */
+        char path [512];
+        snprintf (path, sizeof (path), "./%s.spec", argv [2]);
+        char buf [8192];
+        size_t n = mig_spec_emit_normalized (&mig_spec_store [idx].spec, buf, sizeof (buf));
+        FILE *f = fopen (path, "w");
+        if (!f) {
+            term_err ("mpe: mig edit: cannot write ");
+            term_err (path);
+            term_err ("\n");
+            return;
+        }
+        fwrite (buf, 1, n, f);
+        fclose (f);
+        mig_edit_in_progress = true;
+        snprintf (mig_edit_spec_name, sizeof (mig_edit_spec_name), "%s", argv [2]);
+        microvim_open (path);
+        if (terminal_entry) { gtk_widget_set_visible (terminal_entry, FALSE); }
+        if (terminal_prompt_label) { gtk_widget_set_visible (terminal_prompt_label, FALSE); }
+        term_ok ("mpe: mig edit: editing ");
+        term_out (argv [2]);
+        term_out (" — :wq to save and stage, :q! to abandon\n");
+        if (terminal_output_buffer) { microvim_render (terminal_output_buffer); }
     } else {
         term_err ("mpe: mig: unknown subcommand ");
         term_err (argv [1]);

@@ -509,6 +509,10 @@ static gboolean on_terminal_window_key_pressed (GtkEventControllerKey *controlle
             if (terminal_prompt_label) { gtk_widget_set_visible (terminal_prompt_label, TRUE); }
             term_ok ("MicroVim exited.\n");
             if (terminal_entry) { gtk_widget_grab_focus (terminal_entry); }
+            /* WP4 4.3: finalize a mig edit session — re-parse the saved
+             * .spec and stage it back into the spec store (no-op if no
+             * mig edit was in progress). */
+            mig_edit_on_exit ();
         }
         /* MPE_TASK_V15R2_MICROVIM_EXIT_FIX_END */
         return TRUE;

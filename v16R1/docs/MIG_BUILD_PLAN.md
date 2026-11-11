@@ -1023,10 +1023,16 @@ the editor is a window onto it; no editor-only truth exists.
   valid round-trip, all reject codes, required-field enforcement, part
   cap). Docs-only diagram → implemented reader; no engine behavior
   changed, gate bump only.
-- [ ] **4.3 microvim is the editor.** The in-app editing path is literally
-  `ui_input/microvim.c` (it already exists, 1390 lines) — `mig edit`
-  opens the spec in the microvim buffer; saving re-parses and stages the
-  body. "Tiny CAD" step one costs almost nothing and is native.
+- [x] **4.3 microvim editing integration (LANDED 2026-11-10):** `mig edit
+  <name>` writes the stored spec to `./<name>.spec`, opens it in the
+  existing microvim buffer (`ui_input/microvim.c`), and on editor exit
+  (`:wq`/`:x`/`:q!`/double-Esc) `mig_edit_on_exit()` re-parses the file
+  through `mig_spec_parse_file` and stages it back into the per-session
+  spec store — write-on-success, a rejected save leaves the entry
+  unchanged. Wired into the terminal's microvim-exit detection branch in
+  debug_terminal.c; `vi` stays blocked while an edit is active. GUI-only
+  (microvim is suite-unlinked); no gate bump; engine build 0 under
+  -Werror.
 - [ ] **4.4 GTK panel** (`ui_input/mig_editor.c`, new): part-list panel +
   per-part fields (type, dims, pose, material, mass-or-density, colour)
   in the `config_menu`/`editor_dialog` construction style; two-axis

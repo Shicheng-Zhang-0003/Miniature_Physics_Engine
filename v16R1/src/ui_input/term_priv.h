@@ -177,6 +177,7 @@ void cmd_dmesg (int argc, char **argv);
 void cmd_vi (int argc, char **argv);
 void cmd_mod (int argc, char **argv);
 void cmd_mig (int argc, char **argv);
+void mig_edit_on_exit (void);
 void cmd_diag (int argc, char **argv);
 void cmd_modinfo (int argc, char **argv);
 void cmd_eco (int argc, char **argv);
