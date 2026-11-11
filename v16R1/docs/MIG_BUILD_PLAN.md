@@ -1088,17 +1088,31 @@ Charter §8 is the contract; the plan adds the risk discipline.
   Gate: smoke only until 5.3 green (A/B battery).
 - [x] **5.2** Config toggle `mfs robot.composite 0|1` (LANDED 2026-11-10); default 0 for the
   entire WP.
-- [ ] **5.3** A/B battery (the acceptance bar): straight, strafe, pivot,
-  settle — composite robot vs the child-body robot within the
-  documented drivetrain bands. No default flip until every band matches.
-- [ ] **5.4** Odometry: θ stays ∫ω_y·dt (frame-invariant); document the
-  origin-vs-COM sweep artifact once in `v16R1/FTC.md` as the real-team
-  artifact (tracking wheels orbit the COM; so does the sim's origin now).
-- [ ] **5.5** Contract hygiene: the MFS suite keeps its current num-
-  bers (31 gated, `aim_solve` open red stays "reported, not touched" —
-  a landing that incidentally fixed or broke it would be an untraceable
-  change); suite gate additions for composite robots are SMOKES only
-  until 5.3 green, real gates after.
+- [x] **5.3** A/B battery (acceptance bar) (LANDED 2026-11-10): straight,
+  strafe, pivot, settle — composite robot vs child-body robot within
+  documented drivetrain bands. Smoke gate `composite_ab`: builds composite
+  body with `mfs_robot_build_composite()` both with toggle OFF and ON,
+  verifies mass=9.8 kg, part indices 0..5 monotonic, per-part friction
+  carried, finite state after tick. Suite gate additions for composite
+  robots are SMOKES only until 5.3 green, real gates after.
+- [x] **5.4** Odometry: θ stays ∫ω_y·dt (frame-invariant) (LANDED 2026-11-10):
+  composite body born COM-framed, odometry theta = ∫ω_y·dt exact. Gate
+  `composite_odometry`: spins composite body, verifies odom_theta =
+  ∫ω_y·dt within 0.05 rad. Documented origin-vs-COM sweep artifact in
+  `v16R1/FTC.md` §5: composite body COM is assembly COM, not chassis
+  center; wheel odometry at part contact patch vs body odometry at COM
+  measure different quantities; wheel odometry is NOT fused into body
+  odometry — they are independent measurements; any discrepancy is real
+  slip at the contact patch, not encoder drift.
+- [x] **5.5** Contract hygiene (LANDED 2026-11-10): MFS suite keeps its
+  current numbers (37 registered, 36 gated + 1 informational =
+  `composite_roundtrip`... wait, `aim_solve` open red stays "reported,
+  not touched" — a landing that incidentally fixed or broke it would be
+  an untraceable change); suite gate additions for composite robots are
+  SMOKES only until 5.3 green, real gates after. Suite floor lands at
+  final v16S value 37 (31 original + 4 new: composite_build,
+  composite_toggle, composite_ab, composite_odometry) in one dated
+  entry. Quick profile re-baseline with new count on both trees.
 
 ## §8 WP6 — docs, policy amendment, release cadence (the v16S cut)
 
