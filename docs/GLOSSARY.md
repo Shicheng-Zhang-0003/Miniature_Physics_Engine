@@ -10,6 +10,11 @@
 |---|---|
 | **MPE** | Miniature Physics Engine — the hand-written C rigid-body engine + renderer in this repo. |
 | **world** | `physics_world*` — one self-owned simulation: bodies, manifolds, config binding. The kernel holds **zero** global game-sim state. |
+| **composite** | `object_composite` — one rigid body carrying a per-world part pool slice. Parts share one COM, one velocity, one angular velocity, one rigid-body state. Not a welded chain (joints remain the connector system). Part indices are per-body monotonic and never reused. |
+| **part** | One primitive slice of a composite body. Part poses are assembly-frame; the body is born COM-framed (re-anchor via `mig_rebase_parts`). Part poses stored world-frame in the scene file. |
+| **rebase** | `mig_rebase_parts()` — shifts every part position by `-delta` (typically `-totals.com`) to turn an assembly-frame definition into a COM-framed one. Pure translation; no re-normalization, no reordering — part indices stay exactly as defined. |
+| **totals** | `mig_totals` — composed mass / COM / inertia about COM, computed by `mig_compose` in double precision, float-cast at the struct boundary. |
+| **ghost view** | Temporary rigidbody view copied from the parent body with per-part fields overridden (type, world pose, dimensions, mass, friction, restitution). Used by narrowphase so composite parts collide via existing primitive paths; thread-local storage avoids shared temporary writes. |
 | **canonical dt** | The fixed timestep all guarantees are stated for: `1/60 s`. |
 | **island** | A connected component of bodies joined by contacts/constraints; solver sweeps parallelize **across** islands, never within one (order preserved). |
 | **pair handler** | Registered shape-vs-shape collision function (e.g. `capsule-sphere`); may run concurrently under `MPE_THREADS > 1`. |

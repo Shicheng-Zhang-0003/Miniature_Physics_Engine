@@ -33,6 +33,7 @@ referenced), and the MFS sub-document section.
 | Document | Contents |
 |---|---|
 | [`v16R1/PHYSICS.md`](../v16R1/PHYSICS.md) | Every equation as implemented: integrator, solver, collision, joints |
+| [`v16R1/docs/MIG_SPEC.md`](../v16R1/docs/MIG_SPEC.md) | MIG object spec grammar v1 (FROZEN): file rules, keyword state machine, per-type dims subsets, assembly→COM round-trip, canonical normalized output, 26 named `mig_spec_*` diag codes |
 | [`v16R1/docs/NUMERICAL_GUARANTEES.md`](../v16R1/docs/NUMERICAL_GUARANTEES.md) | Precise numerical budgets — what holds, where, and what does not |
 | [`v16R1/MULTICORE.md`](../v16R1/MULTICORE.md) | Threading model, island parallelism, determinism guarantees |
 | [`v16R1/docs/DIAGNOSTICS.md`](../v16R1/docs/DIAGNOSTICS.md) | Self-reporting diagnostics & how to read them; S2 bridge transcript |
@@ -79,7 +80,7 @@ referenced), and the MFS sub-document section.
 | [`ARCHITECTURE.md`](../v16R1/src/ecosystem/mfs/docs/ARCHITECTURE.md) | MFS internal structure and data flow |
 | [`FTC_SPECS.md`](../v16R1/src/ecosystem/mfs/docs/FTC_SPECS.md) | Control scheme and regulation details for the league |
 | [`MODELS.md`](../v16R1/src/ecosystem/mfs/docs/MODELS.md) | Motor / drivetrain / physics models behind `ftc/` |
-| [`TESTING.md`](../v16R1/src/ecosystem/mfs/docs/TESTING.md) | MFS suite (30 gated cases) and how to run it (`build_tests.sh`) |
+| [`TESTING.md`](../v16R1/src/ecosystem/mfs/docs/TESTING.md) | MFS suite (37 gated cases) and how to run it (`build_tests.sh`) |
 | [`VALIDATION.md`](../v16R1/src/ecosystem/mfs/docs/VALIDATION.md) | MFS-level validation records |
 | [`KNOWN_FAILURES.md`](../v16R1/src/ecosystem/mfs/docs/KNOWN_FAILURES.md) | Measured failures the MFS layer documents and works around |
 | [`SYNC_CONTRACT.md`](../v16R1/src/ecosystem/mfs/docs/SYNC_CONTRACT.md) | Twin-tree sync discipline (461-MFS / 472-MGB), what `sync_mfs_check.sh` governs |

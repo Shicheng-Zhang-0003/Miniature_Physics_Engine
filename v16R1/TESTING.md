@@ -8,9 +8,9 @@
 ## 1. Profiles
 
 ```bash
-python3 tools/test_runner.py --profile quick   # runner contracts + canonical C suite (46 cases)
+python3 tools/test_runner.py --profile quick   # runner contracts + canonical C suite (61 cases)
 python3 tools/test_runner.py --profile physics # quick + isolated legacy (30) + paranoia (15)
-python3 tools/test_runner.py --profile full    # physics + ASan/UBSan + MFS (30 gated) + TUI snapshots (9) + engine build
+python3 tools/test_runner.py --profile full    # physics + ASan/UBSan + MFS (37 gated) + TUI snapshots (9) + engine build
 python3 tools/test_runner.py --list            # discover registered test cases
 ```
 
@@ -21,7 +21,7 @@ to change the limit. The runner uses only the Python standard library.
 **Strict contract:**
 - Suite cases that print `[SKIP]` fail the run unless `--allow-skip`.
 - `[XFAIL]` markers are surfaced in summary counts but never block.
-- Registry floors: `MIN_SUITE_ENTRIES=46`, `MIN_LEGACY_ENTRIES=30`,
+- Registry floors: `MIN_SUITE_ENTRIES=61`, `MIN_LEGACY_ENTRIES=30`,
   `MIN_PARANOIA_ENTRIES=15`.
 - Summary contract: `Total == registry size` and `Blocking failures == 0`.
 
@@ -32,7 +32,7 @@ floor is now pinned at the exact registry size (46) with a contract test.
 
 ---
 
-## 2. Canonical C Suite (46 cases)
+## 2. Canonical C Suite (61 cases)
 
 One binary `test_mpe_suite` (`make build_suite`), exact-name dispatch, one
 registry, no substring fan-out. Every test runs under a saved/restored
@@ -159,7 +159,7 @@ then `python3 temp/ext_oracle_check.py`.
 
 ## 7. MFS Robotics Suite (`ecosystem/mfs/`)
 
-`build_tests.sh` — unified `mfs_suite --all` (30 gated) plus build gates
+`build_tests.sh` — unified `mfs_suite --all` (37 gated) plus build gates
 and ungated diagnostics; CWD-independent. **Status 2026-10-14: 29/30 green**
 — only `tank` is red (pre-existing baseline, moved with cause by the
 observer Q-filter, untouched by the handling work). `odometry_yaw` went

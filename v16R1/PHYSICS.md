@@ -403,3 +403,98 @@ Measured budgets: 10-cube default gravity 0.1134@32 → 0.0145@64 → 0.0000@96/
 friction breakaway 0.999–1.005 μs·N; pendulum/spring periods ≤1.5%/0.8%;
 free-fall/projectile ≤5e-5; inertias ≤2e-5 abs; rolling 4–14 m; angmom ≤0.5%
 (converged 0.0028%).
+
+---
+
+## 9. Composite scene persistence (v201 `MIG1` record)
+
+### 9.1 Format contract (v200 → v201)
+
+The writer emits one dedicated section after revolutes carrying every composite
+body's ACTIVE part slice expanded to the WORLD frame (owner `object_id`, part
+count, then per part: type, radius, cylinder half length, half extents, world
+position, world orientation, mass, and per-part friction/restitution). The
+CRC footer covers the section like every other byte; the saver's strict
+atomic-write path is untouched.
+
+The loader keeps v200 byte-compatible (same sectioned reader, no composite
+section, type 4 still vetoed there) and accepts v201: type-4 records stage
+their ENVELOPE only (dynamic state + identity), the composites section matches
+by owner id, and at commit every composite is REBUILT through
+`physics_world_add_composite` -- mass, COM, inertia and the covering bound are
+recomputed as engine truth, never trusted from the file. The rebuilt body then
+receives the envelope's velocity, angular velocity, colour, body-level
+materials, nice value, generation, static/kinematic/sleep state, and its SAVED
+id (next_object_id re-bumped via `scene_note_loaded_id`), so joints rewire
+unchanged. Per-part friction/restitution are carried from the file onto the
+fresh pool slice (the add path stamps body_defaults).
+
+Corrupt section entries (owner not a staged composite, duplicate entry,
+over-cap slice, non-finite/degenerate dims or orientation) veto the file, per
+the loader's hostile-file philosophy; a composite with no usable part slice or
+a rejected compose is DROPPED LOUDLY (counted stderr), never a silent loss.
+v200 files reject type 4 exactly as before.
+
+Gate: `composite_roundtrip` (58th blocking entry) -- weld sphere+cube via
+`physics_world_add_composite`, author state, save, wreck the scene, reload,
+assert body count/type/part count, recomposed mass (1+2=3), COM within 1e-3,
+velocity/colour/materials, per-part materials from the FILE (not
+body_defaults), spring rewired to the preserved id; then a second save/load
+cycle proves the rebuilt body re-persists. Suite floor 57 → 58.
+
+### 9.2 The spec grammar (MIG_SPEC.md v1, frozen)
+
+The authoring spec text is the single source of truth for composite objects.
+It is frozen at v1: post-freeze changes are dated v2 amendments, never silent
+extensions, because a v1 file must parse identically forever. The grammar is
+line-oriented, `#`-commented, whitespace-insensitive (structure is the
+keyword state machine, not indentation), C-locale decimal numbers.
+
+`mig <name>` must come first and exactly once; `frame` is optional and v1
+accepts EXACTLY ONE value, `'assembly'` -- the reader never guesses a
+frame; part indices must be exactly `0..n-1` monotonic; 1 to
+`composite.max_parts` parts, and an over-cap file is REJECTED, not
+truncated -- the P2 clamp is a pool property, not a file property.
+
+Per-part fields are pinned to the `mig_part` contract:
+
+- **dims**: per-type subsets -- sphere `radius r`; cube `hx hy hz`;
+  cylinder `radius r half hl` (axle local-X the MPE_FTC_090 convention).
+  A cross-type key is a named reject, never ignored.
+- **pose**: w-first `(w,x,y,z)`, unit within 1e-4 -- asserted, NEVER
+  renormalised (the `mig_compose_bad_quat` rule).
+- **material**: optional `mu_s F mu_k F rest F`; defaults to `body_defaults`
+  per part type.
+- **mass XOR density**: exactly one per part; density uses the SAME exact
+  volume formulas as `mig_part_mass` -- no second volume math anywhere.
+- **colour**: optional `r g b` in [0,1], default `(1,1,1)` -- the WP4
+  arrival of per-part authored colour (plan 2.7: parts carried the parent's
+  colour until WP4).
+
+26 named `mig_spec_*` diag codes (source `mig_spec`, mpe_diag discipline:
+source, stable code, call site, message with the offending line number and
+token). Write-on-success: a rejected file enters NOTHING into the spec store.
+
+### 9.3 Frame rule and round-trip contract
+
+The FILE stores assembly-frame poses. When the spec becomes a body,
+`mig_make_bridge` composes and re-anchors a COPY to the COM frame; the
+definition frame in the file is untouched by that act. SAVING a body back
+to spec re-emits assembly-frame poses (the un-rebase: part position +
+body COM) and the composed totals are NOT written -- mass is re-derived
+from the file's `mass`/`density` lines on every load (the WP3
+loader-kindness rule carried into the spec).
+
+Canonical normalized output order: `mig`, `frame` (always emitted), then
+per part in index order: `part`, `dims`, `pose`, `material` (only if
+authored), `mass`|`density`, `colour` (only if authored); single spaces;
+numbers in shortest round-trip form. Read + write must reproduce
+byte-identical normalized output -- gate 4.2 pins it.
+
+Frozen OUT of v1 (decisions, not omissions): joints between objects;
+per-part `no_collide` (stays body-level); velocity/sleep/static/kinematic
+authoring (WP3 scene persistence owns dynamic state); convex hulls and
+mesh import (next train); principal-axis display (plan 4.4 named TODO);
+units other than metres/kilograms/seconds; multiple objects per file (one
+file, one object -- share by copying files, not by growing a container
+format).

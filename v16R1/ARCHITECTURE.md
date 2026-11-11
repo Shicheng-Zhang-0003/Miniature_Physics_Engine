@@ -56,6 +56,19 @@ The world owns, per instance:
   buffer (512 KB), 16K-body index arrays, and a 4K-entry initial contact cache
   (grows to 64K). Most pages fault lazily, but the address footprint is low
   single-digit MB per world, not kilobytes.
+- **Per-world part pool** (`composite_parts[]` / `composite_part_count` /
+  `composite_part_capacity`) — contiguous per-world slice storage for
+  `object_composite` parts. Each `rigidbody` indexes its parts via
+  `part_base` / `composite_part_count`; parts are never per-body allocated,
+  so pool relocation never invalidates body references. Part indices are
+  per-body monotonic and never reused (delete deactivates, count stays
+  honest); contact-cache keys embed part ids from day one (the
+  `TASK_05` both-side-match repair). Part order is definition order and is
+  bitwise-insensitive on the floor-manifold solver path, but the part-PAIR
+  path is order-sensitive (composite narrowphase iterates serially after the
+  primitive parallel barrier; the boundary safety net walks the pool array
+  directly). The engine call site passes the STEPPED world, not
+  `physics_world_get_primary`, so twin test worlds stay independent.
 - **Contact cache** — warm-start impulse cache (`cached_contact[]`), O(1)
   hash probes, per-world.
 - **Solver scratch** — pair buffer, manifolds, island union-find arrays,
@@ -91,12 +104,28 @@ inertia tensors (local + system); force/torque accumulators; dimensions
 (radius, half_extensions, cylinder_half_length); sleep state; kinematic flag;
 static flag; friction_static / friction_kinetic; anisotropic friction
 fields; object_id / object_generation / body_index; type (sphere / cube /
-cylinder / custom); no_collide flag.
+cylinder / composite / custom); no_collide flag.
 
 Effective-mass helpers (`rigidbody_effective_inv_mass`,
 `rigidbody_effective_inv_inertia`) treat sleeping / static / kinematic bodies
 as infinite mass **without mutating stored fields** — observable state is
 never corrupted mid-tick and the path is thread-safe.
+
+### 3.3 Per-world part pool (composite parts only)
+
+The per-world part pool (`composite_parts[]` / `composite_part_count` /
+`composite_part_capacity`) is append-only, write-on-success. Each
+`rigidbody` of type `object_composite` indexes its parts via `part_base`
+/ `composite_part_count`. Parts are never per-body allocated, so pool
+relocation never invalidates body references. Part indices are per-body
+monotonic and never reused (delete deactivates, count stays honest);
+contact-cache keys embed part ids from day one (`TASK_05` precedent). Part
+order is definition order and is bitwise-insensitive on the floor-manifold
+solver path, but the part-PAIR path is order-sensitive (composite
+narrowphase iterates serially after the primitive parallel barrier; the
+boundary safety net walks the pool array directly). The engine call site
+passes the STEPPED world, not `physics_world_get_primary` — twin test
+worlds stay independent.
 
 ### 3.3 Step Pipeline (`physics_world_step`)
 
