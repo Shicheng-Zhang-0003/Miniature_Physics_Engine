@@ -248,6 +248,17 @@
 > WP2 physics checks pass). Suite `--all` 61/0 (floor 61), quick green,
 > make everything exit 0. WP4 COMPLETE — WP5 (MFS adoption behind the
 > default-OFF toggle with the A/B acceptance bar) is next.
+> WP6 6.1+6.2 LANDED 2026-11-11 (`ce87e60`, `77d1ec5`): doc sweep
+> (PHYSICS §9 composite persistence, ARCHITECTURE part pool, glossary/
+> index/testing counts) + RELEASE_POLICY v16S charter entry + the
+> duplicate `mpe_engine.h` version macros removed in favor of
+> `core/mpe_version.h`. WP2.5 COMPLETE 2026-11-11: all six sub-steps
+> landed one commit each — 2.5.0 flag `dc925b4`, 2.5.1 point collection
+> `09929fe`, 2.5.2 2D proof `6b987e4`, 2.5.3 hull mass props `3ebb428`,
+> 2.5.4 SAT reference pairs `81ec1d0`, 2.5.5 cut note (this line +
+> the §9 ledger entry). Suite floor 65, suite 65/65, quick 79/79 at the
+> landing; everything ships behind `composite.hull 0` default. WP2.5 is
+> DONE — the next parts are up to the user.
 
 ---
 
@@ -1148,23 +1159,29 @@ ledger line saying so. Work files live in `core/` beside the MIG mass
 module; nothing here duplicates an existing primitive path until the
 reference gates force it.
 
-- [ ] **2.5.0 Flag.** `composite.hull 0|1` default 0, config-schema key;
-  NOT the load path — every hull increment ships behind this flag.
-- [ ] **2.5.1 Point collection (no physics).** Import or build hull
-  point sets as data; unit: exact tetra/box point sets, no solver
-  involvement, suite-gated garbage rejection (non-finite points).
-- [ ] **2.5.2 The 2D proof.** Divergence-theorem area/moment on polygon
-  cross-sections vs closed forms (box slice exact) — the mathematical
-  foundation of 2.5.3, proven on the lowest dimension first.
-- [ ] **2.5.3 Hull inertia, standalone.** Divergence-theorem mass
-  properties for closed triangle meshes as a pure math module (mig_mass
-  discipline: double accumulation, write-on-success, named errors);
-  gates: box hull reproduces the box closed form, tetra exact.
-- [ ] **2.5.4 SAT reference pairs.** hull-vs-primitive narrowphase
-  behind `composite.hull 1`, reference-pair gates only (box-hull vs box,
-  sphere-hull vs sphere); no scene-format default flips.
-- [ ] **2.5.5 Cut note.** Whichever of 2.5.1–2.5.4 are green at the v16S
-  cut ride to release; a ledger line names the shipped increment set.
+- [x] **2.5.0 Flag (LANDED 2026-11-11, `dc925b4`).** `composite.hull 0|1`
+  default 0, config-schema key; NOT the load path — every hull increment
+  ships behind this flag.
+- [x] **2.5.1 Point collection (no physics) (LANDED 2026-11-11, `09929fe`).**
+  Import or build hull point sets as data; unit: exact tetra/box point
+  sets, no solver involvement, suite-gated garbage rejection (non-finite
+  points).
+- [x] **2.5.2 The 2D proof (LANDED 2026-11-11, `6b987e4`).**
+  Divergence-theorem area/moment on polygon cross-sections vs closed
+  forms (box slice exact) — the mathematical foundation of 2.5.3, proven
+  on the lowest dimension first.
+- [x] **2.5.3 Hull inertia, standalone (LANDED 2026-11-11, `3ebb428`).**
+  Divergence-theorem mass properties for closed triangle meshes as a
+  pure math module (mig_mass discipline: double accumulation,
+  write-on-success, named errors); gates: box hull reproduces the box
+  closed form, tetra exact.
+- [x] **2.5.4 SAT reference pairs (LANDED 2026-11-11, `81ec1d0`).**
+  hull-vs-primitive narrowphase behind `composite.hull 1`,
+  reference-pair gates only (box-hull vs box, sphere-hull vs sphere); no
+  scene-format default flips.
+- [x] **2.5.5 Cut note (LANDED 2026-11-11, see the §9 ledger line).**
+  Whichever of 2.5.1–2.5.4 are green at the v16S cut ride to release; a
+  ledger line names the shipped increment set.
 
 ## §9 Risk register + the standing ledger
 
@@ -1471,6 +1488,25 @@ Ledger (new entries get a line, never an edit of a past line):
   `-rdynamic` (50/52, pre-existing, unchanged, outside 2.6). No
   pre-existing engine defect surfaced; no numbers moved outside the new
   gate's own assertions.
+- 2026-11-11 — WP2.5 COMPLETE (cut note, 2.5.5): the P3-ruled convex-hull
+  increment set is fully green and rides to the v16S cut. Shipped set,
+  one commit each (green-or-rollback held): 2.5.0 `composite.hull` flag
+  default 0 (`dc925b4`); 2.5.1 hull point collection, exact box/tetra
+  point sets + garbage rejection (`09929fe`); 2.5.2 the 2D proof,
+  divergence-theorem polygon moments vs closed forms (`6b987e4`); 2.5.3
+  hull mass properties via face-tetra decomposition, box + regular-tetra
+  exact (`3ebb428`, pre-gate probe caught the missing density factor on
+  inertia before the suite ever saw it); 2.5.4 SAT reference pairs,
+  boolean + MTD only for hull-vs-box and hull-vs-sphere (`81ec1d0`).
+  All five ship behind `composite.hull 0` default; the SAT functions
+  check the flag caller-side, never inside; scene files carry no hull
+  state. NOT shipped at this cut, by design: contact manifold
+  generation from hull pairs (future work — the SAT layer is
+  boolean + MTD only), any scene-format default flip, and hull
+  consumption by the engine's own primitive paths. Suite floor moved
+  61 → 65 (four gates registered: mig_hull_point_collection,
+  mig_hull_2d_proof, mig_hull_mass_props, mig_hull_sat_pairs); quick
+  checks 75 → 79; suite 65/65, quick 79/79 at the landing.
 
 ## §10 Definition of done for v16S (the cut checklist)
 
