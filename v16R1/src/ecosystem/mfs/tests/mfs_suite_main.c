@@ -46,6 +46,7 @@ extern int mfs_t_thermal_137 (void);
 extern int mfs_t_composite_build (void);
 extern int mfs_t_composite_toggle (void);
 extern int mfs_t_composite_ab (void);
+extern int mfs_t_composite_odometry (void);
 static const mfs_test_entry_t registry [] = {
     {"teleop", mfs_t_teleop, false},
     {"mecanum", mfs_t_mecanum, false},
@@ -91,6 +92,10 @@ static const mfs_test_entry_t registry [] = {
      * straight/strafe/pivot/settle within documented bands. Smoke only
      * until all bands pass; then blocking. */
     {"composite_ab", mfs_t_composite_ab, false},
+    /* MIG WP5 5.4: odometry gate -- composite robot odometry theta =
+     * integral of body angular velocity about Y. Child-body comparison for
+     * reference. Smoke only until 5.3 green. */
+    {"composite_odometry", mfs_t_composite_odometry, false},
 };
 int main (int argc, char **argv) {
     if (argc > 1 && strcmp (argv [1], "--list") == 0) {

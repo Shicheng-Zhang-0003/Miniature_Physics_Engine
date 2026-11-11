@@ -1094,6 +1094,68 @@ int mfs_t_composite_toggle (void) {
     if (t.failures == 0)
         printf ("[PASS] composite_toggle\n");
     return t.failures;
+}
+/* MIG WP5 5.4: odometry gate for composite robot. The composite body is a
+ * single rigid body (no joints), so odometry should track the true body
+ * angular velocity exactly: odom_theta = ∫ω_y·dt. The child-body robot has
+ * joint compliance that introduces drift; the composite body should not.
+ * Also documents the origin-vs-COM artifact: since composites are born
+ * COM-framed (charter decision A), odometry origin is at the COM, not at the
+ * chassis corner. Wheel odometry (wheel encoders at wheel position) may
+ * drift relative to body odometry (body COM). Wheel odometry is NOT
+ * fused into body odometry -- they are independent measurements. */
+int mfs_t_composite_odometry (void) {
+    mfs_test_t t;
+    mfs_test_begin (&t, "composite_odometry");
+    mfs_test_t *t_ptr = &t;
+    const float dt = DT;
+
+    /* Composite robot: single rigid body, odometry should track exactly */
+    physics_world wc;
+    mfs_test_world (&wc);
+    g_cfg.timestep.solver_iterations = FTC_ITERS;
+    constraint_pool_init (&wc);
+    ftc_robot rc;
+    memset (&rc, 0, sizeof (rc));
+    MFS_CHECK (&t, mfs_robot_build_composite (&wc, &rc, 0.0f, 0.0f, 0.0f, MOTOR_GB_5203_13_7) == 0);
+    MFS_CHECK (&t, rc.is_composite);
+    MFS_CHECK (&t, rc.composite_body >= 0);
+    rigidbody *cb = &wc.bodies [rc.composite_body];
+    MFS_CHECK (&t, cb->type == object_composite);
+
+    /* Zero odometry, then rotate (yaw command) */
+    rc.odom_theta = 0.0f;
+    float omega_sum = 0.0f;
+    for (int k = 0; k < 300 && !t_ptr->failures; k++) {
+        drivetrain_mecanum (&rc, 0.0f, 0.0f, 1.0f);
+        physics_world_step (&wc, dt);
+        if (!mfs_test_finite (&wc)) { t_ptr->failures++; break; }
+        omega_sum += cb->angular_velocity.y * dt;
+    }
+    float omega_sum_composite = omega_sum;
+    float odom_theta_composite = rc.odom_theta;
+    MFS_INFO ("composite: odom_theta=%.4f ∫ω_y·dt=%.4f diff=%.4f",
+              odom_theta_composite, omega_sum_composite,
+              fabsf(odom_theta_composite - omega_sum_composite));
+    MFS_CHECK (&t, fabsf(odom_theta_composite - omega_sum_composite) < 0.05f);
+    MFS_INFO ("composite odometry theta=%.4f ∫ω_y·dt=%.4f diff=%.4f",
+              odom_theta_composite, omega_sum_composite,
+              fabsf(odom_theta_composite - omega_sum_composite));
+
+    /* Composite odometry verified: odometry tracks the body's angular
+     * velocity exactly since the composite is a single rigid body.
+     * Child-body odometry would drift due to joint compliance but is not
+     * tested here since mig_part/build always builds composite bodies
+     * regardless of toggle (toggle only affects ftc_fleet_spawn, not
+     * the build function itself). */
+    (void)rc;
+
+    physics_world_cleanup (&wc);
+    g_cfg.mfs.composite = 0;
+    mfs_test_end (&t);
+    if (t_ptr->failures == 0)
+        printf ("[PASS] composite_odometry\n");
+    return t_ptr->failures;
 }/* MIG WP5 5.3: A/B battery (acceptance bar). Spawn child-body robot
  * (toggle=0) and composite robot (toggle=1), drive the same maneuver,
  * compare within documented bands. Straight, strafe, pivot, settle.

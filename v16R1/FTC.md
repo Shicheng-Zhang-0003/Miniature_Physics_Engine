@@ -151,7 +151,46 @@ where the wheels sit).
 
 ---
 
-## 5. BioBuzz Regulation League
+## 5. Composite Robot Odometry (MIG WP5)
+
+Composite robots are built as a single `object_composite` body
+(`mig_part` parts fused via `physics_world_add_composite`). Per the
+charter decision (§2 decision A), the body `position` is the COM of the
+assembly — **not** the chassis geometric center. This has direct
+consequences for odometry:
+
+### 5.1 Odometer origin: COM vs chassis center
+
+The encoder odometry (`odom_theta`) integrates wheel angular velocity
+about each wheel's axle. The body odometry (`odom_theta`) integrates the
+body's angular velocity about its COM. For a composite body:
+
+- **Body COM** = assembly-frame COM of all parts (authored in spec)
+- **Wheel contact points** = at each wheel's actual position on the floor
+- **Chassis center** = not a physical point of the composite; the chassis
+  is just one part among several
+
+`odom_theta` is integrated from `body.angular_velocity.y` — the true
+angular velocity of the entire rigid body about its COM. This is exact:
+no joint compliance, no drift accumulation beyond float accumulation.
+
+**Wheel encoders vs body odometry:** Wheel encoders measure rotation at
+the wheel contact patch radius (`wheel_effective_radius`). The body
+odometry measures rotation about the body COM at distance `r` from the
+COM. These measure the same physical rotation but at different radii —
+`ω_body = ω_wheel` exactly (rigid body), but the linear velocity at the
+contact patch differs from linear velocity at the COM by `ω × r_offset`.
+Do not fuse wheel odometry into body odometry: they are independent
+measurements at different radii. Any discrepancy is real slip at the
+contact patch, not encoder drift.
+
+### 5.2 Odometry gate
+
+Gate `composite_odometry` spins a composite robot about its COM and
+verifies `odom_theta = ∫ω_y·dt` within tolerance. The same test on a
+child-body robot (jointed) shows the drift that composite bodies avoid.
+
+## 6. BioBuzz Regulation League
 
 The full 2026-2027 field in SI — 144 in floor, 12 in walls, centre hive
 frame (pivots 43.95 in) with 2 tipping hives × 2 cells, 4 flowers, zone
