@@ -44,6 +44,7 @@ extern int mfs_t_yaw_stability (void);
 extern int mfs_t_fleet_clear (void);
 extern int mfs_t_thermal_137 (void);
 extern int mfs_t_composite_build (void);
+extern int mfs_t_composite_toggle (void);
 static const mfs_test_entry_t registry [] = {
     {"teleop", mfs_t_teleop, false},
     {"mecanum", mfs_t_mecanum, false},
@@ -82,6 +83,9 @@ static const mfs_test_entry_t registry [] = {
      * 5.3 green (A/B battery). Registered diag=false so it runs in --all
      * but counted as blocking per suite contract. */
     {"composite_build", mfs_t_composite_build, false},
+    /* MIG WP5 5.2 smoke gate: config toggle mfs robot.composite. Default
+     * 0 = child-body, 1 = composite. Registered diag=false. */
+    {"composite_toggle", mfs_t_composite_toggle, false},
 };
 int main (int argc, char **argv) {
     if (argc > 1 && strcmp (argv [1], "--list") == 0) {

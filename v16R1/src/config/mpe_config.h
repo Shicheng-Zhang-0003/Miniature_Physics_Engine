@@ -32,7 +32,8 @@ typedef enum {
     cat_camera,
     cat_render,
     cat_ui,
-    cat_composite /* MIG WP2 2.1: appended, existing category values stable */
+    cat_composite /* MIG WP2 2.1: appended, existing category values stable */,
+    cat_mfs /* MIG WP5 5.2: MFS adoption toggle */
 } param_category;
 /* ------------------------------------------------------------------
  * The live config struct — all tunables grouped by domain
@@ -183,6 +184,14 @@ typedef struct {
          * ceiling, never silently raise the frozen cap. */
         int max_parts;
     } composite;
+    struct {
+        /* MIG WP5 5.2: build the FTC robot as a single object_composite
+         * body instead of chassis + separate wheels + revolute joints.
+         * 0 = child-body robot (existing, default), 1 = composite robot.
+         * Default 0 for the entire WP5 — no behavior change unless flipped.
+         * Read once at spawn time in ftc_fleet_spawn; not re-read mid-session. */
+        int composite;
+    } mfs;
 } mpe_config_t;
 /* ------------------------------------------------------------------
  * Parameter registry entry — describes one tunable

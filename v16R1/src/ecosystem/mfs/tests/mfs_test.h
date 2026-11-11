@@ -29,6 +29,7 @@
 #include "physics/constraint.h"
 #include "config/mpe_config.h"
 #include "core/det_math.h"
+#include "ecosystem/mpe_ecosystem.h"
 #include "modules/ftc/submodules/robot.h"
 #include "modules/ftc/submodules/drivetrain.h"
 #include "modules/ftc/submodules/motor_presets.h"

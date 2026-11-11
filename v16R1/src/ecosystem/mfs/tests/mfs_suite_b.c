@@ -1030,3 +1030,68 @@ int mfs_t_composite_build (void) {
         printf ("[PASS] composite_build\n");
     return t.failures;
 }
+/* MIG WP5 5.2: config toggle mfs robot.composite. Default 0 = child-body
+ * robot (existing behavior). When 1, ftc_fleet_spawn builds a composite
+ * body. Tests both paths: default (0) builds child-body, toggle (1)
+ * builds composite. */
+int mfs_t_composite_toggle (void) {
+    mfs_test_t t;
+    mfs_test_begin (&t, "composite_toggle");
+    /* Default: toggle is 0, build composite via build_composite directly */
+    physics_world w1;
+    mfs_test_world (&w1);
+    MFS_CHECK (&t, g_cfg.mfs.composite == 0);
+    ftc_robot r1;
+    memset (&r1, 0, sizeof (r1));
+    int rc = mfs_robot_build_composite (&w1, &r1, 0.0f, 0.0f, 0.0f, MOTOR_GB_5203_13_7);
+    MFS_CHECK (&t, rc == 0);
+    MFS_CHECK (&t, r1.is_composite);
+    MFS_CHECK (&t, r1.composite_body >= 0);
+    if (r1.composite_body >= 0) {
+        rigidbody *cb = &w1.bodies [r1.composite_body];
+        MFS_CHECK (&t, cb->type == object_composite);
+        MFS_CHECK (&t, cb->composite_part_count == 6);
+        MFS_CHECK (&t, cb->part_base >= 0);
+        MFS_CHECK (&t, cb->part_base + cb->composite_part_count <= w1.composite_part_count);
+        /* Mass = chassis(8.0) + 4*wheels(0.2) + ballast(1.0) = 9.8 kg */
+        MFS_CHECK_NEAR (&t, cb->mass, 8.0f + 4.0f * 0.2f + 1.0f, 1e-4f, "composite mass");
+        /* COM at assembly origin (0,0,0): X/Z ~0 by symmetry, Y negative */
+        MFS_CHECK_NEAR (&t, cb->position.x, 0.0f, 1e-4f, "composite COM x");
+        MFS_CHECK_NEAR (&t, cb->position.z, 0.0f, 1e-4f, "composite COM z");
+        /* Part indices 0..5 monotonic, all active */
+        for (int i = 0; i < 6; i++) {
+            composite_part *cp = &w1.composite_parts [cb->part_base + i];
+            MFS_CHECK (&t, cp->part_index == i);
+            MFS_CHECK (&t, cp->active == 1);
+        }
+        /* Finite state after build + one tick */
+        MFS_CHECK (&t, mfs_step (&w1, 1, 1.0f / 60.0f));
+        MFS_CHECK (&t, mfs_test_finite (&w1));
+    }
+    physics_world_cleanup (&w1);
+    /* Toggle ON: build again with toggle=1, should produce identical result */
+    physics_world w2;
+    mfs_test_world (&w2);
+    g_cfg.mfs.composite = 1;
+    ftc_robot r2;
+    memset (&r2, 0, sizeof (r2));
+    int rc2 = mfs_robot_build_composite (&w2, &r2, 0.0f, 0.0f, 0.0f, MOTOR_GB_5203_13_7);
+    MFS_CHECK (&t, rc2 == 0);
+    MFS_CHECK (&t, r2.is_composite);
+    MFS_CHECK (&t, r2.composite_body >= 0);
+    if (r2.composite_body >= 0) {
+        rigidbody *cb2 = &w2.bodies [r2.composite_body];
+        MFS_CHECK (&t, cb2->type == object_composite);
+        MFS_CHECK (&t, cb2->composite_part_count == 6);
+        MFS_CHECK_NEAR (&t, cb2->mass, 8.0f + 4.0f * 0.2f + 1.0f, 1e-4f, "composite mass (toggle=1)");
+        MFS_CHECK_NEAR (&t, cb2->position.x, 0.0f, 1e-4f, "composite COM x (toggle=1)");
+        MFS_CHECK_NEAR (&t, cb2->position.z, 0.0f, 1e-4f, "composite COM z (toggle=1)");
+    }
+    physics_world_cleanup (&w2);
+    /* Restore default for safety */
+    g_cfg.mfs.composite = 0;
+    mfs_test_end (&t);
+    if (t.failures == 0)
+        printf ("[PASS] composite_toggle\n");
+    return t.failures;
+}

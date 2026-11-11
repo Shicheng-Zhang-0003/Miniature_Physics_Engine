@@ -4,6 +4,7 @@
 #include "submodules/intake.h"
 #include "submodules/biobuzz.h"
 #include "mfs_platform.h"
+#include "config/mpe_config.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -165,7 +166,14 @@ int ftc_fleet_spawn (struct physics_world *world, float x, float y, float z, mot
         f -> robots = nr;
         f -> cap = ncap;
     }
-    if (ftc_robot_create_with_drive (world, &f -> robots [f -> count], x, y, z, preset, drivetrain_type) != 0) { return -1; }
+    /* MIG WP5 5.2: config toggle mfs robot.composite selects build path.
+     * 0 = child-body robot (existing, default), 1 = composite robot.
+     * Read once at spawn; not re-read mid-session. */
+    if (g_cfg.mfs.composite != 0) {
+        if (mfs_robot_build_composite (world, &f -> robots [f -> count], x, y, z, preset) != 0) { return -1; }
+    } else {
+        if (ftc_robot_create_with_drive (world, &f -> robots [f -> count], x, y, z, preset, drivetrain_type) != 0) { return -1; }
+    }
     return f -> count++;
 }
 int ftc_fleet_count (struct physics_world *world) {

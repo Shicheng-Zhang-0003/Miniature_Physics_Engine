@@ -1086,7 +1086,7 @@ Charter §8 is the contract; the plan adds the risk discipline.
   `mfs_composite_build`: body count=1, type=object_composite, parts=6,
   mass=9.8 kg, part indices 0..5 monotonic, per-part friction carried.
   Gate: smoke only until 5.3 green (A/B battery).
-- [ ] **5.2** Config toggle `mfs robot.composite 0|1`; default 0 for the
+- [x] **5.2** Config toggle `mfs robot.composite 0|1` (LANDED 2026-11-10); default 0 for the
   entire WP.
 - [ ] **5.3** A/B battery (the acceptance bar): straight, strafe, pivot,
   settle — composite robot vs the child-body robot within the

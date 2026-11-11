@@ -280,6 +280,16 @@ static mpe_param s_registry [] = {
     {"composite.max_parts", "Composite Max Parts",
      "Per-composite part ceiling (P2 cap 16): an over-cap assembly keeps its first max_parts and counts one clamp",
      p_int, cat_composite, &g_cfg.composite.max_parts, 16.0, 1.0, 16.0, false},
+    /* ============================================================
+     * cat_mfs
+     * ============================================================ */
+    {"mfs robot.composite", "MFS Robot Composite",
+     "Build the FTC robot as a single object_composite body instead of "
+     "chassis + separate wheel bodies + revolute joints. "
+     "0 = child-body robot (existing, default), 1 = composite robot. "
+     "Default 0 for WP5 — no behavior change unless flipped. "
+     "Read once at spawn time in ftc_fleet_spawn.",
+     p_int, cat_mfs, &g_cfg.mfs.composite, 0.0, 0.0, 1.0, false},
 };
 /* ------------------------------------------------------------------
  * Registry count and public aliases
