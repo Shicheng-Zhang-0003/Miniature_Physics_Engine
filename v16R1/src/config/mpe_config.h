@@ -183,6 +183,13 @@ typedef struct {
          * the schema ceiling is also 16, so configuration can only lower the
          * ceiling, never silently raise the frozen cap. */
         int max_parts;
+
+        /* MIG WP2.5 2.5.0: convex hulls behind this flag. Every hull
+         * increment ships behind composite.hull; default 0 = all hull paths
+         * OFF, no behavior change unless flipped. Read once at spawn time;
+         * not re-read mid-session. Not the load path — scene files do not
+         * carry hull state. */
+        int hull;
     } composite;
     struct {
         /* MIG WP5 5.2: build the FTC robot as a single object_composite

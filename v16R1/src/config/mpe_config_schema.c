@@ -280,6 +280,13 @@ static mpe_param s_registry [] = {
     {"composite.max_parts", "Composite Max Parts",
      "Per-composite part ceiling (P2 cap 16): an over-cap assembly keeps its first max_parts and counts one clamp",
      p_int, cat_composite, &g_cfg.composite.max_parts, 16.0, 1.0, 16.0, false},
+    {"composite.hull", "Composite Hull",
+     "Convex hulls behind this flag (WP2.5). Every hull increment ships behind "
+     "composite.hull; default 0 = all hull paths OFF, no behavior change unless "
+     "flipped. Read once at spawn time; not re-read mid-session. Not the load "
+     "path — scene files do not carry hull state. "
+     "0 = hull disabled (default), 1 = hull enabled.",
+     p_int, cat_composite, &g_cfg.composite.hull, 0.0, 0.0, 1.0, false},
     /* ============================================================
      * cat_mfs
      * ============================================================ */
