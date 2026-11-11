@@ -16,7 +16,7 @@ only the Python standard library.
 
 Strict contract: suite cases that print [SKIP] (self-skipped coverage) fail
 the run unless --allow-skip is given; [XFAIL] markers are surfaced in the
-summary counts but never block. Registry floors: MIN_SUITE_ENTRIES=59,
+summary counts but never block. Registry floors: MIN_SUITE_ENTRIES=60,
 MIN_LEGACY_ENTRIES=30, MIN_PARANOIA_ENTRIES=15; summary contract requires
 Total == registry size and Blocking failures == 0.
 """
@@ -170,7 +170,12 @@ MPE_TEST_REGIMES = ("default", "light", "heavy", "brittle", "sticky")
 # the part's OWN local_orientation, not just the body's; a cylinder
 # posed axle-along-+Y used to read its half-length as its radius and
 # sink 0.7 m under the net; NULL-world legacy projection pinned).
-MIN_SUITE_ENTRIES = 59
+# -> 60 (2026-11-10, mig_spec_roundtrip: WP4 4.2 gate — the frozen
+# grammar reader parses a spec, emits canonical normalized text, re-parses
+# it, and requires byte-identical output; plus a reject-code battery for
+# malformed inputs (write-on-success: nothing enters the spec store on
+# a reject)).
+MIN_SUITE_ENTRIES = 60
 # DESPOT-2026-10-01: pin per-suite floors so deleting a legacy/paranoia target
 # + its make target together cannot shrink the headline silently (the 220->204
 # drift). Canonical floor above; legacy 30 + paranoia 15 pinned here.

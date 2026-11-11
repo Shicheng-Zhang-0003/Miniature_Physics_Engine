@@ -361,6 +361,7 @@ const terminal_command terminal_commands [] = {
         {"microvim", true, cmd_vi, "microvim [filename]", "open microvim editor"},
         /* MPE_TASK_V15R2_PHASE8_TABLE_END */
         {"mod", true, cmd_mod, "mod ls|load|unload|attach|detach|use-*", "hot plug physics modules"},
+        {"mig", true, cmd_mig, "mig load|save|show|list", "MIG object spec authoring (WP4 4.2)"},
         {"diag", false, cmd_diag, "diag [tail N|sources|on|off|clear|status]", "engine self-report: every error source"},
         {"eco", true, cmd_eco, "eco attach|detach|command", "drive ecosystem bundles"},
         {"ftc", true, cmd_ftc, "ftc spawn [x y z]|telemetry", "spawn/inspect the robot (F310 drives)"},

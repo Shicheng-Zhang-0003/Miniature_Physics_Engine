@@ -1008,12 +1008,21 @@ the editor is a window onto it; no editor-only truth exists.
       colour r g b
   ```
 
-- [ ] **4.2 Headless surface first.** Parser that fills `mig_part` arrays
-  (pure, suite-gated for determinism/reject codes); terminal verbs in
-  `ui_input/term_obj.c`: `mig load`, `mig show`, `mig save`, `mig list`
-  (spec store is a per-session named table, not a world write). Includes
-  the spec-round-trip gate (read + write must reproduce byte-identical
-  normalized output) BEFORE any button exists.
+- [x] **4.2 Headless surface first (LANDED 2026-11-10):** pure grammar
+  reader in `core/mig_spec.[ch]` implementing the frozen `MIG_SPEC.md`
+  v1 (no rigidbody/physics_world/config dependency); terminal verbs
+  `mig load <file> | save <name> | show <name> | list` in
+  `ui_input/term_obj.c` backed by a per-session named spec store (not a
+  world write); registered terminal command `mig`. Write-on-success: a
+  rejected file enters nothing into the spec store. 26 named
+  `mig_spec_*` diag codes (source `mig_spec`, mpe_diag discipline).
+  Gate `mig_spec_roundtrip` (60th blocking entry, runner floor 59 ->
+  60): parse a valid spec, emit canonical normalized text, re-parse it,
+  require byte-identical output; plus a 10-case reject-code battery.
+  Parser correctness also verified with a standalone harness (22 cases:
+  valid round-trip, all reject codes, required-field enforcement, part
+  cap). Docs-only diagram → implemented reader; no engine behavior
+  changed, gate bump only.
 - [ ] **4.3 microvim is the editor.** The in-app editing path is literally
   `ui_input/microvim.c` (it already exists, 1390 lines) — `mig edit`
   opens the spec in the microvim buffer; saving re-parses and stages the

@@ -39,6 +39,7 @@
 #include "scene/boundary.h"
 #include "core/rigidbody.h"
 #include "core/mig_mass.h"
+#include "core/mig_spec.h"
 #include "core/mpe_registry.h"
 
 /* Probe-7 fixture checker: the untouched totals must read 0xAB in every
@@ -2245,6 +2246,104 @@ int mpe_t_mig_boundary_rotated_part (void) {
                         "NULL-world legacy clamp at the covering bound");
     }
     physics_world_cleanup (&w);
+    mpe_test_end (&t);
+    return t.failures;
+}
+
+/* ---- MIG WP4 4.2 gate: spec round-trip ------------------------------
+ * Read a valid spec, emit normalized text, re-parse it, emit again —
+ * the two emissions must be byte-identical (the frozen grammar's
+ * canonical output contract). Also probes the reject codes for a
+ * battery of malformed inputs (write-on-success: a rejected file enters
+ * nothing into the spec store). */
+int mpe_t_mig_spec_roundtrip (void) {
+    mpe_test_t t;
+    mpe_test_begin (&t, "mig_spec_roundtrip");
+    mpe_clamp_counters_reset ();
+    const char *tmpd = getenv ("TMPDIR");
+    const char *base = tmpd && tmpd [0] ? tmpd : "../../temp";
+    char dir [512];
+    snprintf (dir, sizeof (dir), "%s/mpe_suite_spec_roundtrip.dat", base);
+    /* A valid spec: sphere + density cube with material and colour. */
+    const char *good = "mig test_obj\n"
+                       "frame assembly\n"
+                       "part 0 type sphere\n"
+                       "  dims radius 0.5\n"
+                       "  pose 0 0 0 1 0 0 0\n"
+                       "  material mu_s 0.9 mu_k 0.7 rest 0.1\n"
+                       "  mass 2.0\n"
+                       "  colour 1 0.5 0.25\n"
+                       "part 1 type cube\n"
+                       "  dims hx 0.1 hy 0.2 hz 0.3\n"
+                       "  pose 1 2 3 0.70710678 0 0 0.70710678\n"
+                       "  density 3000\n"
+                       "  colour 0 1 0\n";
+    FILE *f = fopen (dir, "w");
+    MPE_CHECK (&t, f != NULL);
+    if (f) {
+        fwrite (good, 1, strlen (good), f);
+        fclose (f);
+    }
+    mig_spec spec_a, spec_b;
+    int rc = mig_spec_parse_file (dir, 16, &spec_a);
+    MPE_CHECK (&t, rc == mig_spec_ok);
+    if (rc == mig_spec_ok) {
+        char buf1 [8192], buf2 [8192];
+        size_t n1 = mig_spec_emit_normalized (&spec_a, buf1, sizeof (buf1));
+        /* Write the normalized form and re-parse it. */
+        FILE *f2 = fopen (dir, "w");
+        MPE_CHECK (&t, f2 != NULL);
+        if (f2) { fwrite (buf1, 1, n1, f2); fclose (f2); }
+        rc = mig_spec_parse_file (dir, 16, &spec_b);
+        MPE_CHECK (&t, rc == mig_spec_ok);
+        if (rc == mig_spec_ok) {
+            size_t n2 = mig_spec_emit_normalized (&spec_b, buf2, sizeof (buf2));
+            MPE_CHECK (&t, n1 == n2);
+            MPE_CHECK (&t, memcmp (buf1, buf2, n1) == 0);
+            MPE_CHECK (&t, strcmp (spec_a.name, spec_b.name) == 0);
+            MPE_CHECK (&t, spec_a.count == spec_b.count);
+        }
+    }
+    /* Reject battery: each malformed input must be refused with its
+     * named code and must not populate the spec store (out untouched). */
+    struct { const char *content; int expect_code; } cases [] = {
+        { "# only a comment\n", mig_spec_empty_file },
+        { "part 0 type sphere\n  dims radius 0.1\n  pose 0 0 0 1 0 0 0\n  mass 1\n",
+          mig_spec_no_object },
+        { "mig x\nframe world\npart 0 type sphere\n  dims radius 0.1\n  pose 0 0 0 1 0 0 0\n  mass 1\n",
+          mig_spec_bad_frame },
+        { "mig x\npart 0 type custom\n  dims radius 0.1\n  pose 0 0 0 1 0 0 0\n  mass 1\n",
+          mig_spec_bad_type },
+        { "mig x\npart 0 type sphere\n  dims hx 0.1\n  pose 0 0 0 1 0 0 0\n  mass 1\n",
+          mig_spec_bad_dims },
+        { "mig x\npart 0 type sphere\n  pose 0 0 0 1 0 0 0\n  mass 1\n",
+          mig_spec_missing_dims },
+        { "mig x\npart 0 type sphere\n  dims radius 0.1\n  mass 1\n  density 2\n",
+          mig_spec_mass_xor_density },
+        { "mig x\npart 0 type sphere\n  dims radius 0.1\n  pose 0 0 0 0.5 0 0 0\n  mass 1\n",
+          mig_spec_bad_quat },
+        { "mig x\npart 1 type sphere\n  dims radius 0.1\n  pose 0 0 0 1 0 0 0\n  mass 1\n",
+          mig_spec_bad_part_index },
+        { "mig x\npart 0 type sphere\n  dims radius 0.1\n  pose 0 0 0 1 0 0 0\n  mass -1\n",
+          mig_spec_bad_mass },
+        { "mig x\npart 0 type sphere\n  dims radius 0.1\n  pose 0 0 0 1 0 0 0\n  frobnicate 5\n",
+          mig_spec_unknown_kw },
+    };
+    int ncases = sizeof (cases) / sizeof (cases [0]);
+    for (int i = 0; i < ncases; i++) {
+        FILE *fc = fopen (dir, "w");
+        if (!fc) { MPE_CHECK (&t, 0); continue; }
+        fwrite (cases [i].content, 1, strlen (cases [i].content), fc);
+        fclose (fc);
+        mig_spec junk;
+        memset (&junk, 0, sizeof (junk));
+        int rc2 = mig_spec_parse_file (dir, 16, &junk);
+        char label [64];
+        snprintf (label, sizeof (label), "reject case %d", i);
+        MPE_CHECK (&t, rc2 == cases [i].expect_code);
+    }
+    remove (dir);
+    if (t.failures == 0) { printf ("[PASS] mig spec round-trip + reject battery\n"); }
     mpe_test_end (&t);
     return t.failures;
 }

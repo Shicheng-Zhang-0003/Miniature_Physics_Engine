@@ -120,6 +120,7 @@ int mpe_t_mig_composite_stack (void);
 int mpe_t_mig_pendulum_com_offset (void);
 int mpe_t_mig_determinism_twins (void);
 int mpe_t_mig_boundary_rotated_part (void);
+int mpe_t_mig_spec_roundtrip (void);
 typedef struct {
     const char *name;
     int (*fn) (void);
@@ -260,6 +261,9 @@ static const mpe_entry_t mpe_registry [] = {
      * not just the body's — a rotated cylinder part used to read its
      * half-length as its radius and sink 0.7 m under the net. */
     {"mig_boundary_rotated_part", mpe_t_mig_boundary_rotated_part, 0},
+    /* MIG WP4 4.2: spec grammar reader — round-trip byte-identity plus the
+     * reject-code battery (frozen grammar from docs/MIG_SPEC.md). */
+    {"mig_spec_roundtrip", mpe_t_mig_spec_roundtrip, 0},
 };
 #define MPE_NTESTS ((int) (sizeof (mpe_registry) / sizeof (mpe_registry [0])))
 /* Returns 0 pass, 1 fail, 2 skipped.

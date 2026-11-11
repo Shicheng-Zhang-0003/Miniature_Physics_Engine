@@ -12,6 +12,7 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#include "core/mig_spec.h"
 const char *term_object_type_name (rigidbody *rigid_body) {
     if (!rigid_body) { return "?"; }
     if (rigid_body -> type == object_sphere) { return "sph"; }
@@ -238,4 +239,115 @@ bool term_mode_is_static (const char *mode_text) {
         if (mode_bits == 0) { return true; }
         return false;
     } return false;
+}
+
+/* ---- MIG WP4 4.2: spec store + terminal verbs -----------------------
+ * Per-session named table of parsed specs. Not a world write: loading a
+ * spec stages it for authoring; nothing touches the physics world until
+ * a later WP4 step composes it. */
+#define MIG_SPEC_STORE_MAX 64
+typedef struct {
+    char name [MIG_SPEC_NAME_LEN];
+    mig_spec spec;
+    int used;
+} mig_spec_store_entry;
+static mig_spec_store_entry mig_spec_store [MIG_SPEC_STORE_MAX];
+
+static int mig_spec_store_find (const char *name) {
+    for (int i = 0; i < MIG_SPEC_STORE_MAX; i++) {
+        if (mig_spec_store [i].used && strcmp (mig_spec_store [i].name, name) == 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+static int mig_spec_store_add (const char *name, const mig_spec *spec) {
+    int idx = mig_spec_store_find (name);
+    if (idx >= 0) { /* replace existing */ {
+        mig_spec_store [idx].spec = *spec;
+        return idx;
+    }}
+    for (int i = 0; i < MIG_SPEC_STORE_MAX; i++) {
+        if (!mig_spec_store [i].used) {
+            mig_spec_store [i].used = 1;
+            snprintf (mig_spec_store [i].name, sizeof (mig_spec_store [i].name), "%s", name);
+            mig_spec_store [i].spec = *spec;
+            return i;
+        }
+    }
+    return -1; /* store full */
+}
+
+void cmd_mig (int argc, char **argv) {
+    if (argc < 2) {
+        term_err ("mpe: mig: usage: mig load <file> | save <name> | show <name> | list\n");
+        return;
+    }
+    if (term_str_eq (argv [1], "load")) {
+        if (argc < 3) { term_err ("mpe: mig load: missing <file>\n"); return; }
+        mig_spec spec;
+        int rc = mig_spec_parse_file (argv [2], 16, &spec);
+        if (rc != mig_spec_ok) {
+            term_err ("mpe: mig load: spec rejected (code ");
+            char n [16];
+            snprintf (n, sizeof (n), "%d", rc);
+            term_out (n);
+            term_err (") — run 'diag' for detail\n");
+            return;
+        }
+        if (mig_spec_store_add (spec.name, &spec) < 0) {
+            term_err ("mpe: mig load: spec store full\n");
+            return;
+        }
+        term_ok ("loaded spec ");
+        term_out (spec.name);
+        term_out (" (");
+        char n [16];
+        snprintf (n, sizeof (n), "%d", spec.count);
+        term_out (n);
+        term_out (" parts)\n");
+    } else if (term_str_eq (argv [1], "show")) {
+        if (argc < 3) { term_err ("mpe: mig show: missing <name>\n"); return; }
+        int idx = mig_spec_store_find (argv [2]);
+        if (idx < 0) { term_err ("mpe: mig show: no such spec\n"); return; }
+        char buf [8192];
+        size_t n = mig_spec_emit_normalized (&mig_spec_store [idx].spec, buf, sizeof (buf));
+        term_out (buf);
+        if (n > 0 && buf [n - 1] != '\n') { term_out ("\n"); }
+    } else if (term_str_eq (argv [1], "save")) {
+        if (argc < 3) { term_err ("mpe: mig save: missing <name>\n"); return; }
+        int idx = mig_spec_store_find (argv [2]);
+        if (idx < 0) { term_err ("mpe: mig save: no such spec\n"); return; }
+        char path [512];
+        snprintf (path, sizeof (path), "./%s.spec", argv [2]);
+        char buf [8192];
+        size_t n = mig_spec_emit_normalized (&mig_spec_store [idx].spec, buf, sizeof (buf));
+        FILE *f = fopen (path, "w");
+        if (!f) { term_err ("mpe: mig save: cannot open ");
+            term_err (path); term_err ("\n"); return; }
+        fwrite (buf, 1, n, f);
+        fclose (f);
+        term_ok ("saved spec ");
+        term_out (argv [2]);
+        term_out (" -> ");
+        term_out (path);
+        term_out ("\n");
+    } else if (term_str_eq (argv [1], "list")) {
+        int any = 0;
+        for (int i = 0; i < MIG_SPEC_STORE_MAX; i++) {
+            if (!mig_spec_store [i].used) { continue; }
+            any = 1;
+            term_out ("  ");
+            term_out (mig_spec_store [i].name);
+            char n [16];
+            snprintf (n, sizeof (n), " (%d parts)\n", mig_spec_store [i].spec.count);
+            term_out (n);
+        }
+        if (!any) { term_out ("(no specs)\n"); }
+    } else {
+        term_err ("mpe: mig: unknown subcommand ");
+        term_err (argv [1]);
+        term_err ("\n");
+    }
 }
