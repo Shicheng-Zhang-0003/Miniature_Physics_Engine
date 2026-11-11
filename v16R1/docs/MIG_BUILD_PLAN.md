@@ -194,6 +194,50 @@
 > floor 57.
 > NEXT: WP3 — scene persistence (v200 `MIG1` record): 3.1 writer/reader
 > two-pass with the id-remap pass, 3.2 degrade-not-veto loader.**
+> WP3 STEPS 3.1+3.2+3.3 ALL LANDED 2026-11-10 (`5a3dd4d` code + gate,
+> `5938c23` plans): composite scene persistence at format v201
+> (`mpe_version` 200→201, dedicated `composite_count` section after
+> revolutes — the WP3 shape deviation, deemed cleaner than in-band `MIG1`
+> row extensions): per composite the ACTIVE part slice expanded to the
+> WORLD frame, the exact representation `physics_world_add_composite`
+> consumes; ids preserved so springs rewire unchanged; envelope dynamic
+> state (velocity, colour, materials, sleep, generation, saved id)
+> re-applies to the rebuilt body; loader NEVER trusts the file for the
+> body — mass/COM/inertia recomputed through the compose path at commit,
+> unusable composites DROPPED LOUDLY (stricter than the plan's
+> placeholder-a-cube), structurally corrupt section entries veto the
+> file per the hostile-file philosophy; v200 files keep loading through
+> the same sectioned reader (type 4 still vetoed there); new gate
+> `composite_roundtrip` (58th blocking entry) proves weld → author →
+> save → reload → assert body count/type/parts/mass(1+2)/COM/velocity/
+> colour/per-part materials/spring rewire, then a SECOND cycle proves the
+> rebuilt body re-persists. FALSIFIABILITY: CRC corruption vetoed,
+> truncated composite section vetoed, bad owner id vetoed — all verified.
+> Suite `--all` 58/0 (floor 58), quick green, make everything exit 0.
+> WP4 STEP 4.1 LANDED 2026-11-10: SPEC GRAMMAR v1 FROZEN as
+> `docs/MIG_SPEC.md` — the §6 diagram became the reader's spec, expanded
+> to the byte: file rules (line-oriented, `#` comments, whitespace-
+> insensitive, C-locale numbers), the keyword state machine (`mig <name>`
+> first-and-once, optional `frame assembly` the ONLY frame value — the
+> reader never guesses a frame, part indices exactly 0..n-1 monotonic,
+> 1..max_parts parts — a file over the P2 cap 16 is REJECTED, not
+> truncated: the clamp is a pool property, not a file property), per-part
+> fields pinned to the `mig_part` contract (per-type dims subsets with
+> cross-type keys a named reject; pose w-first unit-within-1e-4 NEVER
+> renormalised; material optional defaulting to body_defaults per part
+> type; mass XOR density — no second volume math anywhere, density mode
+> is mig_part_mass's exact formulas; colour r g b the WP4 arrival of
+> per-part authored colour, default (1,1,1)), the round-trip contract
+> (file stores ASSEMBLY-frame poses, body born COM-framed via the
+> bridge, save re-emits assembly frame by the +COM un-rebase, totals
+> never written — recomputed through compose on every load, the WP3
+> loader-kindness rule carried into the spec), canonical normalized
+> output order (the byte-identical target 4.2's gate pins), 26 named
+> `mig_spec_*` diag codes (source `mig_spec`, mpe_diag discipline,
+> write-on-success: a rejected file enters nothing into the spec store),
+> and §7 names what is frozen OUT (joints, per-part no_collide, dynamic
+> state, hulls/mesh — decisions, not omissions). Doc-only step: no engine
+> files touched, no gate bump; 4.2's parser is the first consumer.**
 
 ---
 
@@ -939,8 +983,15 @@ Charter §5 is the contract; the plan adds touch-points only.
 Headless before GTK, always. The spec text is the single source of truth;
 the editor is a window onto it; no editor-only truth exists.
 
-- [ ] **4.1 Spec grammar v1** (freeze AT this step, diagram becomes the
-  reader's spec):
+- [x] **4.1 Spec grammar v1 (LANDED 2026-11-10, FROZEN as
+  `docs/MIG_SPEC.md`):** the diagram below became the reader's spec,
+  expanded to the byte — file rules, keyword state machine, per-type
+  dims subsets pinned to the `mig_part` contract, the assembly→COM frame
+  round-trip rule, canonical normalized output (4.2's byte-identical
+  target), 26 named `mig_spec_*` diag codes, and a §7 of named
+  exclusions. Doc-only step (no engine files touched, no gate bump);
+  every later WP4 step implements THIS text, and post-freeze changes are
+  dated v2 amendments, never silent extensions. The frozen v1 grammar:
 
   ```
   # MIG object spec — one file, one object. Reader rejects unknown
