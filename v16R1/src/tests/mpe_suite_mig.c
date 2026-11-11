@@ -2697,6 +2697,8 @@ int mpe_t_mig_hull_point_collection (void) {
  *  - unit right triangle (0,0),(1,0),(0,1): area 1/2, ∫x = 1/6,
  *    ∫x² = 1/12, ∫xy = 1/24 (y-moments mirror x);
  *  - clockwise winding yields the NEGATIVE of every integral (signed);
+ *  - scale robustness: finite-but-huge coordinates whose second moments
+ *    overflow are REFUSED (bad_point), never written as Inf;
  *  - error contracts: NULL, count < 3, non-finite vertex. */
 int mpe_t_mig_hull_2d_proof (void) {
     mpe_test_t t;
@@ -2781,12 +2783,27 @@ int mpe_t_mig_hull_2d_proof (void) {
         MPE_CHECK_NEAR (&t, a.area, 0.5, 1e-12, "z ignored area");
     }
 
+    /* ---- 5. scale robustness: finite-but-huge coordinates ----
+     * A sliver with x ≈ 1e200 against y ≈ 1e-200: the signed-area
+     * cancellations stay finite while the all-positive second moments
+     * overflow to +Inf. The module must REFUSE (bad_point), never write
+     * Inf into `out` — every accumulator is guarded, not just area. */
+    {
+        mig_hull_point sliver [4] = {
+            {-1e200, -1e-200, 0.0}, { 1e200, -1e-200, 0.0},
+            { 1e200,  1e-200, 0.0}, {-1e200,  1e-200, 0.0},
+        };
+        mig_hull_area2 a;
+        MPE_CHECK (&t, mig_hull_polygon_props (sliver, 4, &a)
+                   == mig_hull_bad_point);
+    }
+
     if (t.failures == 0) {
         printf ("[PASS] mig WP2.5 2.5.2: the 2D proof — divergence theorem on "
                 "plane polygons vs closed forms\n");
         MPE_INFO ("rect [-1,1]×[-2,2]: 8, 0, 8/3, 32/3, 0; unit right tri: "
                   "1/2, 1/6, 1/12, 1/24; CW = exact negation; z ignored; "
-                  "NULL/bad_count/bad_point contracts");
+                  "overflow sliver refused; NULL/bad_count/bad_point contracts");
     }
     mpe_test_end (&t);
     return t.failures;
@@ -2801,6 +2818,8 @@ int mpe_t_mig_hull_2d_proof (void) {
  *    V = 8s³/3 = 64/3, I = m·a²/20 = 16s⁵/15 = 512/15 per centroid axis;
  *  - translation: com carries the offset, inertia about the COM unchanged;
  *  - density: mass and inertia scale with ρ, com does not;
+ *  - scale robustness: huge density / huge vertices / underflow vertices
+ *    are refused (bad_mesh) whenever the output would be non-finite;
  *  - error contracts: NULL, vert/face count < 4, non-finite vertex
  *    (bad_point), out-of-range/negative index (bad_index), density ≤ 0 or
  *    NaN, inward winding (V < 0), degenerate zero-volume mesh (bad_mesh). */
@@ -2947,6 +2966,26 @@ int mpe_t_mig_hull_mass_props (void) {
         };
         MPE_CHECK (&t, mig_hull_mesh_props (degen_v, 4, &tet_f [0][0], 4, 1.0, &m)
                    == mig_hull_bad_mesh);
+        /* Scale robustness: finite-but-huge inputs are REFUSED when the
+         * OUTPUT would be non-finite, never written as Inf/NaN.
+         *  - huge density: mass = ρ·V overflows → bad_mesh;
+         *  - huge vertices: dV overflows to ±Inf → bad_mesh;
+         *  - underflow vertices: dV underflows to 0 → V ≤ 0 → bad_mesh. */
+        MPE_CHECK (&t, mig_hull_mesh_props (box_v, 8, &box_f [0][0], 12,
+                                            1e308, &m) == mig_hull_bad_mesh);
+        mig_hull_point huge_v [8], tiny_v [8];
+        for (int i = 0; i < 8; i++) {
+            huge_v [i].x = box_v [i].x * 1e200;
+            huge_v [i].y = box_v [i].y * 1e200;
+            huge_v [i].z = box_v [i].z * 1e200;
+            tiny_v [i].x = box_v [i].x * 1e-200;
+            tiny_v [i].y = box_v [i].y * 1e-200;
+            tiny_v [i].z = box_v [i].z * 1e-200;
+        }
+        MPE_CHECK (&t, mig_hull_mesh_props (huge_v, 8, &box_f [0][0], 12,
+                                            1.0, &m) == mig_hull_bad_mesh);
+        MPE_CHECK (&t, mig_hull_mesh_props (tiny_v, 8, &box_f [0][0], 12,
+                                            1.0, &m) == mig_hull_bad_mesh);
     }
 
     if (t.failures == 0) {
@@ -2954,8 +2993,9 @@ int mpe_t_mig_hull_mass_props (void) {
                 "theorem over face tetras vs closed forms\n");
         MPE_INFO ("box hull: m 48, I (208,160,80), com 0; tetra s=2: m 64/3, "
                   "I 512/15 per axis; translation moves com only; density "
-                  "scales mass+inertia; NULL/bad_count/bad_point/bad_index/"
-                  "bad_mesh contracts");
+                  "scales mass+inertia; huge density/vertices and underflow "
+                  "refused; NULL/bad_count/bad_point/bad_index/bad_mesh "
+                  "contracts");
     }
     mpe_test_end (&t);
     return t.failures;
@@ -2966,7 +3006,10 @@ int mpe_t_mig_hull_mass_props (void) {
  *  - hull-vs-box axes = hull face normals + 3 box axes + edge crosses;
  *  - hull-vs-sphere axes = face normals + edge-to-center + vertex-to-center;
  *  - one-sided depths d1 = hi_A − lo_B, d2 = hi_B − lo_A; MTD = min over
- *    unit axes; separation = any axis with a negative one-sided depth.
+ *    unit axes; separation = any axis with a negative one-sided depth;
+ *  - scale robustness: axis normalization pre-scales by the max
+ *    component before squaring, so huge-but-finite geometry keeps its
+ *    true MTD and non-finite OUTPUTS are refused.
  * The composite.hull flag contract: default 0, SAT paths exercised only
  * when flipped (the functions stay pure math; the flag is caller-side). */
 int mpe_t_mig_hull_sat_pairs (void) {
@@ -3177,6 +3220,63 @@ int mpe_t_mig_hull_sat_pairs (void) {
                    == mig_hull_bad_mesh);
     }
 
+    /* ---- 11. scale robustness: huge-but-finite inputs ----
+     * Axis normalization pre-scales by the max component BEFORE
+     * squaring, so directions survive near the double ceiling (a raw
+     * cross of two ~1e200 edges would overflow len to Inf and fabricate
+     * a zero axis with a false depth-0 touch). Consistent rule: accept
+     * while the OUTPUT is finite, refuse when it is not.
+     *  - huge hull (unit cube × 1e200) vs unit box: supports ±1e200, all
+     *    axis depths tie at 1e200, first face normal (+x) wins;
+     *  - unit hull vs box half 1e308 in x: hull INSIDE the box along x
+     *    (one-sided depth ~1e308) but the y intervals coincide → true
+     *    MTD exactly 2 @ +y;
+     *  - unit hull vs sphere r = 1e308 concentric: every axis ~1e308,
+     *    first face normal (+x) wins the tie;
+     *  - sphere center at the ceiling: cs = center·u overflows to +Inf,
+     *    the sphere interval clears the hull → cleanly separated, NOT
+     *    bad_mesh (the verdict itself is finite). */
+    {
+        mig_hull_point huge_v [8];
+        for (int i = 0; i < 8; i++) {
+            huge_v [i].x = unit_v [i].x * 1e200;
+            huge_v [i].y = unit_v [i].y * 1e200;
+            huge_v [i].z = unit_v [i].z * 1e200;
+        }
+        const double c0 [3] = {0.0, 0.0, 0.0};
+        const double h1 [3] = {1.0, 1.0, 1.0};
+        MPE_CHECK (&t, mig_hull_sat_hull_box (huge_v, 8, &box_f [0][0], 12,
+                                              c0, h1, &s) == mig_hull_ok);
+        MPE_CHECK (&t, s.overlap == 1);
+        MPE_CHECK_NEAR (&t, s.depth, 1e200, 1e192, "huge hull depth");
+        MPE_CHECK_NEAR (&t, s.axis [0], 1.0, 1e-9, "huge hull ax x");
+        MPE_CHECK_NEAR (&t, s.axis [1], 0.0, 1e-9, "huge hull ax y");
+        MPE_CHECK_NEAR (&t, s.axis [2], 0.0, 1e-9, "huge hull ax z");
+
+        const double hx [3] = {1e308, 1.0, 1.0};
+        MPE_CHECK (&t, mig_hull_sat_hull_box (unit_v, 8, &box_f [0][0], 12,
+                                              c0, hx, &s) == mig_hull_ok);
+        MPE_CHECK (&t, s.overlap == 1);
+        MPE_CHECK_NEAR (&t, s.depth, 2.0, 1e-9, "huge box depth 2@y");
+        MPE_CHECK_NEAR (&t, s.axis [0], 0.0, 1e-9, "huge box ax x");
+        MPE_CHECK_NEAR (&t, s.axis [1], 1.0, 1e-9, "huge box ax y");
+        MPE_CHECK_NEAR (&t, s.axis [2], 0.0, 1e-9, "huge box ax z");
+
+        MPE_CHECK (&t, mig_hull_sat_hull_sphere (unit_v, 8, &box_f [0][0], 12,
+                                                 c0, 1e308, &s) == mig_hull_ok);
+        MPE_CHECK (&t, s.overlap == 1);
+        MPE_CHECK_NEAR (&t, s.depth, 1e308, 1e300, "huge sphere depth");
+        MPE_CHECK_NEAR (&t, s.axis [0], 1.0, 1e-9, "huge sphere ax x");
+        MPE_CHECK_NEAR (&t, s.axis [1], 0.0, 1e-9, "huge sphere ax y");
+        MPE_CHECK_NEAR (&t, s.axis [2], 0.0, 1e-9, "huge sphere ax z");
+
+        const double cf [3] = {1e308, 1e308, 1e308};
+        MPE_CHECK (&t, mig_hull_sat_hull_sphere (unit_v, 8, &box_f [0][0], 12,
+                                                 cf, 1.0, &s) == mig_hull_ok);
+        MPE_CHECK (&t, s.overlap == 0);
+        MPE_CHECK_NEAR (&t, s.depth, 0.0, 1e-12, "ceiling center separated");
+    }
+
     /* Restore the shipping default (harness also restores per test). */
     g_cfg.composite.hull = 0;
 
@@ -3187,6 +3287,8 @@ int mpe_t_mig_hull_sat_pairs (void) {
                   "unit pair @1: 1@x, @2.5: separated; 45° cube-hull vs flat "
                   "box: 0.6@z; octa-sphere concentric 1+1/√3, @1.8: 0.2@x, "
                   "@2.5: separated, diagonal 1.2 overlap / 2.0 separated; "
+                  "scale pins: huge hull 1e200@x, box half 1e308 → 2@y, "
+                  "sphere r 1e308 → 1e308@x, ceiling center separated; "
                   "NULL/bad_count/bad_point/bad_index/bad_mesh contracts");
     }
     mpe_test_end (&t);

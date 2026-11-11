@@ -3,10 +3,11 @@
  */
 #include "core/mig_hull.h"
 #include <math.h>
-#include <string.h>
 
-/* Fixed π literal — identical bits every platform, never math.h's macro. */
-#define MIG_HULL_PI 3.14159265358979323846
+/* Note: no fixed-π literal here — unlike mig_mass, no hull formula in
+ * this TU touches π (polygon/tetra integrals are rational in the
+ * coordinates). Keep it that way: any future formula that needs π must
+ * define the fixed literal locally, never math.h's macro. */
 
 mig_hull_err mig_hull_point_set_init (mig_hull_point_set *set,
                                       mig_hull_point *buf, int cap) {
@@ -120,7 +121,15 @@ mig_hull_err mig_hull_polygon_props (const mig_hull_point *verts, int count,
         sxy += (2.0 * p -> x * p -> y + p -> x * q -> y +
                 q -> x * p -> y + 2.0 * q -> x * q -> y) * c;
     }
-    if (!isfinite (area)) { return mig_hull_bad_point; }
+    /* EVERY accumulator is guarded, not just `area`: finite coordinates
+     * near the double ceiling (e.g. x ≈ 1e200 against y ≈ 1e-200) can keep
+     * the signed area cancellations finite while the all-positive second
+     * moments overflow to +Inf. Writing Inf into `out` would be a silent
+     * quality break; the named-error discipline refuses instead. */
+    if (!isfinite (area) || !isfinite (mx) || !isfinite (my) ||
+        !isfinite (sxx) || !isfinite (syy) || !isfinite (sxy)) {
+        return mig_hull_bad_point;
+    }
     out -> area      = 0.5 * area;
     out -> moment_x  = mx / 6.0;
     out -> moment_y  = my / 6.0;
@@ -208,6 +217,19 @@ mig_hull_err mig_hull_mesh_props (const mig_hull_point *verts, int vert_count,
         }
         tr += Jc [i][i];
     }
+    /* Final sweep on the DERIVED quantities: finite V, M, J, density do
+     * not guarantee finite com = M/V (denormal V), Jc, tr, or
+     * mass = density·V (both near the ceiling). Refuse, never write Inf
+     * or NaN into `out`. */
+    for (int i = 0; i < 3; i++) {
+        if (!isfinite (com [i])) { return mig_hull_bad_mesh; }
+    }
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            if (!isfinite (Jc [i][j])) { return mig_hull_bad_mesh; }
+        }
+    }
+    if (!isfinite (tr) || !isfinite (density * V)) { return mig_hull_bad_mesh; }
     out -> mass = density * V;
     for (int i = 0; i < 3; i++) { out -> com [i] = com [i]; }
     /* Inertia scales with density like mass: I = ρ·(tr·Id − J_com). */
@@ -306,6 +328,52 @@ static mig_hull_err mig_hull_sat_validate (const mig_hull_point *verts,
 /* Axis validity threshold: below this the direction is degenerate. */
 #define MIG_HULL_AXIS_EPS 1e-12
 
+/* Robust axis normalization: scale by the max absolute component BEFORE
+ * squaring, so the direction survives coordinates near the double
+ * ceiling (the raw cross of two ~1e200 edges overflows a double, but its
+ * DIRECTION is exact — and (α·e1)×(β·e2) = αβ·(e1×e2) keeps it).
+ * Returns 0 (axis unusable) when any component is non-finite or the
+ * magnitude is degenerate; a "unit" axis that is actually ~0 would
+ * fabricate depth-0 overlaps with a zero normal, and a NaN component
+ * would poison the interval arithmetic. The upfront all-component check
+ * is mandatory: NaN compares false against everything, so it can hide
+ * from the max-abs selection when it is not the largest component. */
+static int mig_hull_axis_unit (const double v [3], double u [3]) {
+    if (!isfinite (v [0]) || !isfinite (v [1]) || !isfinite (v [2])) {
+        return 0;
+    }
+    const double ax = fabs (v [0]), ay = fabs (v [1]), az = fabs (v [2]);
+    const double m = (ax > ay) ? ((ax > az) ? ax : az) : ((ay > az) ? ay : az);
+    if (m <= MIG_HULL_AXIS_EPS) { return 0; }
+    const double sx = v [0] / m, sy = v [1] / m, sz = v [2] / m;
+    const double len = sqrt (sx * sx + sy * sy + sz * sz); /* ∈ [1, √3] */
+    u [0] = sx / len;
+    u [1] = sy / len;
+    u [2] = sz / len;
+    return 1;
+}
+
+/* Cross-product candidate axis: scale EACH vector by its own max
+ * component first (independent positive scalings preserve the cross
+ * direction exactly), so the cross stays finite for any finite inputs.
+ * Used for face normals (cross of the two face edges) and hull-edge ×
+ * box-edge crosses alike. */
+static int mig_hull_cross_unit (const double p [3], const double q [3],
+                                double u [3]) {
+    const double mp = fmax (fmax (fabs (p [0]), fabs (p [1])), fabs (p [2]));
+    const double mq = fmax (fmax (fabs (q [0]), fabs (q [1])), fabs (q [2]));
+    if (!isfinite (mp) || mp <= MIG_HULL_AXIS_EPS ||
+        !isfinite (mq) || mq <= MIG_HULL_AXIS_EPS) {
+        return 0;
+    }
+    const double ps [3] = {p [0] / mp, p [1] / mp, p [2] / mp};
+    const double qs [3] = {q [0] / mq, q [1] / mq, q [2] / mq};
+    const double n [3] = {ps [1] * qs [2] - ps [2] * qs [1],
+                          ps [2] * qs [0] - ps [0] * qs [2],
+                          ps [0] * qs [1] - ps [1] * qs [0]};
+    return mig_hull_axis_unit (n, u);
+}
+
 mig_hull_err mig_hull_sat_hull_box (const mig_hull_point *verts, int vert_count,
                                     const int *faces, int face_count,
                                     const double box_center [3],
@@ -329,14 +397,10 @@ mig_hull_err mig_hull_sat_hull_box (const mig_hull_point *verts, int vert_count,
         const mig_hull_point *a = &verts [faces [3 * f + 0]];
         const mig_hull_point *b = &verts [faces [3 * f + 1]];
         const mig_hull_point *c = &verts [faces [3 * f + 2]];
-        const double e1x = b -> x - a -> x, e1y = b -> y - a -> y, e1z = b -> z - a -> z;
-        const double e2x = c -> x - a -> x, e2y = c -> y - a -> y, e2z = c -> z - a -> z;
-        const double nx = e1y * e2z - e1z * e2y;
-        const double ny = e1z * e2x - e1x * e2z;
-        const double nz = e1x * e2y - e1y * e2x;
-        const double len = sqrt (nx * nx + ny * ny + nz * nz);
-        if (len <= MIG_HULL_AXIS_EPS) { continue; }
-        const double u [3] = {nx / len, ny / len, nz / len};
+        const double e1 [3] = {b -> x - a -> x, b -> y - a -> y, b -> z - a -> z};
+        const double e2 [3] = {c -> x - a -> x, c -> y - a -> y, c -> z - a -> z};
+        double u [3];
+        if (!mig_hull_cross_unit (e1, e2, u)) { continue; }
         mig_hull_support_range (verts, vert_count, u, &lo, &hi);
         const double cb = box_center [0] * u [0] + box_center [1] * u [1]
                         + box_center [2] * u [2];
@@ -358,15 +422,11 @@ mig_hull_err mig_hull_sat_hull_box (const mig_hull_point *verts, int vert_count,
         for (int k = 0; k < 3 && !st.separated; k++) {
             const mig_hull_point *a = &verts [faces [3 * f + k]];
             const mig_hull_point *b = &verts [faces [3 * f + (k + 1) % 3]];
-            const double ex = b -> x - a -> x, ey = b -> y - a -> y,
-                         ez = b -> z - a -> z;
+            const double e [3] = {b -> x - a -> x, b -> y - a -> y,
+                                  b -> z - a -> z};
             for (int m = 0; m < 3 && !st.separated; m++) {
-                const double cx = ey * axes [m][2] - ez * axes [m][1];
-                const double cy = ez * axes [m][0] - ex * axes [m][2];
-                const double cz = ex * axes [m][1] - ey * axes [m][0];
-                const double len = sqrt (cx * cx + cy * cy + cz * cz);
-                if (len <= MIG_HULL_AXIS_EPS) { continue; }
-                const double u [3] = {cx / len, cy / len, cz / len};
+                double u [3];
+                if (!mig_hull_cross_unit (e, axes [m], u)) { continue; }
                 mig_hull_support_range (verts, vert_count, u, &lo, &hi);
                 const double cb = box_center [0] * u [0] + box_center [1] * u [1]
                                 + box_center [2] * u [2];
@@ -415,14 +475,10 @@ mig_hull_err mig_hull_sat_hull_sphere (const mig_hull_point *verts, int vert_cou
         const mig_hull_point *a = &verts [faces [3 * f + 0]];
         const mig_hull_point *b = &verts [faces [3 * f + 1]];
         const mig_hull_point *c = &verts [faces [3 * f + 2]];
-        const double e1x = b -> x - a -> x, e1y = b -> y - a -> y, e1z = b -> z - a -> z;
-        const double e2x = c -> x - a -> x, e2y = c -> y - a -> y, e2z = c -> z - a -> z;
-        const double nx = e1y * e2z - e1z * e2y;
-        const double ny = e1z * e2x - e1x * e2z;
-        const double nz = e1x * e2y - e1y * e2x;
-        const double len = sqrt (nx * nx + ny * ny + nz * nz);
-        if (len <= MIG_HULL_AXIS_EPS) { continue; }
-        const double u [3] = {nx / len, ny / len, nz / len};
+        const double e1 [3] = {b -> x - a -> x, b -> y - a -> y, b -> z - a -> z};
+        const double e2 [3] = {c -> x - a -> x, c -> y - a -> y, c -> z - a -> z};
+        double u [3];
+        if (!mig_hull_cross_unit (e1, e2, u)) { continue; }
         mig_hull_support_range (verts, vert_count, u, &lo, &hi);
         const double cs = center [0] * u [0] + center [1] * u [1] + center [2] * u [2];
         mig_hull_sat_feed (&st, u, lo, hi, cs - radius, cs + radius);
@@ -432,21 +488,33 @@ mig_hull_err mig_hull_sat_hull_sphere (const mig_hull_point *verts, int vert_cou
         for (int k = 0; k < 3 && !st.separated; k++) {
             const mig_hull_point *a = &verts [faces [3 * f + k]];
             const mig_hull_point *b = &verts [faces [3 * f + (k + 1) % 3]];
-            const double abx = b -> x - a -> x, aby = b -> y - a -> y,
-                         abz = b -> z - a -> z;
-            const double denom = abx * abx + aby * aby + abz * abz;
-            if (denom <= MIG_HULL_AXIS_EPS) { continue; }
-            const double acx = center [0] - a -> x, acy = center [1] - a -> y,
-                         acz = center [2] - a -> z;
-            double t = (acx * abx + acy * aby + acz * abz) / denom;
+            const double ab [3] = {b -> x - a -> x, b -> y - a -> y,
+                                   b -> z - a -> z};
+            /* Scale the edge before squaring: |ab|² overflows a double for
+             * ceiling-scale edges, and with it the projection parameter.
+             * t is invariant under ab → abm·âb:
+             *   t = (ac·ab)/(ab·ab) = (ac·âb)/(abm·(âb·âb)),
+             * so compute it as (ac·âb)/abm/denom — sequential divides keep
+             * every intermediate representable. */
+            const double abm = fmax (fmax (fabs (ab [0]), fabs (ab [1])),
+                                     fabs (ab [2]));
+            if (!isfinite (abm) || abm <= MIG_HULL_AXIS_EPS) { continue; }
+            const double abh [3] = {ab [0] / abm, ab [1] / abm, ab [2] / abm};
+            const double denom = abh [0] * abh [0] + abh [1] * abh [1]
+                               + abh [2] * abh [2]; /* ∈ [1, 3] */
+            const double ac [3] = {center [0] - a -> x, center [1] - a -> y,
+                                   center [2] - a -> z};
+            double t = ac [0] * abh [0] + ac [1] * abh [1] + ac [2] * abh [2];
+            t = (t / abm) / denom;
             if (t < 0.0) { t = 0.0; }
             if (t > 1.0) { t = 1.0; }
-            const double ux = center [0] - (a -> x + t * abx);
-            const double uy = center [1] - (a -> y + t * aby);
-            const double uz = center [2] - (a -> z + t * abz);
-            const double len = sqrt (ux * ux + uy * uy + uz * uz);
-            if (len <= MIG_HULL_AXIS_EPS) { continue; }
-            const double u [3] = {ux / len, uy / len, uz / len};
+            const double d [3] = {
+                center [0] - (a -> x + t * ab [0]),
+                center [1] - (a -> y + t * ab [1]),
+                center [2] - (a -> z + t * ab [2]),
+            };
+            double u [3];
+            if (!mig_hull_axis_unit (d, u)) { continue; }
             mig_hull_support_range (verts, vert_count, u, &lo, &hi);
             const double cs = center [0] * u [0] + center [1] * u [1]
                             + center [2] * u [2];
@@ -455,12 +523,11 @@ mig_hull_err mig_hull_sat_hull_sphere (const mig_hull_point *verts, int vert_cou
     }
     /* Vertex-to-center directions. */
     for (int i = 0; i < vert_count && !st.separated; i++) {
-        const double ux = center [0] - verts [i].x;
-        const double uy = center [1] - verts [i].y;
-        const double uz = center [2] - verts [i].z;
-        const double len = sqrt (ux * ux + uy * uy + uz * uz);
-        if (len <= MIG_HULL_AXIS_EPS) { continue; }
-        const double u [3] = {ux / len, uy / len, uz / len};
+        const double d [3] = {center [0] - verts [i].x,
+                              center [1] - verts [i].y,
+                              center [2] - verts [i].z};
+        double u [3];
+        if (!mig_hull_axis_unit (d, u)) { continue; }
         mig_hull_support_range (verts, vert_count, u, &lo, &hi);
         const double cs = center [0] * u [0] + center [1] * u [1]
                         + center [2] * u [2];

@@ -8,7 +8,7 @@
  * output set is left untouched.
  *
  * Discipline (mirrors mig_mass.h):
- *  - all coordinates double; fixed π literal; no pow/trig;
+ *  - all coordinates double; no pow/trig (no hull formula needs π);
  *  - caller-owned buffers, no malloc, write-on-success;
  *  - every malformed input is a distinct named error.
  */
