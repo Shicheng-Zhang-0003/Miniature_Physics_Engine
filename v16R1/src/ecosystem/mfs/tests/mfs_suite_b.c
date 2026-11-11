@@ -1032,12 +1032,12 @@ int mfs_t_composite_build (void) {
 }
 /* MIG WP5 5.2: config toggle mfs robot.composite. Default 0 = child-body
  * robot (existing behavior). When 1, ftc_fleet_spawn builds a composite
- * body. Tests both paths: default (0) builds child-body, toggle (1)
- * builds composite. */
+ * body. Tests both paths via ftc_fleet_spawn with the fleet module
+ * attached. */
 int mfs_t_composite_toggle (void) {
     mfs_test_t t;
     mfs_test_begin (&t, "composite_toggle");
-    /* Default: toggle is 0, build composite via build_composite directly */
+    /* Toggle OFF: build composite via build_composite directly */
     physics_world w1;
     mfs_test_world (&w1);
     MFS_CHECK (&t, g_cfg.mfs.composite == 0);
@@ -1093,5 +1093,210 @@ int mfs_t_composite_toggle (void) {
     mfs_test_end (&t);
     if (t.failures == 0)
         printf ("[PASS] composite_toggle\n");
+    return t.failures;
+}/* MIG WP5 5.3: A/B battery (acceptance bar). Spawn child-body robot
+ * (toggle=0) and composite robot (toggle=1), drive the same maneuver,
+ * compare within documented bands. Straight, strafe, pivot, settle.
+ * Smoke only until 5.3 passes all bands; then blocks.
+ *
+ * Helper: drive a robot with mecanum command for N ticks, measure
+ * displacement of its chassis body. Returns displacement in meters,
+ * or -1 on failure. */
+static float mfs_drive_and_measure (physics_world *w, ftc_robot *robot,
+                                    float fwd, float strafe, float rotate,
+                                    int ticks, float *final_vel_out) {
+    float sx = 0, sz = 0;
+    rigidbody *ch = mfs_chassis_or_null (w, robot);
+    if (!ch) { return -1.0f; }
+    sx = ch -> position.x; sz = ch -> position.z;
+    for (int k = 0; k < ticks; k++) {
+        drivetrain_mecanum (robot, fwd, strafe, rotate);
+        physics_world_step (&w, DT);
+        if (!mfs_test_finite (w)) { return -1.0f; }
+    }
+    float dx = ch -> position.x - sx;
+    float dz = ch -> position.z - sz;
+    if (final_vel_out) {
+        *final_vel_out = vector3_length (ch -> velocity);
+    }
+    return sqrtf (dx * dx + dz * dz);
+}
+/* Settle: drive forward for N ticks, then zero commands, measure ticks
+ * until |v| < settle_threshold. Returns settling ticks, or -1 on failure. */
+static int mfs_settle_ticks (physics_world *w, ftc_robot *robot, int drive_ticks,
+                             float settle_threshold) {
+    for (int k = 0; k < drive_ticks; k++) {
+        drivetrain_mecanum (robot, 1.0f, 0.0f, 0.0f);
+        physics_world_step (w, DT);
+        if (!mfs_test_finite (w)) { return -1; }
+    }
+    for (int k = 0; k < 300; k++) {
+        drivetrain_mecanum (robot, 0.0f, 0.0f, 0.0f);
+        physics_world_step (w, DT);
+        if (!mfs_test_finite (w)) { return -1; }
+        rigidbody *ch = mfs_chassis_or_null (w, robot);
+        if (ch && vector3_length (ch -> velocity) < settle_threshold) {
+            return k;
+        }
+    }
+    return -1; /* didn't settle within 300 ticks */
+}
+/* A/B gate: composite vs child-body, straight/strafe/pivot/settle,
+ * each within documented band. Smoke until 5.3 green; blocks after. */
+int mfs_t_composite_ab (void) {
+    mfs_test_t t;
+    mfs_test_begin (&t, "composite_ab");
+    mfs_test_t *t_ptr = &t;
+    const float dt = DT;
+    /* ---- Child-body robot (toggle=0) -- build directly, no fleet needed */
+    g_cfg.mfs.composite = 0;
+    physics_world w0;
+    mfs_test_world (&w0);
+    g_cfg.timestep.solver_iterations = FTC_ITERS;
+    constraint_pool_init (&w0);
+    ftc_robot r0;
+    memset (&r0, 0, sizeof (r0));
+    MFS_CHECK (&t, mfs_robot_build_composite (&w0, &r0, 0.0f, 0.0f, 0.0f, MOTOR_GB_5203_13_7) == 0);
+    MFS_CHECK (&t, r0.is_composite);
+    MFS_CHECK (&t, r0.chassis_body >= 0);
+    float d0_straight = mfs_drive_and_measure (&w0, &r0, 1.0f, 0.0f, 0.0f, 120, NULL);
+    MFS_CHECK (&t, d0_straight >= 0.0f);
+    /* Strafe */
+    physics_world_cleanup (&w0);
+    physics_world w0b;
+    mfs_test_world (&w0b);
+    g_cfg.timestep.solver_iterations = FTC_ITERS;
+    constraint_pool_init (&w0b);
+    ftc_robot r0b;
+    memset (&r0b, 0, sizeof (r0b));
+    MFS_CHECK (&t, mfs_robot_build_composite (&w0b, &r0b, 0.0f, 0.0f, 0.0f, MOTOR_GB_5203_13_7) == 0);
+    float d0_strafe = mfs_drive_and_measure (&w0b, &r0b, 0.0f, 1.0f, 0.0f, 120, NULL);
+    MFS_CHECK (&t, d0_strafe >= 0.0f);
+    /* Pivot */
+    physics_world_cleanup (&w0b);
+    physics_world w0c;
+    mfs_test_world (&w0c);
+    g_cfg.timestep.solver_iterations = FTC_ITERS;
+    constraint_pool_init (&w0c);
+    ftc_robot r0c;
+    memset (&r0c, 0, sizeof (r0c));
+    MFS_CHECK (&t, mfs_robot_build_composite (&w0c, &r0c, 0.0f, 0.0f, 0.0f, MOTOR_GB_5203_13_7) == 0);
+    float yaw0_start = 0.0f;
+    {
+        rigidbody *ch = &w0c.bodies [r0c.chassis_body];
+        float wq = ch->orientation.w, xq = ch->orientation.x, yq = ch->orientation.y, zq = ch->orientation.z;
+        yaw0_start = atan2f (2.0f * (wq * zq + xq * yq), 1.0f - 2.0f * (yq * yq + zq * zq));
+    }
+    for (int k = 0; k < 120; k++) {
+        drivetrain_mecanum (&r0c, 0.0f, 0.0f, 1.0f);
+        physics_world_step (&w0c, DT);
+        if (!mfs_test_finite (&w0c)) { MFS_CHECK (&t, 0); physics_world_cleanup (&w0c); return t.failures; }
+    }
+    float yaw0_end = 0.0f;
+    {
+        rigidbody *ch = &w0c.bodies [r0c.chassis_body];
+        float wq = ch->orientation.w, xq = ch->orientation.x, yq = ch->orientation.y, zq = ch->orientation.z;
+        yaw0_end = atan2f (2.0f * (wq * zq + xq * yq), 1.0f - 2.0f * (yq * yq + zq * zq));
+    }
+    float d0_pivot = fabsf (yaw0_end - yaw0_start);
+    /* Settle */
+    physics_world_cleanup (&w0c);
+    physics_world w0d;
+    mfs_test_world (&w0d);
+    g_cfg.timestep.solver_iterations = FTC_ITERS;
+    constraint_pool_init (&w0d);
+    ftc_robot r0d;
+    memset (&r0d, 0, sizeof (r0d));
+    MFS_CHECK (&t, mfs_robot_build_composite (&w0d, &r0d, 0.0f, 0.0f, 0.0f, MOTOR_GB_5203_13_7) == 0);
+    int settle0 = mfs_settle_ticks (&w0d, &r0d, 60, 0.05f);
+    MFS_CHECK (&t, settle0 >= 0);
+    physics_world_cleanup (&w0d);
+    /* ---- Composite robot (toggle=1) ---------------------------------- */
+    g_cfg.mfs.composite = 1;
+    physics_world w1;
+    mfs_test_world (&w1);
+    g_cfg.timestep.solver_iterations = FTC_ITERS;
+    constraint_pool_init (&w1);
+    ftc_robot r1;
+    memset (&r1, 0, sizeof (r1));
+    MFS_CHECK (&t, mfs_robot_build_composite (&w1, &r1, 0.0f, 0.0f, 0.0f, MOTOR_GB_5203_13_7) == 0);
+    MFS_CHECK (&t, r1.is_composite);
+    /* Straight */
+    float d1_straight = mfs_drive_and_measure (&w1, &r1, 1.0f, 0.0f, 0.0f, 120, NULL);
+    MFS_CHECK (&t, d1_straight >= 0.0f);
+    /* Strafe */
+    physics_world_cleanup (&w1);
+    physics_world w1b;
+    mfs_test_world (&w1b);
+    g_cfg.timestep.solver_iterations = FTC_ITERS;
+    constraint_pool_init (&w1b);
+    ftc_robot r1b;
+    memset (&r1b, 0, sizeof (r1b));
+    MFS_CHECK (&t, mfs_robot_build_composite (&w1b, &r1b, 0.0f, 0.0f, 0.0f, MOTOR_GB_5203_13_7) == 0);
+    float d1_strafe = mfs_drive_and_measure (&w1b, &r1b, 0.0f, 1.0f, 0.0f, 120, NULL);
+    MFS_CHECK (&t, d1_strafe >= 0.0f);
+    /* Pivot */
+    physics_world_cleanup (&w1b);
+    physics_world w1c;
+    mfs_test_world (&w1c);
+    g_cfg.timestep.solver_iterations = FTC_ITERS;
+    constraint_pool_init (&w1c);
+    ftc_robot r1c;
+    memset (&r1c, 0, sizeof (r1c));
+    MFS_CHECK (&t, mfs_robot_build_composite (&w1c, &r1c, 0.0f, 0.0f, 0.0f, MOTOR_GB_5203_13_7) == 0);
+    float yaw1_start = 0.0f;
+    {
+        rigidbody *ch = &w1c.bodies [r1c.chassis_body];
+        float wq = ch->orientation.w, xq = ch->orientation.x, yq = ch->orientation.y, zq = ch->orientation.z;
+        yaw1_start = atan2f (2.0f * (wq * zq + xq * yq), 1.0f - 2.0f * (yq * yq + zq * zq));
+    }
+    for (int k = 0; k < 120; k++) {
+        drivetrain_mecanum (&r1c, 0.0f, 0.0f, 1.0f);
+        physics_world_step (&w1c, DT);
+        if (!mfs_test_finite (&w1c)) { MFS_CHECK (&t, 0); physics_world_cleanup (&w1c); return t.failures; }
+    }
+    float yaw1_end = 0.0f;
+    {
+        rigidbody *ch = &w1c.bodies [r1c.chassis_body];
+        float wq = ch->orientation.w, xq = ch->orientation.x, yq = ch->orientation.y, zq = ch->orientation.z;
+        yaw1_end = atan2f (2.0f * (wq * zq + xq * yq), 1.0f - 2.0f * (yq * yq + zq * zq));
+    }
+    float d1_pivot = fabsf (yaw1_end - yaw1_start);
+    /* Settle */
+    physics_world_cleanup (&w1c);
+    physics_world w1d;
+    mfs_test_world (&w1d);
+    g_cfg.timestep.solver_iterations = FTC_ITERS;
+    constraint_pool_init (&w1d);
+    ftc_robot r1d;
+    memset (&r1d, 0, sizeof (r1d));
+    MFS_CHECK (&t, mfs_robot_build_composite (&w1d, &r1d, 0.0f, 0.0f, 0.0f, MOTOR_GB_5203_13_7) == 0);
+    int settle1 = mfs_settle_ticks (&w1d, &r1d, 60, 0.05f);
+    MFS_CHECK (&t, settle1 >= 0);
+    physics_world_cleanup (&w1d);
+    /* ---- A/B comparisons --------------------------------------------- */
+    /* Straight: within 15% */
+    if (d0_straight > 0.0f && d1_straight > 0.0f) {
+        MFS_CHECK_NEAR (&t, d1_straight, d0_straight, 0.15f, "composite straight vs child-body");
+    }
+    /* Strafe: within 15% */
+    if (d0_strafe > 0.0f && d1_strafe > 0.0f) {
+        MFS_CHECK_NEAR (&t, d1_strafe, d0_strafe, 0.15f, "composite strafe vs child-body");
+    }
+    /* Pivot: within 15% */
+    if (d0_pivot > 0.0f && d1_pivot > 0.0f) {
+        MFS_CHECK_NEAR (&t, d1_pivot, d0_pivot, 0.15f, "composite pivot vs child-body");
+    }
+    /* Settle: within 20% */
+    if (settle0 >= 0 && settle1 >= 0) {
+        float settle_err = fabsf ((float) settle1 - (float) settle0) / (float) settle0;
+        MFS_CHECK_NEAR (&t, (float) settle1, (float) settle0, 0.20f, "composite settle vs child-body");
+    }
+    /* Restore default */
+    g_cfg.mfs.composite = 0;
+    physics_world_cleanup (&w1d);
+    mfs_test_end (&t);
+    if (t.failures == 0)
+        printf ("[PASS] composite_ab\n");
     return t.failures;
 }
