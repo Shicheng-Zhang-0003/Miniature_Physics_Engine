@@ -41,6 +41,7 @@
 #include "core/mig_mass.h"
 #include "core/mig_spec.h"
 #include "core/mig_hull.h"
+#include "config/mpe_config.h"
 #include "core/mpe_registry.h"
 
 /* Probe-7 fixture checker: the untouched totals must read 0xAB in every
@@ -2955,6 +2956,238 @@ int mpe_t_mig_hull_mass_props (void) {
                   "I 512/15 per axis; translation moves com only; density "
                   "scales mass+inertia; NULL/bad_count/bad_point/bad_index/"
                   "bad_mesh contracts");
+    }
+    mpe_test_end (&t);
+    return t.failures;
+}
+
+/* WP2.5 2.5.4 gate (plan §8.5): SAT reference pairs — boolean + MTD only
+ * (contact manifolds are future work). Oracles are hand geometry:
+ *  - hull-vs-box axes = hull face normals + 3 box axes + edge crosses;
+ *  - hull-vs-sphere axes = face normals + edge-to-center + vertex-to-center;
+ *  - one-sided depths d1 = hi_A − lo_B, d2 = hi_B − lo_A; MTD = min over
+ *    unit axes; separation = any axis with a negative one-sided depth.
+ * The composite.hull flag contract: default 0, SAT paths exercised only
+ * when flipped (the functions stay pure math; the flag is caller-side). */
+int mpe_t_mig_hull_sat_pairs (void) {
+    mpe_test_t t;
+    mpe_test_begin (&t, "mig_hull_sat_pairs");
+
+    /* Flag contract: default 0, then flipped for the SAT cases below. */
+    MPE_CHECK (&t, g_cfg.composite.hull == 0);
+    g_cfg.composite.hull = 1;
+
+    mig_hull_sat_result s;
+    static const int box_f [12][3] = {
+        {0, 2, 3}, {0, 3, 1}, {4, 7, 6}, {4, 5, 7}, {0, 1, 5}, {0, 5, 4},
+        {2, 7, 3}, {2, 6, 7}, {0, 4, 6}, {0, 6, 2}, {1, 7, 5}, {1, 3, 7},
+    };
+
+    /* ---- 1. box-hull (2,1,0.5) vs box (1,1,1) concentric ----
+     * Depths: x 2+1 = 3, y 1+1 = 2, z 0.5+1 = 1.5 → MTD 1.5 along z. */
+    static const mig_hull_point hull_v [8] = {
+        { 2.0,  1.0,  0.5}, { 2.0,  1.0, -0.5}, { 2.0, -1.0,  0.5}, { 2.0, -1.0, -0.5},
+        {-2.0,  1.0,  0.5}, {-2.0,  1.0, -0.5}, {-2.0, -1.0,  0.5}, {-2.0, -1.0, -0.5},
+    };
+    {
+        const double c [3] = {0.0, 0.0, 0.0}, h [3] = {1.0, 1.0, 1.0};
+        MPE_CHECK (&t, mig_hull_sat_hull_box (hull_v, 8, &box_f [0][0], 12,
+                                              c, h, &s) == mig_hull_ok);
+        MPE_CHECK (&t, s.overlap == 1);
+        MPE_CHECK_NEAR (&t, s.depth, 1.5, 1e-9, "hb1 depth");
+        MPE_CHECK_NEAR (&t, s.axis [0], 0.0, 1e-9, "hb1 ax x");
+        MPE_CHECK_NEAR (&t, s.axis [1], 0.0, 1e-9, "hb1 ax y");
+        MPE_CHECK_NEAR (&t, s.axis [2], 1.0, 1e-9, "hb1 ax z");
+    }
+
+    /* ---- 2. unit box-hull vs unit box at x-offset 1: depth 1 along x ----
+     * Intervals along x: hull [-1,1], box [0,2] → d1 = 1, d2 = 3. */
+    static const mig_hull_point unit_v [8] = {
+        { 1.0,  1.0,  1.0}, { 1.0,  1.0, -1.0}, { 1.0, -1.0,  1.0}, { 1.0, -1.0, -1.0},
+        {-1.0,  1.0,  1.0}, {-1.0,  1.0, -1.0}, {-1.0, -1.0,  1.0}, {-1.0, -1.0, -1.0},
+    };
+    {
+        const double c [3] = {1.0, 0.0, 0.0}, h [3] = {1.0, 1.0, 1.0};
+        MPE_CHECK (&t, mig_hull_sat_hull_box (unit_v, 8, &box_f [0][0], 12,
+                                              c, h, &s) == mig_hull_ok);
+        MPE_CHECK (&t, s.overlap == 1);
+        MPE_CHECK_NEAR (&t, s.depth, 1.0, 1e-9, "hb2 depth 2-1");
+        MPE_CHECK_NEAR (&t, s.axis [0], 1.0, 1e-9, "hb2 ax x");
+        MPE_CHECK_NEAR (&t, s.axis [1], 0.0, 1e-9, "hb2 ax y");
+        MPE_CHECK_NEAR (&t, s.axis [2], 0.0, 1e-9, "hb2 ax z");
+    }
+
+    /* ---- 3. unit box-hull vs unit box at x-offset 2.5: separated ----
+     * Intervals [-1,1] and [1.5,3.5]: d1 = −0.5 < 0 proves separation. */
+    {
+        const double c [3] = {2.5, 0.0, 0.0}, h [3] = {1.0, 1.0, 1.0};
+        MPE_CHECK (&t, mig_hull_sat_hull_box (unit_v, 8, &box_f [0][0], 12,
+                                              c, h, &s) == mig_hull_ok);
+        MPE_CHECK (&t, s.overlap == 0);
+        MPE_CHECK_NEAR (&t, s.depth, 0.0, 1e-12, "hb3 depth");
+    }
+
+    /* ---- 4. cube-hull (half 0.5) rotated 45° about z vs flat box (1,1,0.1) ----
+     * Concentric: z faces still (0,0,±1); xy diagonals give 1.914, x/y
+     * 1.707, z 0.5+0.1 = 0.6 → MTD 0.6 along z. h = √2/2. */
+    {
+        const double h = 0.70710678118654752440;
+        const mig_hull_point rc [8] = {
+            { 0.0,  h,  0.5}, { 0.0,  h, -0.5}, { h,  0.0,  0.5}, { h,  0.0, -0.5},
+            {-h,  0.0,  0.5}, {-h,  0.0, -0.5}, { 0.0, -h,  0.5}, { 0.0, -h, -0.5},
+        };
+        const double c [3] = {0.0, 0.0, 0.0}, fh [3] = {1.0, 1.0, 0.1};
+        MPE_CHECK (&t, mig_hull_sat_hull_box (rc, 8, &box_f [0][0], 12,
+                                              c, fh, &s) == mig_hull_ok);
+        MPE_CHECK (&t, s.overlap == 1);
+        MPE_CHECK_NEAR (&t, s.depth, 0.6, 1e-9, "rc depth 0.5+0.1");
+        MPE_CHECK_NEAR (&t, s.axis [0], 0.0, 1e-9, "rc ax x");
+        MPE_CHECK_NEAR (&t, s.axis [1], 0.0, 1e-9, "rc ax y");
+        MPE_CHECK_NEAR (&t, s.axis [2], 1.0, 1e-9, "rc ax z");
+    }
+
+    /* ---- 5. octahedron (r=1) vs sphere (r=1) concentric ----
+     * Face planes at distance 1/√3 → MTD 1 + 1/√3 along the diagonal. */
+    static const mig_hull_point oct_v [6] = {
+        { 1.0, 0.0, 0.0}, {-1.0, 0.0, 0.0}, { 0.0,  1.0, 0.0},
+        { 0.0, -1.0, 0.0}, { 0.0, 0.0,  1.0}, { 0.0, 0.0, -1.0},
+    };
+    /* Outward winding: (x,y,z) vertex order per octant, y/z swapped when
+     * the octant sign product is negative. */
+    static const int oct_f [8][3] = {
+        {0, 2, 4}, {0, 5, 2}, {0, 4, 3}, {0, 3, 5},
+        {1, 4, 2}, {1, 2, 5}, {1, 3, 4}, {1, 5, 3},
+    };
+    {
+        const double c [3] = {0.0, 0.0, 0.0};
+        const double inv3 = sqrt (3.0) / 3.0; /* 1/√3 */
+        MPE_CHECK (&t, mig_hull_sat_hull_sphere (oct_v, 6, &oct_f [0][0], 8,
+                                                 c, 1.0, &s) == mig_hull_ok);
+        MPE_CHECK (&t, s.overlap == 1);
+        MPE_CHECK_NEAR (&t, s.depth, 1.0 + inv3, 1e-9, "os0 depth 1+1/√3");
+        MPE_CHECK_NEAR (&t, s.axis [0], inv3, 1e-9, "os0 ax x");
+        MPE_CHECK_NEAR (&t, s.axis [1], inv3, 1e-9, "os0 ax y");
+        MPE_CHECK_NEAR (&t, s.axis [2], inv3, 1e-9, "os0 ax z");
+    }
+
+    /* ---- 6. octahedron vs sphere at (1.8,0,0): depth 2r − D = 0.2 along x ----
+     * Axis x: d1 = 1 + (−1.8 + 1) = 0.2; diagonals 0.538, edges 0.434. */
+    {
+        const double c [3] = {1.8, 0.0, 0.0};
+        MPE_CHECK (&t, mig_hull_sat_hull_sphere (oct_v, 6, &oct_f [0][0], 8,
+                                                 c, 1.0, &s) == mig_hull_ok);
+        MPE_CHECK (&t, s.overlap == 1);
+        MPE_CHECK_NEAR (&t, s.depth, 0.2, 1e-9, "os1 depth 2r−D");
+        MPE_CHECK_NEAR (&t, s.axis [0], 1.0, 1e-9, "os1 ax x");
+        MPE_CHECK_NEAR (&t, s.axis [1], 0.0, 1e-9, "os1 ax y");
+        MPE_CHECK_NEAR (&t, s.axis [2], 0.0, 1e-9, "os1 ax z");
+    }
+
+    /* ---- 7. octahedron vs sphere at (2.5,0,0): separated (D > 2r) ---- */
+    {
+        const double c [3] = {2.5, 0.0, 0.0};
+        MPE_CHECK (&t, mig_hull_sat_hull_sphere (oct_v, 6, &oct_f [0][0], 8,
+                                                 c, 1.0, &s) == mig_hull_ok);
+        MPE_CHECK (&t, s.overlap == 0);
+        MPE_CHECK_NEAR (&t, s.depth, 0.0, 1e-12, "os2 depth");
+    }
+
+    /* ---- 8. sphere displaced D = 1.2 along the diagonal (D < r + r/√3) ----
+     * Overlap: MTD = (1 + 1/√3) − 1.2 along (1,1,1)/√3. */
+    {
+        const double d = 1.2 / sqrt (3.0);
+        const double c [3] = {d, d, d};
+        const double inv3 = sqrt (3.0) / 3.0;
+        MPE_CHECK (&t, mig_hull_sat_hull_sphere (oct_v, 6, &oct_f [0][0], 8,
+                                                 c, 1.0, &s) == mig_hull_ok);
+        MPE_CHECK (&t, s.overlap == 1);
+        MPE_CHECK_NEAR (&t, s.depth, 1.0 + inv3 - 1.2, 1e-9, "os3 depth");
+        MPE_CHECK_NEAR (&t, s.axis [0], inv3, 1e-9, "os3 ax x");
+        MPE_CHECK_NEAR (&t, s.axis [1], inv3, 1e-9, "os3 ax y");
+        MPE_CHECK_NEAR (&t, s.axis [2], inv3, 1e-9, "os3 ax z");
+    }
+
+    /* ---- 9. sphere displaced D = 2.0 along the diagonal (D > r + r/√3) ----
+     * Separated: the face-normal axis proves it. */
+    {
+        const double d = 2.0 / sqrt (3.0);
+        const double c [3] = {d, d, d};
+        MPE_CHECK (&t, mig_hull_sat_hull_sphere (oct_v, 6, &oct_f [0][0], 8,
+                                                 c, 1.0, &s) == mig_hull_ok);
+        MPE_CHECK (&t, s.overlap == 0);
+        MPE_CHECK_NEAR (&t, s.depth, 0.0, 1e-12, "os4 depth");
+    }
+
+    /* ---- 10. error contracts ----
+     * NULL args → mig_hull_null; vert/face count < 4 → bad_count;
+     * non-finite vertex → bad_point; out-of-range index → bad_index;
+     * non-positive/non-finite half extents or radius, NaN center →
+     * bad_mesh. */
+    {
+        const double c [3] = {0.0, 0.0, 0.0}, h [3] = {1.0, 1.0, 1.0};
+        MPE_CHECK (&t, mig_hull_sat_hull_box (NULL, 8, &box_f [0][0], 12, c, h, &s)
+                   == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_sat_hull_box (unit_v, 8, NULL, 12, c, h, &s)
+                   == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_sat_hull_box (unit_v, 8, &box_f [0][0], 12, NULL, h, &s)
+                   == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_sat_hull_box (unit_v, 8, &box_f [0][0], 12, c, NULL, &s)
+                   == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_sat_hull_box (unit_v, 8, &box_f [0][0], 12, c, h, NULL)
+                   == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_sat_hull_box (unit_v, 3, &box_f [0][0], 12, c, h, &s)
+                   == mig_hull_bad_count);
+        MPE_CHECK (&t, mig_hull_sat_hull_box (unit_v, 8, &box_f [0][0], 3, c, h, &s)
+                   == mig_hull_bad_count);
+        static const int bad_f [4][3] = {{0,1,2}, {0,3,1}, {0,2,3}, {1,3,8}};
+        MPE_CHECK (&t, mig_hull_sat_hull_box (unit_v, 8, &bad_f [0][0], 4, c, h, &s)
+                   == mig_hull_bad_index);
+        mig_hull_point nan_v [8] = {
+            { 1.0,  1.0,  1.0}, { 1.0,  1.0, -1.0}, { 1.0, -1.0,  1.0}, { 1.0, -1.0, -1.0},
+            {-1.0,  1.0,  1.0}, {-1.0,  1.0, -1.0}, {-1.0, -1.0,  1.0}, {-1.0, -1.0, 0.0 / 0.0},
+        };
+        MPE_CHECK (&t, mig_hull_sat_hull_box (nan_v, 8, &box_f [0][0], 12, c, h, &s)
+                   == mig_hull_bad_point);
+        const double z0 [3] = {0.0, 1.0, 1.0};
+        MPE_CHECK (&t, mig_hull_sat_hull_box (unit_v, 8, &box_f [0][0], 12, c, z0, &s)
+                   == mig_hull_bad_mesh);
+        const double hn [3] = {-1.0, 1.0, 1.0};
+        MPE_CHECK (&t, mig_hull_sat_hull_box (unit_v, 8, &box_f [0][0], 12, c, hn, &s)
+                   == mig_hull_bad_mesh);
+        const double hnan [3] = {0.0 / 0.0, 1.0, 1.0};
+        MPE_CHECK (&t, mig_hull_sat_hull_box (unit_v, 8, &box_f [0][0], 12, c, hnan, &s)
+                   == mig_hull_bad_mesh);
+        MPE_CHECK (&t, mig_hull_sat_hull_sphere (NULL, 6, &oct_f [0][0], 8, c, 1.0, &s)
+                   == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_sat_hull_sphere (oct_v, 6, &oct_f [0][0], 8, NULL, 1.0, &s)
+                   == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_sat_hull_sphere (oct_v, 6, &oct_f [0][0], 8, c, 1.0, NULL)
+                   == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_sat_hull_sphere (oct_v, 3, &oct_f [0][0], 8, c, 1.0, &s)
+                   == mig_hull_bad_count);
+        MPE_CHECK (&t, mig_hull_sat_hull_sphere (oct_v, 6, &oct_f [0][0], 3, c, 1.0, &s)
+                   == mig_hull_bad_count);
+        MPE_CHECK (&t, mig_hull_sat_hull_sphere (oct_v, 6, &bad_f [0][0], 4, c, 1.0, &s)
+                   == mig_hull_bad_index);
+        MPE_CHECK (&t, mig_hull_sat_hull_sphere (oct_v, 6, &oct_f [0][0], 8, c, 0.0, &s)
+                   == mig_hull_bad_mesh);
+        MPE_CHECK (&t, mig_hull_sat_hull_sphere (oct_v, 6, &oct_f [0][0], 8, c, -1.0, &s)
+                   == mig_hull_bad_mesh);
+        MPE_CHECK (&t, mig_hull_sat_hull_sphere (oct_v, 6, &oct_f [0][0], 8, c, 0.0 / 0.0, &s)
+                   == mig_hull_bad_mesh);
+    }
+
+    /* Restore the shipping default (harness also restores per test). */
+    g_cfg.composite.hull = 0;
+
+    if (t.failures == 0) {
+        printf ("[PASS] mig WP2.5 2.5.4: SAT reference pairs — boolean + MTD "
+                "for hull-vs-box and hull-vs-sphere\n");
+        MPE_INFO ("flag default 0 then 1; box-hull (2,1,0.5) vs box: 1.5@z; "
+                  "unit pair @1: 1@x, @2.5: separated; 45° cube-hull vs flat "
+                  "box: 0.6@z; octa-sphere concentric 1+1/√3, @1.8: 0.2@x, "
+                  "@2.5: separated, diagonal 1.2 overlap / 2.0 separated; "
+                  "NULL/bad_count/bad_point/bad_index/bad_mesh contracts");
     }
     mpe_test_end (&t);
     return t.failures;

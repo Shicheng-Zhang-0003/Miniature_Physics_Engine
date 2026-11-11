@@ -102,4 +102,34 @@ mig_hull_err mig_hull_mesh_props (const mig_hull_point *verts, int vert_count,
                                   const int *faces, int face_count,
                                   double density, mig_hull_mass *out);
 
+/* ---- WP2.5 2.5.4: SAT reference pairs (boolean + MTD only) ----
+ * No contact manifold is generated here — that is future work. Both
+ * functions report one separating-axis result per pair. */
+
+typedef struct {
+    int overlap;      /* 1 = penetrating or touching on every axis */
+    double axis[3];   /* unit axis pointing FROM the hull TOWARD the primitive */
+    double depth;     /* overlap: positive MTD; separated: 0 */
+} mig_hull_sat_result;
+
+/* Hull (closed, convex, outward-wound — caller contract, validated by
+ * mig_hull_mesh_props) vs an AXIS-ALIGNED box (center + half extents).
+ * Axis set: hull face normals, the 3 box axes, hull-edge × box-edge
+ * crosses. On overlap, translating the HULL by −axis·depth separates the
+ * pair (first min axis wins ties); on separation, `axis` is a proven
+ * separating direction and depth is 0. */
+mig_hull_err mig_hull_sat_hull_box (const mig_hull_point *verts, int vert_count,
+                                    const int *faces, int face_count,
+                                    const double box_center[3],
+                                    const double box_half[3],
+                                    mig_hull_sat_result *out);
+
+/* Hull vs sphere (center + radius). Axis set: hull face normals,
+ * edge-to-center perpendiculars, and vertex-to-center directions — the
+ * complete separating-axis set for a convex polyhedron against a sphere. */
+mig_hull_err mig_hull_sat_hull_sphere (const mig_hull_point *verts, int vert_count,
+                                       const int *faces, int face_count,
+                                       const double center[3], double radius,
+                                       mig_hull_sat_result *out);
+
 #endif /* mig_hull_h */
