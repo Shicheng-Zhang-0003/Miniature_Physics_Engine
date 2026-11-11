@@ -16,7 +16,7 @@ only the Python standard library.
 
 Strict contract: suite cases that print [SKIP] (self-skipped coverage) fail
 the run unless --allow-skip is given; [XFAIL] markers are surfaced in the
-summary counts but never block. Registry floors: MIN_SUITE_ENTRIES=60,
+summary counts but never block. Registry floors: MIN_SUITE_ENTRIES=61,
 MIN_LEGACY_ENTRIES=30, MIN_PARANOIA_ENTRIES=15; summary contract requires
 Total == registry size and Blocking failures == 0.
 """
@@ -175,7 +175,14 @@ MPE_TEST_REGIMES = ("default", "light", "heavy", "brittle", "sticky")
 # it, and requires byte-identical output; plus a reject-code battery for
 # malformed inputs (write-on-success: nothing enters the spec store on
 # a reject)).
-MIN_SUITE_ENTRIES = 60
+# -> 61 (2026-11-10, mig_editor_roundtrip: WP4 4.5 gate — build a spec
+# as the editor would assemble it, emit normalized text, save to disk,
+# load back, require byte-identical output; then compose bodies from the
+# in-memory and re-loaded specs through physics_world_add_composite and
+# require bitwise identity; re-run WP2 physics checks (mass, COM, bound,
+# per-part materials from file) on the editor-created body. Pins
+# "editor and terminal create the same objects through the same parser".)
+MIN_SUITE_ENTRIES = 61
 # DESPOT-2026-10-01: pin per-suite floors so deleting a legacy/paranoia target
 # + its make target together cannot shrink the headline silently (the 220->204
 # drift). Canonical floor above; legacy 30 + paranoia 15 pinned here.

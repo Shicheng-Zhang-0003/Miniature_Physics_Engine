@@ -238,6 +238,16 @@
 > and §7 names what is frozen OUT (joints, per-part no_collide, dynamic
 > state, hulls/mesh — decisions, not omissions). Doc-only step: no engine
 > files touched, no gate bump; 4.2's parser is the first consumer.**
+> WP4 STEPS 4.2+4.3+4.4+4.5 ALL LANDED 2026-11-10: headless spec reader
+> (`core/mig_spec.[ch]`, 26 named `mig_spec_*` diag codes, write-on-
+> success) + terminal verbs `mig load/save/show/list` (`ui_input/term_obj.c`)
+> + microvim edit (`mig edit`, re-parse + stage on exit) + GTK editor
+> panel (`ui_input/mig_editor.c`, part list + per-part fields + COM marker
+> in 3D view) + gate `mig_editor_roundtrip` (61st blocking entry — save/
+> load bitwise identity, editor and terminal compose identical bodies,
+> WP2 physics checks pass). Suite `--all` 61/0 (floor 61), quick green,
+> make everything exit 0. WP4 COMPLETE — WP5 (MFS adoption behind the
+> default-OFF toggle with the A/B acceptance bar) is next.
 
 ---
 
@@ -249,9 +259,9 @@ truth in this order and do not write a new line of code until green:
 ```bash
 cd 475-MPE/v16R1/src
 make build_suite            # zero complaints expected (-Werror is default)
-./test_mpe_suite --all      # expect: Total: 54 | Blocking failures: 0
+./test_mpe_suite --all      # expect: Total: 61 | Blocking failures: 0
 cd ../..
-python3 tools/test_runner.py --profile quick   # expect Checks: 68 | passed: 68
+python3 tools/test_runner.py --profile quick   # expect Checks: 75 | passed: 75
 git status --short          # manifest must match §1 exactly — no half-written files
 ```
 
@@ -1047,10 +1057,19 @@ the editor is a window onto it; no editor-only truth exists.
   Grammar frozen at 4.1 governs both paths (editor + terminal).
   GUI-only (suite-unlinked); no gate bump; engine + suite builds 0 under
   -Werror.
-- [ ] **4.5 Gate:** editor panel edits → spec save → load from disk →
-  bitwise identity, PLUS the WP2 physics gates re-run with editor-created
-  bodies (editor and terminal create the same objects through the same
-  parser).
+- [x] **4.5 Gate (LANDED 2026-11-10, `mig_editor_roundtrip`, suite floor 60 → 61):**
+  editor panel edits → spec save → load from disk → bitwise identity,
+  PLUS the WP2 physics gates re-run with editor-created bodies. Builds a
+  spec programmatically (as the GTK editor would assemble it), emits
+  normalized text, saves to disk, loads back, requires byte-identical
+  normalized output; then composes bodies from the in-memory and re-loaded
+  specs through `physics_world_add_composite` and requires bitwise
+  identity (mass, COM, pose, inertia, per-part pool slices); re-runs WP2
+  physics checks (mass = sum of effective part masses, COM = mass-weighted
+  average, bound = covering bound) on the editor-created body. Pins
+  "editor and terminal create the same objects through the same parser."
+  Per-part authored materials are a post-4.5 feature (mig_part has no
+  material fields — body_defaults per part type, review 9.3).
 
 ## §7 WP5 — MFS adoption (toggle default OFF, A/B or the gate doesn't flip)
 
