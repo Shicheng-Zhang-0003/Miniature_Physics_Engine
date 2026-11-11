@@ -40,6 +40,7 @@
 #include "core/rigidbody.h"
 #include "core/mig_mass.h"
 #include "core/mig_spec.h"
+#include "core/mig_hull.h"
 #include "core/mpe_registry.h"
 
 /* Probe-7 fixture checker: the untouched totals must read 0xAB in every
@@ -2561,6 +2562,127 @@ int mpe_t_mig_editor_roundtrip (void) {
         printf ("[PASS] mig WP4 4.5: editor round-trip — save/load bitwise identity, "
                 "editor and terminal compose identical bodies, WP2 physics checks pass\n");
         MPE_INFO ("spec: sphere+explicit+mass+colour, cube+density+material, cylinder+explicit");
+    }
+    mpe_test_end (&t);
+    return t.failures;
+}
+
+/* WP2.5 2.5.1 gate (plan §8.5): hull point collection — pure data, no
+ * physics. Exact tetra/box point sets, garbage rejection of non-finite
+ * points, capacity enforcement. Oracles are hand geometry (binary-exact
+ * coordinates), never calls into the implementation. */
+int mpe_t_mig_hull_point_collection (void) {
+    mpe_test_t t;
+    mpe_test_begin (&t, "mig_hull_point_collection");
+
+    /* ---- 1. box point set: 8 exact corners of [-1,+2]×[-2,+3]×[-3,+4] ----
+     * hx=1, hy=2, hz=3 → 8 corners (±1,±2,±3). Enumeration order fixed. */
+    {
+        mig_hull_point buf [8];
+        mig_hull_point_set set;
+        MPE_CHECK (&t, mig_hull_point_set_init (&set, buf, 8) == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_build_box (1.0, 2.0, 3.0, &set) == mig_hull_ok);
+        MPE_CHECK (&t, set.count == 8);
+        /* Corner order: (+1,+2,+3), (+1,+2,-3), (+1,-2,+3), (+1,-2,-3),
+         * (-1,+2,+3), (-1,+2,-3), (-1,-2,+3), (-1,-2,-3) */
+        static const double expect [8][3] = {
+            { 1.0,  2.0,  3.0}, { 1.0,  2.0, -3.0}, { 1.0, -2.0,  3.0}, { 1.0, -2.0, -3.0},
+            {-1.0,  2.0,  3.0}, {-1.0,  2.0, -3.0}, {-1.0, -2.0,  3.0}, {-1.0, -2.0, -3.0},
+        };
+        for (int i = 0; i < 8; i++) {
+            char label [64];
+            snprintf (label, sizeof (label), "box corner %d", i);
+            MPE_CHECK_NEAR (&t, set.points [i].x, expect [i][0], 0.0, label);
+            MPE_CHECK_NEAR (&t, set.points [i].y, expect [i][1], 0.0, label);
+            MPE_CHECK_NEAR (&t, set.points [i].z, expect [i][2], 0.0, label);
+        }
+    }
+
+    /* ---- 2. tetra point set: 4 exact vertices, scale=2 ----
+     * (±2,±2,±2) with an even number of minus signs. All edges 2·√2·2. */
+    {
+        mig_hull_point buf [4];
+        mig_hull_point_set set;
+        MPE_CHECK (&t, mig_hull_point_set_init (&set, buf, 4) == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_build_tetra (2.0, &set) == mig_hull_ok);
+        MPE_CHECK (&t, set.count == 4);
+        static const double expect [4][3] = {
+            { 2.0,  2.0,  2.0}, { 2.0, -2.0, -2.0},
+            {-2.0,  2.0, -2.0}, {-2.0, -2.0,  2.0},
+        };
+        for (int i = 0; i < 4; i++) {
+            char label [64];
+            snprintf (label, sizeof (label), "tetra vertex %d", i);
+            MPE_CHECK_NEAR (&t, set.points [i].x, expect [i][0], 0.0, label);
+            MPE_CHECK_NEAR (&t, set.points [i].y, expect [i][1], 0.0, label);
+            MPE_CHECK_NEAR (&t, set.points [i].z, expect [i][2], 0.0, label);
+        }
+        /* All four points finite. */
+        MPE_CHECK (&t, mig_hull_point_set_validate (&set) == mig_hull_ok);
+    }
+
+    /* ---- 3. garbage rejection: non-finite points refused, set untouched ----
+     * NaN, +Inf, -Inf each return mig_hull_bad_point and leave count at 0. */
+    {
+        mig_hull_point buf [4];
+        mig_hull_point_set set;
+        MPE_CHECK (&t, mig_hull_point_set_init (&set, buf, 4) == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_point_set_add (&set, 0.0, 0.0, 0.0) == mig_hull_ok);
+        MPE_CHECK (&t, set.count == 1);
+        MPE_CHECK (&t, mig_hull_point_set_add (&set, 0.0 / 0.0, 0.0, 0.0) == mig_hull_bad_point);
+        MPE_CHECK (&t, mig_hull_point_set_add (&set, 1.0 / 0.0, 0.0, 0.0) == mig_hull_bad_point);
+        MPE_CHECK (&t, mig_hull_point_set_add (&set, -1.0 / 0.0, 0.0, 0.0) == mig_hull_bad_point);
+        MPE_CHECK (&t, mig_hull_point_set_add (&set, 0.0, 0.0 / 0.0, 0.0) == mig_hull_bad_point);
+        MPE_CHECK (&t, set.count == 1); /* garbage did not shrink or grow the set */
+    }
+
+    /* ---- 4. capacity enforcement: init with cap 2, 3rd add fails ----
+     * A full set returns mig_hull_bad_count, never silently grows. */
+    {
+        mig_hull_point buf [2];
+        mig_hull_point_set set;
+        MPE_CHECK (&t, mig_hull_point_set_init (&set, buf, 2) == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_point_set_add (&set, 1.0, 2.0, 3.0) == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_point_set_add (&set, 4.0, 5.0, 6.0) == mig_hull_ok);
+        MPE_CHECK (&t, set.count == 2);
+        MPE_CHECK (&t, mig_hull_point_set_add (&set, 7.0, 8.0, 9.0) == mig_hull_bad_count);
+        MPE_CHECK (&t, set.count == 2);
+    }
+
+    /* ---- 5. bad dims rejected by builders ----
+     * Non-positive or non-finite dims fail before any point is stored. */
+    {
+        mig_hull_point buf [8];
+        mig_hull_point_set set;
+        MPE_CHECK (&t, mig_hull_point_set_init (&set, buf, 8) == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_build_box (0.0, 1.0, 1.0, &set) == mig_hull_bad_point);
+        MPE_CHECK (&t, mig_hull_build_box (-1.0, 1.0, 1.0, &set) == mig_hull_bad_point);
+        MPE_CHECK (&t, mig_hull_build_box (1.0 / 0.0, 1.0, 1.0, &set) == mig_hull_bad_point);
+        MPE_CHECK (&t, set.count == 0); /* nothing stored on failure */
+        MPE_CHECK (&t, mig_hull_build_tetra (0.0, &set) == mig_hull_bad_point);
+        MPE_CHECK (&t, mig_hull_build_tetra (-1.0, &set) == mig_hull_bad_point);
+        MPE_CHECK (&t, set.count == 0);
+    }
+
+    /* ---- 6. NULL guard: all entry points refuse NULL ----
+     * mig_hull_null, never a segfault. */
+    {
+        mig_hull_point buf [4];
+        mig_hull_point_set set;
+        MPE_CHECK (&t, mig_hull_point_set_init (NULL, buf, 4) == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_point_set_init (&set, NULL, 4) == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_point_set_init (&set, buf, 0) == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_point_set_add (NULL, 1.0, 2.0, 3.0) == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_build_box (1.0, 1.0, 1.0, NULL) == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_build_tetra (1.0, NULL) == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_point_set_validate (NULL) == mig_hull_null);
+    }
+
+    if (t.failures == 0) {
+        printf ("[PASS] mig WP2.5 2.5.1: hull point collection — exact box/tetra point "
+                "sets, garbage rejection of non-finite points, capacity enforcement\n");
+        MPE_INFO ("box 8 corners (±1,±2,±3) bit-exact; tetra 4 vertices (±2,±2,±2) "
+                  "even-minus; NaN/±Inf refused with set unchanged; cap 2 blocks 3rd add");
     }
     mpe_test_end (&t);
     return t.failures;
