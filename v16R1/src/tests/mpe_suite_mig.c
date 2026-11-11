@@ -307,11 +307,142 @@ int mpe_t_mig_mass_composite (void) {
         /* Write-on-success contract: seven failing calls must leave every
          * byte of the untouched slab exactly as memset wrote it. */
         MPE_CHECK (&t, unchanged_slab (&untouched));
+
+        /* ---- 2026-11-10 audit tightening (review §2.4) ---- */
+        {
+            /* A zero-mass part inside a POSITIVE-total assembly used to be
+             * accepted (the old per-part check was m < 0): the frozen spec
+             * §4 requires every part's mass or density strictly positive. */
+            mig_part bad [2];
+            bad [0] = parts [0];
+            bad [1] = parts [0];
+            bad [0].mass = 1.0f;
+            bad [0].position = (vector3) {-0.5f, 0.0f, 0.0f};
+            bad [1].mass = 0.0f; /* ballast ghost: total still positive */
+            bad [1].position = (vector3) {0.5f, 0.0f, 0.0f};
+            MPE_CHECK (&t, mig_compose (bad, 2, &untouched) == mig_compose_bad_mass);
+        }
+        {
+            /* Unknown mass_mode enum: its own named reject, never silently
+             * read as density mode (the pre-audit else-branch). */
+            mig_part bad = parts [0];
+            bad.mass_mode = (mig_mass_mode) 7;
+            MPE_CHECK (&t, mig_compose (&bad, 1, &untouched) == mig_compose_bad_mass_mode);
+        }
+        {
+            /* Density mode with a malformed dimension reports bad_dims —
+             * the volume arithmetic must not poison the mass first (the
+             * pre-audit path computed m = rho*volume before validating
+             * dims, so hx = -0.5 surfaced as bad_mass). */
+            mig_part bad = parts [0];
+            bad.type = mig_part_cube;
+            bad.half_extensions = (vector3) {-0.5f, 0.5f, 0.5f};
+            bad.mass_mode = mig_mass_mode_density;
+            bad.mass = 1000.0f;
+            MPE_CHECK (&t, mig_compose (&bad, 1, &untouched) == mig_compose_bad_dims);
+        }
+        /* ---- long-double oracle: non-binary-exact assembly ----
+         * Hand-closed per-part tensors (independent of mig_mass.c's code
+         * path), COM + Steiner accumulated in long double:
+         *  sphere  m=2, r=0.3 at (0.1, 0.2, 0.3): I = 0.072 per axis.
+         *  cube    rho=3000, he=(0.15,0.2,0.25) at (0.55,-0.1,0.4),
+         *          Rz(+30 deg): volume 0.06, m=180; principal
+         *          (6.15, 5.1, 3.75); rotated Bxx 5.8875, Byy 5.3625,
+         *          Bzz 3.75, Bxy = cs(Ix-Iy) = +0.4546633369868303.
+         *  cylinder m=1.5, r=0.2, hl=0.7, axle X at (-0.4,0.35,-0.25),
+         *          Ry(+90 deg): principal (0.03 axial, 0.26 transverse);
+         *          rotated to diag(0.26, 0.26, 0.03).
+         * The float boundary (1e-7 relative) dominates the comparison. */
+        {
+            mig_part tri [3] = {0};
+            tri [0].type = mig_part_sphere; tri [0].radius = 0.3f;
+            tri [0].mass_mode = mig_mass_mode_explicit; tri [0].mass = 2.0f;
+            tri [0].position = (vector3) {0.1f, 0.2f, 0.3f};
+            tri [0].orientation = (vector4) {1.0f, 0.0f, 0.0f, 0.0f};
+            tri [1].type = mig_part_cube;
+            tri [1].half_extensions = (vector3) {0.15f, 0.2f, 0.25f};
+            tri [1].mass_mode = mig_mass_mode_density; tri [1].mass = 3000.0f;
+            tri [1].position = (vector3) {0.55f, -0.1f, 0.4f};
+            tri [1].orientation = (vector4) {0.9659258262890683f, 0.0f, 0.0f, 0.25881904510252074f};
+            tri [2].type = mig_part_cylinder; tri [2].radius = 0.2f; tri [2].cylinder_half_length = 0.7f;
+            tri [2].mass_mode = mig_mass_mode_explicit; tri [2].mass = 1.5f;
+            tri [2].position = (vector3) {-0.4f, 0.35f, -0.25f};
+            tri [2].orientation = (vector4) {0.7071067811865476f, 0.0f, 0.7071067811865476f, 0.0f};
+            mig_totals total;
+            MPE_CHECK (&t, mig_compose (tri, 3, &total) == mig_compose_ok);
+            /* The oracle reads the SAME float-struct inputs (the struct
+             * boundary is float by contract — 0.15/0.2 are not binary-
+             * exact), then derives every tensor in long double with the
+             * hand-closed principal forms and rotations above. */
+            const long double m1 = (long double) tri [0].mass;
+            const long double r1 = (long double) tri [0].radius;
+            const long double hx = (long double) tri [1].half_extensions.x;
+            const long double hy = (long double) tri [1].half_extensions.y;
+            const long double hz = (long double) tri [1].half_extensions.z;
+            const long double m2 = (long double) tri [1].mass * 8.0L * hx * hy * hz;
+            const long double m3 = (long double) tri [2].mass;
+            const long double M = m1 + m2 + m3;
+            const long double cx = (m1 * (long double) tri [0].position.x + m2 * (long double) tri [1].position.x + m3 * (long double) tri [2].position.x) / M;
+            const long double cy = (m1 * (long double) tri [0].position.y + m2 * (long double) tri [1].position.y + m3 * (long double) tri [2].position.y) / M;
+            const long double cz = (m1 * (long double) tri [0].position.z + m2 * (long double) tri [1].position.z + m3 * (long double) tri [2].position.z) / M;
+            /* Principal tensors: sphere 2/5 m r^2; box (m/12)(4h_a^2+4h_b^2);
+             * cylinder axle-X 1/2 m r^2 axial, (m/12)(3r^2+l^2) transverse. */
+            long double sph_B [3][3], cube_B [3][3], cyl_B [3][3];
+            for (int a = 0; a < 3; a++) {
+                sph_B [a][0] = sph_B [a][1] = sph_B [a][2] = 0;
+                cube_B [a][0] = cube_B [a][1] = cube_B [a][2] = 0;
+                cyl_B [a][0] = cyl_B [a][1] = cyl_B [a][2] = 0;
+            }
+            sph_B [0][0] = sph_B [1][1] = sph_B [2][2] = 0.4L * m1 * r1 * r1;
+            const long double cIx = (m2 / 12.0L) * (4.0L * hy * hy + 4.0L * hz * hz);
+            const long double cIy = (m2 / 12.0L) * (4.0L * hx * hx + 4.0L * hz * hz);
+            const long double cIz = (m2 / 12.0L) * (4.0L * hx * hx + 4.0L * hy * hy);
+            { /* Rz(+30 deg): c = cos30, s = sin30 */
+                const long double c = 0.8660254037844386467637232L, s = 0.5L;
+                cube_B [0][0] = c*c*cIx + s*s*cIy; cube_B [1][1] = s*s*cIx + c*c*cIy;
+                cube_B [2][2] = cIz;
+                cube_B [0][1] = cube_B [1][0] = c*s*(cIx - cIy);
+            }
+            const long double xIx = 0.5L * m3 * ((long double) tri [2].radius) * ((long double) tri [2].radius);
+            const long double xIt = (m3 / 12.0L) * (3.0L * ((long double) tri [2].radius) * ((long double) tri [2].radius)
+                                                    + 4.0L * ((long double) tri [2].cylinder_half_length) * ((long double) tri [2].cylinder_half_length));
+            { /* Ry(+90 deg): the axle leaves X, so axial lands on Z */
+                cyl_B [0][0] = xIt; cyl_B [1][1] = xIt; cyl_B [2][2] = xIx;
+            }
+            const long double pos [3][3] = {
+                {(long double) tri [0].position.x, (long double) tri [0].position.y, (long double) tri [0].position.z},
+                {(long double) tri [1].position.x, (long double) tri [1].position.y, (long double) tri [1].position.z},
+                {(long double) tri [2].position.x, (long double) tri [2].position.y, (long double) tri [2].position.z}
+            };
+            const long double mm [3] = {m1, m2, m3};
+            long double I [3][3] = {{0}};
+            for (int i = 0; i < 3; i++) {
+                const long double dx = pos [i][0] - cx, dy = pos [i][1] - cy, dz = pos [i][2] - cz;
+                const long double (*B)[3] = (i == 0) ? sph_B : (i == 1) ? cube_B : cyl_B;
+                for (int a = 0; a < 3; a++) {
+                    for (int b = 0; b < 3; b++) {
+                        I [a][b] += B [a][b] + mm [i] * ((dx*dx + dy*dy + dz*dz) * ((a == b) ? 1.0L : 0.0L)
+                                                        - ((a == 0 ? dx : (a == 1 ? dy : dz)) * (b == 0 ? dx : (b == 1 ? dy : dz))));
+                    }
+                }
+            }
+            MPE_CHECK_NEAR (&t, total.mass, (double) M, 1e-6, "oracle mass");
+            MPE_CHECK_NEAR (&t, total.com.x, (double) cx, 1e-6, "oracle com x");
+            MPE_CHECK_NEAR (&t, total.com.y, (double) cy, 1e-6, "oracle com y");
+            MPE_CHECK_NEAR (&t, total.com.z, (double) cz, 1e-6, "oracle com z");
+            for (int a = 0; a < 3; a++) {
+                for (int b = 0; b < 3; b++) {
+                    char label [64];
+                    snprintf (label, sizeof (label), "oracle I[%d][%d]", a, b);
+                    MPE_CHECK_NEAR (&t, total.inertia.matrix [a][b], (double) I [a][b], 1e-5, label);
+                }
+            }
+        }
     }
 
     if (t.failures == 0) {
         printf ("[PASS] mig stage0: composition matches independent closed-form mechanics\n");
-        MPE_INFO ("probes: dumbbell, L-Steiner offdiag, density mixing, 90-deg axis map, cross-type, rebase, 6 named errors");
+        MPE_INFO ("probes: dumbbell, L-Steiner offdiag, density mixing, 90-deg axis map, cross-type, rebase, 7 named errors, long-double oracle");
     }
     mpe_test_end (&t);
     return t.failures;

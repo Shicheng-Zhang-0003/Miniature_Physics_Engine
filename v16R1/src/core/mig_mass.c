@@ -27,25 +27,17 @@ static void mig_rot_from_quat (vector4 q, mig_rot3 *R) {
 /* Exact principal tensor of one primitive (double). Returns 0 on success.
  * Formulas duplicate — never re-route through — the rigidbody.c ones:
  * sphere (2/5)mr²; box (m/12)(h²+d²) per axis; cylinder axle-X ½mr² axial,
- * (m/12)(3r²+l²) transverse ("verified, do not fix", rigidbody.h). */
+ * (m/12)(3r²+l²) transverse ("verified, do not fix", rigidbody.h).
+ * 2026-11-10 audit tightening (review §2.4): dims and pose validate FIRST
+ * in every mode (a malformed dimension is mig_compose_bad_dims even in
+ * density mode, where the volume arithmetic used to poison the mass first
+ * and report bad_mass); every part's mass is STRICTLY POSITIVE (the frozen
+ * spec §4 — a zero-mass ballast part used to pass on a positive total); and
+ * an unknown mass_mode enum is mig_compose_bad_mass_mode, never silently
+ * read as density. */
 static int mig_part_tensor_local (const mig_part *p, mig_mass_mode mode, double *m_out, double diag [3]) {
-    double m, r, hl, hx, hy, hz;
-    if (mode == mig_mass_mode_explicit) { m = p -> mass; }
-    else {
-        r = p -> radius;
-        switch (p -> type) {
-            case mig_part_sphere: m = p -> mass * (4.0 / 3.0) * MIG_PI * r * r * r; break;
-            case mig_part_cylinder: m = p -> mass * MIG_PI * r * r * ((double) p -> cylinder_half_length * 2.0); break;
-            case mig_part_cube: {
-                hx = p -> half_extensions.x; hy = p -> half_extensions.y; hz = p -> half_extensions.z;
-                m = p -> mass * 8.0 * hx * hy * hz;
-                break;
-            }
-            default: return mig_compose_bad_type;
-        }
-        if (!isfinite (m) || m <= 0.0) { return mig_compose_bad_mass; }
-    }
-    if (!isfinite (m) || m < 0.0) { return mig_compose_bad_mass; }
+    double m = 0.0, r = 0.0, hl = 0.0, hx = 0.0, hy = 0.0, hz = 0.0;
+    /* Dims and pose first, per type — identical rule in BOTH mass modes. */
     switch (p -> type) {
         case mig_part_sphere: {
             r = p -> radius;
@@ -53,7 +45,6 @@ static int mig_part_tensor_local (const mig_part *p, mig_mass_mode mode, double 
                 !isfinite (p -> position.x) || !isfinite (p -> position.y) || !isfinite (p -> position.z)) {
                 return mig_compose_bad_dims;
             }
-            diag [0] = diag [1] = diag [2] = 0.4 * m * r * r;
             break;
         }
         case mig_part_cube: {
@@ -62,9 +53,6 @@ static int mig_part_tensor_local (const mig_part *p, mig_mass_mode mode, double 
                 !isfinite (p -> position.x) || !isfinite (p -> position.y) || !isfinite (p -> position.z)) {
                 return mig_compose_bad_dims;
             }
-            diag [0] = (m / 12.0) * (4.0 * hy * hy + 4.0 * hz * hz);
-            diag [1] = (m / 12.0) * (4.0 * hx * hx + 4.0 * hz * hz);
-            diag [2] = (m / 12.0) * (4.0 * hx * hx + 4.0 * hy * hy);
             break;
         }
         case mig_part_cylinder: {
@@ -73,13 +61,47 @@ static int mig_part_tensor_local (const mig_part *p, mig_mass_mode mode, double 
                 !isfinite (p -> position.x) || !isfinite (p -> position.y) || !isfinite (p -> position.z)) {
                 return mig_compose_bad_dims;
             }
+            break;
+        }
+        default: return mig_compose_bad_type;
+    }
+    /* Mass second: explicit kg, or density times the exact primitive
+     * volume (the SAME formulas the header documents — no second volume
+     * math anywhere). Both modes demand strictly positive mass. */
+    if (mode == mig_mass_mode_explicit) {
+        m = p -> mass;
+        if (!isfinite (m) || m <= 0.0) { return mig_compose_bad_mass; }
+    } else if (mode == mig_mass_mode_density) {
+        switch (p -> type) {
+            case mig_part_sphere:    m = p -> mass * (4.0 / 3.0) * MIG_PI * r * r * r; break;
+            case mig_part_cylinder:  m = p -> mass * MIG_PI * r * r * ((double) hl * 2.0); break;
+            case mig_part_cube:      m = p -> mass * 8.0 * hx * hy * hz; break;
+            default: return mig_compose_bad_type; /* unreachable above */
+        }
+        if (!isfinite (m) || m <= 0.0) { return mig_compose_bad_mass; }
+    } else {
+        /* Unknown enum: rejected LOUDLY with its own name — the pre-audit
+         * else-branch silently read any foreign value as density mode. */
+        return mig_compose_bad_mass_mode;
+    }
+    /* Principal tensor third: dims validated, mass positive. */
+    switch (p -> type) {
+        case mig_part_sphere:
+            diag [0] = diag [1] = diag [2] = 0.4 * m * r * r;
+            break;
+        case mig_part_cube:
+            diag [0] = (m / 12.0) * (4.0 * hy * hy + 4.0 * hz * hz);
+            diag [1] = (m / 12.0) * (4.0 * hx * hx + 4.0 * hz * hz);
+            diag [2] = (m / 12.0) * (4.0 * hx * hx + 4.0 * hy * hy);
+            break;
+        case mig_part_cylinder: {
             const double l = hl * 2.0;
             diag [0] = 0.5 * m * r * r; /* axial, local X */
             diag [1] = (m / 12.0) * (3.0 * r * r + l * l); /* transverse */
             diag [2] = (m / 12.0) * (3.0 * r * r + l * l);
             break;
         }
-        default: return mig_compose_bad_type;
+        default: return mig_compose_bad_type; /* unreachable above */
     }
     *m_out = m;
     return mig_compose_ok;
@@ -134,9 +156,18 @@ int mig_compose (const mig_part *parts, int count, mig_totals *out) {
     const double inv_M = 1.0 / M;
     mig_totals result;
     result.mass = M;
-    result.com.x = (float) (mx * inv_M);
-    result.com.y = (float) (my * inv_M);
-    result.com.z = (float) (mz * inv_M);
+    /* 2026-11-10 audit fix: the COM stays DOUBLE through the inertia sum —
+     * the old code cast it into the float vector3 fields here and then
+     * subtracted that rounded value per part, so the Steiner terms carried
+     * the rounding of an intermediate, not of the result (the documented
+     * "float boundary lands at the end" was not yet true). The struct
+     * write below is the one and only narrowing. */
+    const double com_x = mx * inv_M;
+    const double com_y = my * inv_M;
+    const double com_z = mz * inv_M;
+    result.com.x = (float) com_x;
+    result.com.y = (float) com_y;
+    result.com.z = (float) com_z;
     /* Pass 2: inertia about the COM. Double sums in part order; the float
      * boundary lands once, at the end. */
     double I [3][3] = {{0.0}};
@@ -148,9 +179,9 @@ int mig_compose (const mig_part *parts, int count, mig_totals *out) {
         mig_rot_from_quat (p -> orientation, &R);
         double part_I [3][3];
         mig_rotate_tensor (&R, diag, part_I);
-        const double dx = (double) p -> position.x - result.com.x;
-        const double dy = (double) p -> position.y - result.com.y;
-        const double dz = (double) p -> position.z - result.com.z;
+        const double dx = (double) p -> position.x - com_x;
+        const double dy = (double) p -> position.y - com_y;
+        const double dz = (double) p -> position.z - com_z;
         /* Steiner (parallel axis): I += m (d² δ − d⊗d). Off-diagonals here
          * carry the product-of-inertia the diagonal primitives cannot. */
         const double d2 = dx * dx + dy * dy + dz * dz;

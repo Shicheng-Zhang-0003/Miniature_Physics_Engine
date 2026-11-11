@@ -30,6 +30,11 @@
  *    behind a silent substitution. The assembly-frame matrix algebra
  *    mirrors the engine's vector4_to_math3 (math3d.h) term-for-term in
  *    double so the composite frame never disagrees with the body frame.
+ *  - 2026-11-10 audit: the COM stays double THROUGH the Steiner sum and
+ *    the float boundary lands ONCE, at the struct write — the pre-audit
+ *    code rounded the COM into result.com first and fed that rounded
+ *    float back into the per-part d_i, an unnecessary precision loss the
+ *    header's own "double only inside" claim already forbade.
  */
 #ifndef mig_mass_h
 #define mig_mass_h
@@ -71,7 +76,15 @@ typedef enum {
     mig_compose_bad_type = 2,  /* part type outside the WP0 primitive family */
     mig_compose_bad_dims = 3,  /* non-finite or non-positive dimension */
     mig_compose_bad_quat = 4,  /* non-finite or non-unit orientation */
-    mig_compose_bad_mass = 5   /* negative/non-finite mass, or total mass <= 0 */
+    mig_compose_bad_mass = 5,  /* non-finite or non-positive mass (per part
+                                * STRICTLY positive since the 2026-11-10
+                                * audit — a zero-mass part is a spec §4
+                                * violation, not a ballast idiom), or total
+                                * mass <= 0 */
+    mig_compose_bad_mass_mode = 6 /* 2026-11-10 audit: unknown mass_mode
+                                * enum — rejected with its own name, never
+                                * silently read as density (APPENDED: the
+                                * 0-5 values stay stable) */
 } mig_compose_err;
 
 /* Compose the assembly. Parts are iterated in definition order; mass/COM
