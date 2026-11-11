@@ -1075,15 +1075,17 @@ the editor is a window onto it; no editor-only truth exists.
 
 Charter §8 is the contract; the plan adds the risk discipline.
 
-- [ ] **5.1** `mfs_robot_build_composite()` in
-  `ecosystem/mfs/modules/ftc/submodules/robot.c`: chassis + wheel parts
-  (per-part anisotropic trio; the DESPOT mu_along/mu_across naming and the
-  anisotropy-frame truth transfer to part level verbatim — a wheel part's
-  material frame is its own part-local cross-frame; the frame id pointing
-  at the composite body means the body-local frame) + battery/ballast
-  parts for honest inertia. Motor drive stays
-  `rb_apply_forces_localised` (already COM-correct), forces now applied at
-  wheel-part world points.
+- [x] **5.1** `mfs_robot_build_composite()` (LANDED 2026-11-10) in
+  `ecosystem/mfs/modules/ftc/submodules/robot.c`: chassis + 4 wheel parts
+  + ballast part as a single `object_composite` body via
+  `physics_world_add_composite`. Parts in assembly frame, body born
+  COM-framed. Per-part friction stamped on pool entries (wheel parts
+  0.9/0.7, chassis/ballast from body_defaults). Drive forces applied at
+  wheel-part world positions via `rb_apply_forces_localised` on the
+  composite body (`ftc_robot_drive_composite`). Smoke gate
+  `mfs_composite_build`: body count=1, type=object_composite, parts=6,
+  mass=9.8 kg, part indices 0..5 monotonic, per-part friction carried.
+  Gate: smoke only until 5.3 green (A/B battery).
 - [ ] **5.2** Config toggle `mfs robot.composite 0|1`; default 0 for the
   entire WP.
 - [ ] **5.3** A/B battery (the acceptance bar): straight, strafe, pivot,

@@ -979,3 +979,54 @@ int mfs_t_external_truth (void) {
     } mfs_test_end (t_ptr);
     return t_ptr -> failures;
 }
+/* MIG WP5 5.1 smoke gate: mfs_robot_build_composite builds one
+ * object_composite body (chassis + 4 wheel parts + ballast) with correct
+ * mass, COM, part count, indices, and per-part friction. Smoke only until
+ * 5.3 green (A/B battery). */
+int mfs_t_composite_build (void) {
+    mfs_test_t t;
+    mfs_test_begin (&t, "composite_build");
+    physics_world w;
+    mfs_test_world (&w);
+    ftc_robot robot;
+    int rc = mfs_robot_build_composite (&w, &robot, 0.0f, 0.0f, 0.0f, MOTOR_GB_5203_13_7);
+    MFS_CHECK (&t, rc == 0);
+    MFS_CHECK (&t, robot.is_composite);
+    MFS_CHECK (&t, robot.composite_body >= 0);
+    if (rc == 0 && robot.composite_body >= 0) {
+        rigidbody *cb = &w.bodies [robot.composite_body];
+        MFS_CHECK (&t, cb->type == object_composite);
+        MFS_CHECK (&t, cb->composite_part_count == 6);
+        MFS_CHECK (&t, cb->part_base >= 0);
+        MFS_CHECK (&t, cb->part_base + cb->composite_part_count <= w.composite_part_count);
+        /* Mass = chassis(8.0) + 4*wheels(0.2) + ballast(1.0) = 9.8 kg */
+        MFS_CHECK_NEAR (&t, cb->mass, 8.0f + 4.0f * 0.2f + 1.0f, 1e-4f, "composite mass");
+        /* Assembly frame spawn at (0,0,0): COM is offset below origin by
+         * wheel/ballast mass (that is correct - the body COM is the
+         * assembly-frame COM, not the spawn point). X/Z should be ~0 by
+         * symmetry; Y is negative (wheels+ballast below chassis). */
+        MFS_CHECK_NEAR (&t, cb->position.x, 0.0f, 1e-4f, "composite COM x");
+        MFS_CHECK_NEAR (&t, cb->position.z, 0.0f, 1e-4f, "composite COM z");
+        /* Part indices 0..5 monotonic, all active */
+        for (int i = 0; i < 6; i++) {
+            composite_part *cp = &w.composite_parts [cb->part_base + i];
+            MFS_CHECK (&t, cp->part_index == i);
+            MFS_CHECK (&t, cp->active == 1);
+        }
+        /* Per-part friction carried: wheels 0.9/0.7 */
+        for (int i = 1; i <= 4; i++) {
+            composite_part *cp = &w.composite_parts [cb->part_base + i];
+            MFS_CHECK_NEAR (&t, cp->friction_static, 0.9f, 1e-6f, "wheel static friction");
+            MFS_CHECK_NEAR (&t, cp->friction_kinetic, 0.7f, 1e-6f, "wheel kinetic friction");
+            MFS_CHECK_NEAR (&t, cp->restitution, 0.0f, 1e-6f, "wheel restitution");
+        }
+        /* Finite state after build + one tick */
+        MFS_CHECK (&t, mfs_step (&w, 1, 1.0f / 60.0f));
+        MFS_CHECK (&t, mfs_test_finite (&w));
+    }
+    physics_world_cleanup (&w);
+    mfs_test_end (&t);
+    if (t.failures == 0)
+        printf ("[PASS] composite_build\n");
+    return t.failures;
+}

@@ -160,6 +160,16 @@ typedef struct {
      * creep while the driver's hands are off). Zero-init off; driving code
      * that never sets it is bit-identical. */
     int brake;
+
+    /* MIG WP5 5.1: composite-robot fields. When composite_body >= 0, the
+     * robot is a single object_composite body (chassis + wheel parts as
+     * parts of one rigid body) instead of chassis + separate wheel bodies
+     * + revolute joints. wheel_bodies/wheel_joints are unused in composite
+     * mode; wheel_local_pos holds each wheel part's assembly-frame
+     * position for drive force application via rb_apply_forces_localised. */
+    int composite_body;               /* -1 = child-body mode; >= 0 = composite body index */
+    bool is_composite;                /* true when built as a single object_composite */
+    vector3 wheel_local_pos [FTC_MAX_WHEELS]; /* wheel part local positions, assembly frame */
 } ftc_robot;
 /* MFS-STRAFE-A analytic constants (shared with drivetrain.c): slide
  * coefficient for roller-axle slip on tile (wheel-rubber kinetic class;
@@ -211,6 +221,11 @@ float ftc_robot_rest_height (void);
 int ftc_robot_create_with_drive (physics_world *world, ftc_robot *robot, float x, float y, float z,
                                  motor_preset_id preset, ftc_drivetrain_type drivetrain_type);
 int ftc_robot_create (physics_world *world, ftc_robot *robot, float x, float y, float z, motor_preset_id preset);
+/* MIG WP5 5.1: build one FTC robot as a single object_composite body
+ * (chassis + 4 wheel parts + ballast part). Returns 0 on success, -1 on
+ * failure (robot left poisoned: chassis_body = -1, is_composite = false). */
+int mfs_robot_build_composite (physics_world *world, ftc_robot *robot, float x, float y, float z,
+                               motor_preset_id preset);
 /* Install the drive field: enable MPE's static ground plane and set its
  * friction. RETURNS 0 on success.
  *

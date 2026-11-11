@@ -582,6 +582,190 @@ int ftc_robot_create_with_drive (physics_world *world, ftc_robot *robot, float x
     return -1;
 }
 int ftc_robot_create (physics_world *world, ftc_robot *robot, float x, float y, float z, motor_preset_id preset) {return ftc_robot_create_with_drive (world, robot, x, y, z, preset, FTC_DRIVETRAIN_MECANUM);}
+
+/* MIG WP5 5.1: build one FTC robot as a single object_composite body
+ * (chassis + 4 wheel parts + ballast part) instead of chassis + separate
+ * wheel bodies + revolute joints. Parts are assembly-frame poses in
+ * mig_part format; physics_world_add_composite composes mass/COM/inertia,
+ * re-anchors to the COM frame, and stores a contiguous pool slice.
+ * Motor drive stays rb_apply_forces_localised: forces are applied at
+ * wheel-part world positions (body_pos + R_body * local_pos) on the
+ * composite body. Per-part anisotropic friction is set on the pool
+ * entries after composition (scalar friction; anisotropy-frame wiring is
+ * post-5.1 because composite part ghost views copy scalar friction only).
+ *
+ * Returns 0 on success, -1 on failure (world NULL, robot NULL, compose
+ * rejected, over-cap). On failure the robot is left in a poisoned state
+ * (chassis_body = -1, is_composite = false) matching the child-body
+ * fail-path contract. */
+int mfs_robot_build_composite (physics_world *world, ftc_robot *robot, float x, float y, float z,
+                               motor_preset_id preset) {
+    if ((!world) || (!robot)) { return -1; }
+    memset (robot, 0, sizeof (*robot));
+    for (int i = 0; i < FTC_MAX_WHEELS; i++) {
+        robot -> wheel_traction_scale [i] = 1.0f;
+    } robot -> motor_preset = preset;
+    robot -> drivetrain_type = FTC_DRIVETRAIN_MECANUM;
+    robot -> axle_axis_x = 1.0f;
+    robot -> axle_axis_y = 0.0f;
+    robot -> axle_axis_z = 0.0f;
+    battery_init (&robot -> battery);
+
+    /* Build the assembly in the caller's frame (world position is the
+     * chassis origin). All poses are relative to (x,y,z) so the assembly
+     * frame is at the requested spawn point. */
+    mig_part parts [6];
+    int nparts = 0;
+
+    /* Part 0: chassis cube at assembly origin. */
+    parts [nparts++] = (mig_part){
+        .type = mig_part_cube,
+        .half_extensions = {CHASSIS_HALF_X, CHASSIS_HALF_Y, CHASSIS_HALF_Z},
+        .position = {0.0f, 0.0f, 0.0f},
+        .orientation = {1.0f, 0.0f, 0.0f, 0.0f},
+        .mass_mode = mig_mass_mode_explicit,
+        .mass = CHASSIS_MASS,
+    };
+
+    /* Parts 1-4: wheel cylinders at corner positions (assembly frame,
+     * relative to (x,y,z)). Cylinder axle is local X (MPE_FTC_090); the
+     * wheel axle points along world Y so local X must be rotated to Y:
+     * quaternion (cos45, 0, sin45, 0) = 90 deg about Z. */
+    float wheel_positions [4][3] = {
+        {x - WHEEL_OFFSET_X, y + WHEEL_Y_OFFSET, z - WHEEL_OFFSET_Z}, /* back-left (0) */
+        {x + WHEEL_OFFSET_X, y + WHEEL_Y_OFFSET, z - WHEEL_OFFSET_Z}, /* back-right (1) */
+        {x - WHEEL_OFFSET_X, y + WHEEL_Y_OFFSET, z + WHEEL_OFFSET_Z}, /* front-left (2) */
+        {x + WHEEL_OFFSET_X, y + WHEEL_Y_OFFSET, z + WHEEL_OFFSET_Z}, /* front-right (3) */
+    };
+    const float hsq = 0.7071067811865476f; /* sin/cos 45 deg */
+    robot -> wheel_count = 4;
+    for (int i = 0; i < 4; i++) {
+        robot -> wheel_local_pos [i] = (vector3){
+            wheel_positions [i][0] - x,
+            wheel_positions [i][1] - y,
+            wheel_positions [i][2] - z
+        };
+        parts [nparts++] = (mig_part){
+            .type = mig_part_cylinder,
+            .radius = WHEEL_RADIUS,
+            .cylinder_half_length = WHEEL_HALF_WIDTH,
+            .position = robot -> wheel_local_pos [i],
+            .orientation = {hsq, 0.0f, hsq, 0.0f}, /* axle along world Y */
+            .mass_mode = mig_mass_mode_explicit,
+            .mass = WHEEL_MASS,
+        };
+    }
+
+    /* Part 5: ballast (battery) below chassis, honest inertia. */
+    parts [nparts++] = (mig_part){
+        .type = mig_part_cube,
+        .half_extensions = {0.05f, 0.05f, 0.05f},
+        .position = {0.0f, -0.1f, 0.0f},
+        .orientation = {1.0f, 0.0f, 0.0f, 0.0f},
+        .mass_mode = mig_mass_mode_explicit,
+        .mass = 1.0f,
+    };
+
+    int body_idx = physics_world_add_composite (world, parts, nparts);
+    if (body_idx < 0) {
+        robot -> chassis_body = -1;
+        robot -> is_composite = false;
+        return -1;
+    }
+
+    rigidbody *rb = &world -> bodies [body_idx];
+    robot -> chassis_body = body_idx;
+    robot -> composite_body = body_idx;
+    robot -> is_composite = true;
+
+    /* Set per-part friction on the composite part pool entries.
+     * Wheel parts (1-4): grippy rubber (0.9/0.7). Chassis (0) and
+     * ballast (5): isotropic defaults already stamped by add_composite
+     * from body_defaults; leave them. */
+    for (int i = 1; i <= 4; i++) {
+        long slot = (long) rb -> part_base + (long) i;
+        if (slot >= 0 && slot < (long) world -> composite_part_count) {
+            composite_part *cp = &world -> composite_parts [slot];
+            cp -> friction_static = 0.9f;
+            cp -> friction_kinetic = 0.7f;
+            cp -> restitution = 0.0f;
+        }
+    }
+
+    return 0;
+}
+
+/* MIG WP5 5.1: composite drive. Wheels are fixed parts of one rigid body
+ * (no revolute joints, no independent wheel spin). Motor torque about each
+ * wheel axle becomes a ground-contact force applied at the wheel-part world
+ * position via rb_apply_forces_localised on the composite body:
+ *   F = torque / r_wheel along the roll direction
+ *   applied at body_pos + R_body * local_pos (wheel contact patch)
+ * This generates both linear propulsion (force on COM) and yaw moment
+ * (r x F about COM), exactly as a real mecanum drive would. */
+static void ftc_robot_drive_composite (physics_world *world, ftc_robot *robot, float dt) {
+    (void)dt; /* torque slew and governor already applied in caller */
+    if ((!world) || (!robot) || (robot -> composite_body < 0) ||
+        (robot -> composite_body >= world -> body_count)) { return; }
+    rigidbody *composite = &world -> bodies [robot -> composite_body];
+    if (composite -> static_state) { return; }
+    const mpe_config_t *cfg = mpe_world_cfg (world);
+    float g_mag = fabsf (cfg -> world.gravity);
+    if (!(g_mag > 0.0f) || !isfinite (g_mag)) { return; }
+    /* Normal load per wheel: N = m_wheel * g / wheel_count.
+     * The motor torque budget per wheel is mu * N * r_wheel (force at
+     * contact patch = torque / radius). Cap force at Coulomb cone. */
+    float n_per_wheel = (CHASSIS_MASS + 4.0f * WHEEL_MASS + 1.0f) * g_mag / (float) robot -> wheel_count;
+    float f_max = 0.9f * n_per_wheel; /* same mu_s as wheel parts */
+    for (int i = 0; i < robot -> wheel_count; i++) {
+        if (robot -> wheel_local_pos [i].x == 0.0f && robot -> wheel_local_pos [i].y == 0.0f &&
+            robot -> wheel_local_pos [i].z == 0.0f) { continue; } /* uninitialised */
+        motor *m = &robot -> wheel_motors [i];
+        if (!isfinite (m -> output_torque)) { continue; }
+        /* Only apply when commanded (avoid wasting cycles on idle wheels) */
+        if (fabsf (m -> command) < 0.01f) { continue; }
+        /* World position of this wheel part: body_pos + R_body * local_pos */
+        vector3 axle_world = vector4_rotate_to_vector3 (composite -> orientation,
+                                                        (vector3) {1.0f, 0.0f, 0.0f});
+        /* Roll direction: axle crossed with world up (Y). For mecanum wheels
+         * with axle along local X (rotated to world Y), roll direction is
+         * axle × Y = X × Y = Z in assembly frame, rotated by body orientation. */
+        vector3 roll_dir = vector3_cross (axle_world, (vector3) {0.0f, 1.0f, 0.0f});
+        float roll_len_sq = vector3_length_squared (roll_dir);
+        if (!(roll_len_sq > 1e-12f)) { continue; }
+        roll_dir = vector3_scaling (roll_dir, 1.0f / sqrtf (roll_len_sq));
+        /* World position of wheel part contact patch: body_pos + R_body * local_pos */
+        vector3 wheel_pos = vector3_addition (composite -> position,
+                                              vector4_rotate_to_vector3 (composite -> orientation,
+                                                                         robot -> wheel_local_pos [i]));
+        /* Contact patch is at wheel bottom: subtract r_run * world_up */
+        vector3 contact_pt = vector3_subtraction (wheel_pos,
+                                                  vector3_scaling ((vector3) {0.0f, 1.0f, 0.0f},
+                                                                   robot -> wheel_effective_radius [i] > 0.001f ?
+                                                                   robot -> wheel_effective_radius [i] : WHEEL_RADIUS));
+        /* Motor torque about axle -> force at contact patch along roll direction */
+        float torque = m -> output_torque;
+        /* Slew-limit torque (same 0.6 N.m/tick as articulated path) */
+        float prev = robot -> wheel_applied_torque [i];
+        float dl = torque - prev;
+        if (dl > 0.6f) torque = prev + 0.6f;
+        else if (dl < -0.6f) torque = prev - 0.6f;
+        robot -> wheel_applied_torque [i] = torque;
+        /* Force magnitude = torque / r_wheel, capped at Coulomb cone */
+        float r_run = robot -> wheel_effective_radius [i] > 0.001f ?
+                      robot -> wheel_effective_radius [i] : WHEEL_RADIUS;
+        float force = fabsf (torque) / r_run;
+        if (force > f_max) force = f_max;
+        /* Direction: sign of torque determines forward/reverse along roll_dir */
+        float f_signed = (torque >= 0.0f) ? force : -force;
+        vector3 F = vector3_scaling (roll_dir, f_signed);
+        /* Apply at contact patch: generates linear force + torque about COM */
+        rb_apply_forces_localised (composite, F, contact_pt);
+    }
+    /* Wake the composite body so forces are integrated this tick */
+    rigidbody_wake (composite);
+}
+
 /* Yaw-rate tracking (DESPOT-2026-11-07). The old handling aid was a damper
  * that only woke above 3.0 rad/s and a governor that only cut motor torque
  * above the same band; measured sustained rotate went 7.13 -> 8.03 rad/s
@@ -735,6 +919,15 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
             if (yaw_gov < 0.15f) { yaw_gov = 0.15f; }
         }
     }
+    /* MIG WP5 5.1: composite drive. When the robot is a single
+     * object_composite body, motor forces are applied at wheel-part world
+     * positions via rb_apply_forces_localised on the composite body
+     * (ftc_robot_drive_composite). The per-wheel motor torque loop below
+     * is skipped - wheels are fixed parts, not independently spinning
+     * bodies. */
+    if (robot -> is_composite) {
+        ftc_robot_drive_composite (world, robot, dt);
+    } else {
     for (int i = 0; i < robot -> wheel_count; i++) {
         int wheel_idx = robot -> wheel_bodies [i];
         if ((wheel_idx < 0) || (wheel_idx >= world -> body_count)) { continue; }
@@ -1289,7 +1482,8 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
             roller -> angular_velocity = vector3_scaling (spin_axis, omega_eq);
         }
 #endif
-    }
+    }  /* close per-wheel for loop (articulated path only) */
+    }  /* close else { composite vs articulated drive } */
 }
 void ftc_robot_set_wheel_commands (ftc_robot *robot, const float *commands, int count) {
     if (!robot) { return; }
