@@ -3637,3 +3637,286 @@ int mpe_t_mig_hull_shape_catalog (void) {
     mpe_test_end (&t);
     return t.failures;
 }
+
+/* ---- WP2.6 2.6.4: generic hull-vs-hull SAT — reference scenarios ----
+ *
+ * mig_hull_sat_hull_hull, transcribed from the side study's pp_sat.c
+ * (hardened normalization shared with the 2.5.4 pair functions). The
+ * oracles are the study's hand-derived interval-arithmetic scenarios
+ * (pp_math.md §4, pp_sat_test 59/59) and are INDEPENDENT of the
+ * implementation: prism-prism stack (overlap/touch/separate), prism vs
+ * box OFF the mirror plane (unique-min regime — centred boxes tie axes
+ * and rounding would pick the reported axis), pyramid vs floor box
+ * (sink/touch/raise), apex-to-apex pyramids (a side-face axis beating
+ * the z axis), and the ceiling-scale pin where raw edge crosses would
+ * overflow. Touching counts as overlap with depth 0; the axis points
+ * FROM A TOWARD B. Error mapping is ENGINE-consistent, not
+ * study-verbatim: wrong counts → mig_hull_bad_count, non-finite vertex
+ * → mig_hull_bad_point (the study folds both into bad_mesh), bad face
+ * index → mig_hull_bad_index, no usable axis at all → mig_hull_bad_mesh.
+ * Pure math, no solver, no flag: runs composite.hull-off.
+ */
+int mpe_t_mig_hull_sat_hulls (void) {
+    mpe_test_t t;
+    mpe_test_begin (&t, "mig_hull_sat_hulls");
+
+    const double R3 = 1.73205080756887729353; /* sqrt 3 */
+    const double R5 = 2.23606797749978969641; /* sqrt 5 */
+
+    /* Box face table mirroring mig_hull_build_box's corner enumeration
+     * (the 2.5.1 sgn order) — the same 12 outward-wound tris the 2.5.4
+     * gates use locally; there is no extern box table to consume. */
+    static const int box_f [12][3] = {
+        {0, 2, 3}, {0, 3, 1},  /* +X */
+        {4, 7, 6}, {4, 5, 7},  /* -X */
+        {0, 1, 5}, {0, 5, 4},  /* +Y */
+        {2, 7, 3}, {2, 6, 7},  /* -Y */
+        {0, 4, 6}, {0, 6, 2},  /* +Z */
+        {1, 7, 5}, {1, 3, 7},  /* -Z */
+    };
+
+    /* ---- S1: two aligned prisms stacked along z (s=h=2) ----
+     * B at +1.5: overlap 0.5 @ +z; at exactly +2: touch (overlap, depth
+     * 0); at +2.5: separated. The aligned pair needs only {±z, 3 side
+     * normals} — edge crosses all reduce. */
+    {
+        mig_hull_point va [6], vb [6];
+        mig_hull_point_set sa, sb;
+        mig_hull_sat_result r;
+        MPE_CHECK (&t, mig_hull_point_set_init (&sa, va, 6) == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_build_prism_equilateral (2.0, 2.0, &sa)
+                   == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_point_set_init (&sb, vb, 6) == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_build_prism_equilateral (2.0, 2.0, &sb)
+                   == mig_hull_ok);
+        for (int i = 0; i < 6; i++) { vb [i].z += 1.5; }
+        MPE_CHECK (&t, mig_hull_sat_hull_hull (va, 6, mig_hull_prism_faces, 8,
+                                               vb, 6, mig_hull_prism_faces, 8, &r)
+                   == mig_hull_ok);
+        MPE_CHECK (&t, r.overlap == 1);
+        MPE_CHECK_NEAR (&t, r.depth, 0.5, 1e-9, "S1 overlap depth");
+        MPE_CHECK_NEAR (&t, r.axis [0], 0.0, 1e-9, "S1 axis x");
+        MPE_CHECK_NEAR (&t, r.axis [1], 0.0, 1e-9, "S1 axis y");
+        MPE_CHECK_NEAR (&t, r.axis [2], 1.0, 1e-9, "S1 axis z");
+        MPE_CHECK (&t, mig_hull_point_set_init (&sb, vb, 6) == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_build_prism_equilateral (2.0, 2.0, &sb)
+                   == mig_hull_ok);
+        for (int i = 0; i < 6; i++) { vb [i].z += 2.0; }
+        MPE_CHECK (&t, mig_hull_sat_hull_hull (va, 6, mig_hull_prism_faces, 8,
+                                               vb, 6, mig_hull_prism_faces, 8, &r)
+                   == mig_hull_ok);
+        MPE_CHECK (&t, r.overlap == 1);
+        MPE_CHECK_NEAR (&t, r.depth, 0.0, 1e-9, "S1 touch depth");
+        MPE_CHECK_NEAR (&t, r.axis [2], 1.0, 1e-9, "S1 touch axis z");
+        MPE_CHECK (&t, mig_hull_point_set_init (&sb, vb, 6) == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_build_prism_equilateral (2.0, 2.0, &sb)
+                   == mig_hull_ok);
+        for (int i = 0; i < 6; i++) { vb [i].z += 2.5; }
+        MPE_CHECK (&t, mig_hull_sat_hull_hull (va, 6, mig_hull_prism_faces, 8,
+                                               vb, 6, mig_hull_prism_faces, 8, &r)
+                   == mig_hull_ok);
+        MPE_CHECK (&t, r.overlap == 0);
+        MPE_CHECK_NEAR (&t, r.depth, 0.0, 1e-9, "S1 separated depth");
+        MPE_CHECK_NEAR (&t, r.axis [2], 1.0, 1e-9, "S1 separated axis z");
+    }
+
+    /* ---- S2: prism vs box, off the mirror plane ----
+     * P(2,2) vs box half (0.5,1,1) centred (1.25, √3/2, 1). The box must
+     * NOT sit on the prism's mirror plane x=1: centred boxes tie the two
+     * side normals exactly and rounding would pick the reported axis.
+     * Off-plane the min is unique: MTD = 3√3/8 + 1/2 @ (√3/2, 1/2, 0). */
+    {
+        mig_hull_point va [6], vb [8];
+        mig_hull_point_set sa, sb;
+        mig_hull_sat_result r;
+        MPE_CHECK (&t, mig_hull_point_set_init (&sa, va, 6) == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_build_prism_equilateral (2.0, 2.0, &sa)
+                   == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_point_set_init (&sb, vb, 8) == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_build_box (0.5, 1.0, 1.0, &sb) == mig_hull_ok);
+        for (int i = 0; i < 8; i++) {
+            vb [i].x += 1.25; vb [i].y += R3 / 2.0; vb [i].z += 1.0;
+        }
+        MPE_CHECK (&t, mig_hull_sat_hull_hull (va, 6, mig_hull_prism_faces, 8,
+                                               vb, 8, &box_f [0][0], 12, &r)
+                   == mig_hull_ok);
+        MPE_CHECK (&t, r.overlap == 1);
+        MPE_CHECK_NEAR (&t, r.depth, 3.0 * R3 / 8.0 + 0.5, 1e-9, "S2 depth");
+        MPE_CHECK_NEAR (&t, r.axis [0], R3 / 2.0, 1e-9, "S2 axis x");
+        MPE_CHECK_NEAR (&t, r.axis [1], 0.5, 1e-9, "S2 axis y");
+        MPE_CHECK_NEAR (&t, r.axis [2], 0.0, 1e-9, "S2 axis z");
+    }
+
+    /* ---- S3: square pyramid on a floor box ----
+     * P(2,2) vs box half (10,10,1) centred (0,0,-1) (top surface z=0).
+     * Sunk 0.5 → MTD 0.5 @ (0,0,-1); exact contact → overlap depth 0;
+     * raised 0.5 → separated. Side axes are ~10 far from the min. */
+    {
+        mig_hull_point vf [8];
+        mig_hull_point_set sf;
+        MPE_CHECK (&t, mig_hull_point_set_init (&sf, vf, 8) == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_build_box (10.0, 10.0, 1.0, &sf) == mig_hull_ok);
+        for (int i = 0; i < 8; i++) { vf [i].z -= 1.0; }
+        mig_hull_point vp [5];
+        mig_hull_point_set sp;
+        mig_hull_sat_result r;
+        MPE_CHECK (&t, mig_hull_point_set_init (&sp, vp, 5) == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_build_pyr4_square (2.0, 2.0, &sp) == mig_hull_ok);
+        for (int i = 0; i < 5; i++) { vp [i].z -= 0.5; }
+        MPE_CHECK (&t, mig_hull_sat_hull_hull (vp, 5, mig_hull_pyr4_faces, 6,
+                                               vf, 8, &box_f [0][0], 12, &r)
+                   == mig_hull_ok);
+        MPE_CHECK (&t, r.overlap == 1);
+        MPE_CHECK_NEAR (&t, r.depth, 0.5, 1e-9, "S3 sunk depth");
+        MPE_CHECK_NEAR (&t, r.axis [2], -1.0, 1e-9, "S3 sunk axis z");
+        /* Cross-consistency pin (engine-added): the 2.5.4 hull-vs-box
+         * reference and the new generic pair must agree on the same
+         * geometry (identical axis sets up to duplicates). */
+        mig_hull_sat_result rb;
+        MPE_CHECK (&t, mig_hull_sat_hull_box (vp, 5, mig_hull_pyr4_faces, 6,
+                                              (const double [3]) {0.0, 0.0, -1.0},
+                                              (const double [3]) {10.0, 10.0, 1.0}, &rb)
+                   == mig_hull_ok);
+        MPE_CHECK (&t, rb.overlap == 1);
+        MPE_CHECK_NEAR (&t, rb.depth, r.depth, 1e-12, "S3 hull-box depth parity");
+        MPE_CHECK (&t, mig_hull_point_set_init (&sp, vp, 5) == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_build_pyr4_square (2.0, 2.0, &sp) == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_sat_hull_hull (vp, 5, mig_hull_pyr4_faces, 6,
+                                               vf, 8, &box_f [0][0], 12, &r)
+                   == mig_hull_ok);
+        MPE_CHECK (&t, r.overlap == 1);
+        MPE_CHECK_NEAR (&t, r.depth, 0.0, 1e-9, "S3 touch depth");
+        MPE_CHECK_NEAR (&t, r.axis [2], -1.0, 1e-9, "S3 touch axis z");
+        for (int i = 0; i < 5; i++) { vp [i].z += 0.5; }
+        MPE_CHECK (&t, mig_hull_sat_hull_hull (vp, 5, mig_hull_pyr4_faces, 6,
+                                               vf, 8, &box_f [0][0], 12, &r)
+                   == mig_hull_ok);
+        MPE_CHECK (&t, r.overlap == 0);
+        MPE_CHECK_NEAR (&t, r.axis [2], -1.0, 1e-9, "S3 raised axis z");
+    }
+
+    /* ---- S4: two square pyramids apex to apex ----
+     * P1(2,2) apex-up; P2 = mirror about z=2 (apex-down, base z=4).
+     * Touch: apex meets apex → overlap depth 0 @ +z. P2 raised 0.25 →
+     * separated. P2 lowered 0.5 from there (apex at z=1.75, inside P1):
+     * the z depth would be 0.25 but P1's SIDE face wins with
+     * d1 = 0.25/√5 @ (0,-2,1)/√5; all edge crosses verified >= that. */
+    {
+        mig_hull_point v1 [5], v2 [5];
+        int f2 [18];
+        mig_hull_point_set s1, s2;
+        mig_hull_sat_result r;
+        MPE_CHECK (&t, mig_hull_point_set_init (&s1, v1, 5) == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_build_pyr4_square (2.0, 2.0, &s1) == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_point_set_init (&s2, v2, 5) == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_build_pyr4_square (2.0, 2.0, &s2) == mig_hull_ok);
+        for (int i = 0; i < 5; i++) { v2 [i].z = 4.0 - v2 [i].z; }
+        for (int f = 0; f < 6; f++) { /* reflection flips handedness */
+            f2 [3 * f + 0] = mig_hull_pyr4_faces [3 * f + 1];
+            f2 [3 * f + 1] = mig_hull_pyr4_faces [3 * f + 0];
+            f2 [3 * f + 2] = mig_hull_pyr4_faces [3 * f + 2];
+        }
+        MPE_CHECK (&t, mig_hull_sat_hull_hull (v1, 5, mig_hull_pyr4_faces, 6,
+                                               v2, 5, f2, 6, &r)
+                   == mig_hull_ok);
+        MPE_CHECK (&t, r.overlap == 1);
+        MPE_CHECK_NEAR (&t, r.depth, 0.0, 1e-9, "S4 touch depth");
+        MPE_CHECK_NEAR (&t, r.axis [2], 1.0, 1e-9, "S4 touch axis z");
+        for (int i = 0; i < 5; i++) { v2 [i].z += 0.25; }
+        MPE_CHECK (&t, mig_hull_sat_hull_hull (v1, 5, mig_hull_pyr4_faces, 6,
+                                               v2, 5, f2, 6, &r)
+                   == mig_hull_ok);
+        MPE_CHECK (&t, r.overlap == 0);
+        MPE_CHECK_NEAR (&t, r.axis [2], 1.0, 1e-9, "S4 separated axis z");
+        for (int i = 0; i < 5; i++) { v2 [i].z -= 0.5; }
+        MPE_CHECK (&t, mig_hull_sat_hull_hull (v1, 5, mig_hull_pyr4_faces, 6,
+                                               v2, 5, f2, 6, &r)
+                   == mig_hull_ok);
+        MPE_CHECK (&t, r.overlap == 1);
+        MPE_CHECK_NEAR (&t, r.depth, 0.25 / R5, 1e-9, "S4 overlap depth");
+        MPE_CHECK_NEAR (&t, r.axis [0], 0.0, 1e-9, "S4 axis x");
+        MPE_CHECK_NEAR (&t, r.axis [1], -2.0 / R5, 1e-9, "S4 axis y");
+        MPE_CHECK_NEAR (&t, r.axis [2], 1.0 / R5, 1e-9, "S4 axis z");
+    }
+
+    /* ---- S5: ceiling-scale robustness pin ----
+     * Prism at s=h=1e200 vs box half (1,1,1) at its centroid. Raw
+     * crosses of two ~1e200 edges overflow a double; with the hardened
+     * normalization the true MTD survives: on u = (0,-1,0),
+     * d1 = √3·s/6 + 1 is the min → axis (0,-1,0), translating A by
+     * -axis·depth lifts A's y=0 face exactly to B's top. */
+    {
+        mig_hull_point va [6], vb [8];
+        mig_hull_point_set sa, sb;
+        mig_hull_sat_result r;
+        MPE_CHECK (&t, mig_hull_point_set_init (&sa, va, 6) == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_build_prism_equilateral (1e200, 1e200, &sa)
+                   == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_point_set_init (&sb, vb, 8) == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_build_box (1.0, 1.0, 1.0, &sb) == mig_hull_ok);
+        for (int i = 0; i < 8; i++) {
+            vb [i].x += 0.5e200; vb [i].y += R3 / 6.0 * 1e200;
+            vb [i].z += 0.5e200;
+        }
+        MPE_CHECK (&t, mig_hull_sat_hull_hull (va, 6, mig_hull_prism_faces, 8,
+                                               vb, 8, &box_f [0][0], 12, &r)
+                   == mig_hull_ok);
+        MPE_CHECK (&t, r.overlap == 1);
+        MPE_CHECK_REL (&t, r.depth, R3 / 6.0 * 1e200 + 1.0, 1e-12, "S5 depth");
+        MPE_CHECK_NEAR (&t, r.axis [0], 0.0, 1e-9, "S5 axis x");
+        MPE_CHECK_NEAR (&t, r.axis [1], -1.0, 1e-9, "S5 axis y");
+        MPE_CHECK_NEAR (&t, r.axis [2], 0.0, 1e-9, "S5 axis z");
+    }
+
+    /* ---- S6: refusal battery (engine error mapping) ----
+     * NULL → mig_hull_null; wrong counts → mig_hull_bad_count; bad face
+     * index → mig_hull_bad_index; non-finite vertex → mig_hull_bad_point.
+     * Nothing is written to out on any refusal (write-on-success). */
+    {
+        mig_hull_point va [6];
+        mig_hull_point_set sa;
+        MPE_CHECK (&t, mig_hull_point_set_init (&sa, va, 6) == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_build_prism_equilateral (2.0, 2.0, &sa)
+                   == mig_hull_ok);
+        mig_hull_point vb [8];
+        mig_hull_point_set sb;
+        MPE_CHECK (&t, mig_hull_point_set_init (&sb, vb, 8) == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_build_box (0.5, 1.0, 1.0, &sb) == mig_hull_ok);
+        mig_hull_sat_result r;
+        MPE_CHECK (&t, mig_hull_sat_hull_hull (NULL, 8, &box_f [0][0], 12,
+                                               vb, 8, &box_f [0][0], 12, &r)
+                   == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_sat_hull_hull (va, 6, mig_hull_prism_faces, 8,
+                                               vb, 8, &box_f [0][0], 12, NULL)
+                   == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_sat_hull_hull (va, 3, mig_hull_prism_faces, 8,
+                                               vb, 8, &box_f [0][0], 12, &r)
+                   == mig_hull_bad_count);
+        MPE_CHECK (&t, mig_hull_sat_hull_hull (va, 6, mig_hull_prism_faces, 2,
+                                               vb, 8, &box_f [0][0], 12, &r)
+                   == mig_hull_bad_count);
+        static const int bad_f [4][3] = {
+            {0, 9, 2}, {0, 2, 1}, {3, 4, 5}, {0, 1, 4}
+        };
+        MPE_CHECK (&t, mig_hull_sat_hull_hull (va, 6, &bad_f [0][0], 4,
+                                               vb, 8, &box_f [0][0], 12, &r)
+                   == mig_hull_bad_index);
+        mig_hull_point nanv [4];
+        mig_hull_point_set sn;
+        MPE_CHECK (&t, mig_hull_point_set_init (&sn, nanv, 4) == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_build_pyr3_equilateral (2.0, 3.0, &sn)
+                   == mig_hull_ok);
+        nanv [2].y = 0.0 / 0.0;
+        MPE_CHECK (&t, mig_hull_sat_hull_hull (nanv, 4, mig_hull_pyr3_faces, 4,
+                                               vb, 8, &box_f [0][0], 12, &r)
+                   == mig_hull_bad_point);
+    }
+
+    MPE_INFO ("S1 prism stack 0.5@+z / touch / separated; S2 off-plane "
+              "3√3/8+1/2 @ (√3/2,1/2,0); S3 pyr4-floor sink/touch/raise "
+              "+ hull-box depth parity; S4 apex-apex side-face "
+              "0.25/√5 @ (0,-2,1)/√5; S5 1e200 ceiling pin; NULL/"
+              "bad_count/bad_index/bad_point refusals");
+    mpe_test_end (&t);
+    return t.failures;
+}

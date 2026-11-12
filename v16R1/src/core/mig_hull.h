@@ -138,6 +138,22 @@ mig_hull_err mig_hull_sat_hull_sphere (const mig_hull_point *verts, int vert_cou
                                        const double center[3], double radius,
                                        mig_hull_sat_result *out);
 
+/* Hull vs hull (both closed, convex, outward-wound — caller contract,
+ * validated by mig_hull_mesh_props conventions; count/vertex/index
+ * defects are rejected BEFORE any verdict). Axis set: A's face normals,
+ * B's face normals, then every A-edge × B-edge cross (directed
+ * triangle-soup edges — duplicates only re-test an existing axis). On
+ * overlap, translating A by −axis·depth separates the pair (the FIRST
+ * minimum wins ties); on separation, `axis` is a proven separating
+ * direction pointing FROM A TOWARD B and depth is 0. Overflow-hardened
+ * like the 2.5.4 pairs (pre-scaled normalization), so ceiling-scale
+ * geometry keeps its true MTD. */
+mig_hull_err mig_hull_sat_hull_hull (const mig_hull_point *va, int na,
+                                     const int *fa, int nfa,
+                                     const mig_hull_point *vb, int nb,
+                                     const int *fb, int nfb,
+                                     mig_hull_sat_result *out);
+
 /* ---- APPENDED WP2.6 2.6.1: exact-coordinate hull shapes (pure data) ----
  * Transcribed from the prism/pyramid side study (its sections 1-2;
  * conventions unchanged). Extrusion-family shapes put the base at z=0

@@ -285,9 +285,9 @@ truth in this order and do not write a new line of code until green:
 ```bash
 cd 475-MPE/v16R1/src
 make build_suite            # zero complaints expected (-Werror is default)
-./test_mpe_suite --all      # expect: Total: 66 | Blocking failures: 0
+./test_mpe_suite --all      # expect: Total: 67 | Blocking failures: 0
 cd ../..
-python3 tools/test_runner.py --profile quick   # expect Checks: 80 | passed: 80
+python3 tools/test_runner.py --profile quick   # expect Checks: 81 | passed: 81
 git status --short          # manifest must match §1 exactly — no half-written files
 ```
 
@@ -1236,8 +1236,24 @@ the study's closed-form oracles are the gates' oracles, unchanged.
 - [ ] **2.6.3 Ellipsoid UV builder (`pp_math.md` §7).** Band-sum mass
   properties gate; affine covariance of the inertia tensor is the
   oracle the study proved.
-- [ ] **2.6.4 Generic hull-vs-hull SAT.** Behind `composite.hull 1`;
-  reference-pair gates only, no scene-format default flip.
+- [x] **2.6.4 Generic hull-vs-hull SAT (LANDED 2026-11-12, see the §9
+  ledger line).** Landed as a PURE-DATA brick — `mig_hull_sat_hull_hull`
+  in `core/mig_hull.{h,c}` (boolean + MTD, first-min-wins ties, axis
+  from A toward B), no engine consumption yet, so no flag: the
+  `composite.hull` gate applies when a consumer exists (2.6.5 spawn).
+  The plan's original "behind composite.hull 1" phrasing named the
+  consumption precondition, not the function itself.
+- [ ] **2.6.5 Hull body + spawn consumption.** `object_hull` appended
+  to `object_type` (append-only ABI), per-world hull data pool,
+  `physics_world_add_hull` (density-1 mesh_props → rebase to COM →
+  diagonal inertia × mass → circumradius in `radius`), pair handlers
+  (hull-sphere / hull-cube / hull-hull) ALL gated on `composite.hull`,
+  floor support-vertex manifold, CCD branches, broadphase radius,
+  renderer explicit hull skip + counter, scene-save veto (loader
+  already rejects unknown types), `touch prism|pyr4|pyr3|icosa` verbs
+  that refuse loudly when the flag is 0. Gate `mig_hull_spawn`
+  (68th): flag-off refusal, floor-rest closed form, sphere
+  bounce-off, mesh-props consistency.
 
 ## §9 Risk register + the standing ledger
 
@@ -1617,6 +1633,36 @@ Ledger (new entries get a line, never an edit of a past line):
   no engine-side repeat). Suite floor 65 → 66; suite 65/65 → 66/66,
   quick 79/79 → 80/80 at the landing; pure data + mesh_props, runs
   `composite.hull`-off.
+
+- 2026-11-12 — WP2.6 2.6.4 (this commit): the generic hull-vs-hull
+  SAT — `mig_hull_sat_hull_hull` in `core/mig_hull.{h,c}`, transcribed
+  from the side study's `pp_sat.c` (the study's conventions mirror the
+  engine's 2.5.4 hardening, so the helpers are shared: strict-`<`
+  interval feed with first-min-wins ties, max-abs pre-scaled
+  normalization before squaring, `MIG_HULL_AXIS_EPS 1e-12`). Axis set:
+  A's face normals, B's face normals, then every directed A-edge ×
+  B-edge cross (triangle-soup duplicates harmless); on overlap,
+  translating A by −axis·depth separates the pair; on separation the
+  axis points FROM A TOWARD B and depth is 0 (touching = overlap at
+  depth 0, the engine convention). New gate `mig_hull_sat_hulls`
+  (67th entry, blocking): the study's verified scenario oracles
+  S1–S5 (pp_sat_test 59/59) — prism stack overlap/touch/separate,
+  prism vs box OFF the mirror plane (unique-min regime; centred boxes
+  tie the two side normals exactly and rounding would pick the
+  reported axis), pyr4 vs floor box sink/touch/raise, apex-to-apex
+  pyramids where P1's SIDE face beats the z axis
+  (0.25/√5 @ (0,−2,1)/√5), and the 1e200 ceiling-scale pin where raw
+  edge crosses would overflow — plus the engine-added cross-pin (new
+  generic SAT vs 2.5.4 `mig_hull_sat_hull_box` depth parity on the
+  same geometry) and the refusal battery in the ENGINE-consistent
+  mapping, not study-verbatim: wrong counts (nv<4/nf<4) →
+  `mig_hull_bad_count`, non-finite vertex → `mig_hull_bad_point`
+  (the study folds both into `bad_mesh`), bad face index →
+  `mig_hull_bad_index`, no usable axis at all → `mig_hull_bad_mesh`.
+  Pure data, no solver, no flag (nothing consumes hull-vs-hull yet —
+  2.6.5 spawn gates its consumption on `composite.hull`). Suite floor
+  66 → 67; suite 66/66 → 67/67, quick 80/80 → 81/81 at the landing;
+  ASan/UBSan spot-check of the new gate clean.
 
 ## §10 Definition of done for v16S (the cut checklist)
 

@@ -550,6 +550,91 @@ mig_hull_err mig_hull_sat_hull_sphere (const mig_hull_point *verts, int vert_cou
     return mig_hull_ok;
 }
 
+/* One mesh's face normals as candidate axes (the hull-vs-hull axis set,
+ * step 1 of 2). The cross itself must be overflow-proof: e1 and e2 are
+ * each pre-scaled by their own max-abs INSIDE mig_hull_cross_unit (the
+ * raw cross of two ~1e200 edges overflows a double even though its
+ * direction is exact — the WP2.5 hardening lesson, applied at the
+ * face-normal site too). */
+static void mig_hull_feed_faces (mig_hull_sat_state *st,
+                                 const mig_hull_point *verts, int nv,
+                                 const int *faces, int nf,
+                                 const mig_hull_point *other, int no) {
+    for (int f = 0; f < nf && !st -> separated; f++) {
+        const mig_hull_point *p = &verts [faces [3 * f + 0]];
+        const mig_hull_point *q = &verts [faces [3 * f + 1]];
+        const mig_hull_point *r = &verts [faces [3 * f + 2]];
+        const double e1 [3] = {q -> x - p -> x, q -> y - p -> y,
+                               q -> z - p -> z};
+        const double e2 [3] = {r -> x - p -> x, r -> y - p -> y,
+                               r -> z - p -> z};
+        double u [3];
+        if (!mig_hull_cross_unit (e1, e2, u)) { continue; }
+        double lo_a, hi_a, lo_b, hi_b;
+        mig_hull_support_range (verts, nv, u, &lo_a, &hi_a);
+        mig_hull_support_range (other, no, u, &lo_b, &hi_b);
+        mig_hull_sat_feed (st, u, lo_a, hi_a, lo_b, hi_b);
+    }
+}
+
+mig_hull_err mig_hull_sat_hull_hull (const mig_hull_point *va, int na,
+                                     const int *fa, int nfa,
+                                     const mig_hull_point *vb, int nb,
+                                     const int *fb, int nfb,
+                                     mig_hull_sat_result *out) {
+    if (!out) { return mig_hull_null; }
+    mig_hull_err e = mig_hull_sat_validate (va, na, fa, nfa);
+    if (e != mig_hull_ok) { return e; }
+    e = mig_hull_sat_validate (vb, nb, fb, nfb);
+    if (e != mig_hull_ok) { return e; }
+    mig_hull_sat_state st;
+    st.separated = 0;
+    st.depth = HUGE_VAL;
+    st.axis [0] = st.axis [1] = st.axis [2] = 0.0;
+    /* Axis generation order: A's face normals, B's face normals, then
+     * every A-edge x B-edge cross; the FIRST minimum wins ties. Directed
+     * edges of a triangle soup: 3 per face — duplicates are harmless
+     * (they only re-test an axis that is already in the set). */
+    mig_hull_feed_faces (&st, va, na, fa, nfa, vb, nb);
+    mig_hull_feed_faces (&st, vb, nb, fb, nfb, va, na);
+    const int nea = 3 * nfa, neb = 3 * nfb;
+    for (int i = 0; i < nea && !st.separated; i++) {
+        const int i0 = fa [3 * (i / 3) + (i % 3)];
+        const int i1 = fa [3 * (i / 3) + ((i + 1) % 3)];
+        const double ed [3] = {va [i1].x - va [i0].x,
+                               va [i1].y - va [i0].y,
+                               va [i1].z - va [i0].z};
+        for (int j = 0; j < neb && !st.separated; j++) {
+            const int j0 = fb [3 * (j / 3) + (j % 3)];
+            const int j1 = fb [3 * (j / 3) + ((j + 1) % 3)];
+            const double fd [3] = {vb [j1].x - vb [j0].x,
+                                   vb [j1].y - vb [j0].y,
+                                   vb [j1].z - vb [j0].z};
+            double u [3];
+            if (!mig_hull_cross_unit (ed, fd, u)) { continue; }
+            double lo_a, hi_a, lo_b, hi_b;
+            mig_hull_support_range (va, na, u, &lo_a, &hi_a);
+            mig_hull_support_range (vb, nb, u, &lo_b, &hi_b);
+            mig_hull_sat_feed (&st, u, lo_a, hi_a, lo_b, hi_b);
+        }
+    }
+    if (st.separated) {
+        out -> overlap = 0;
+        out -> depth = 0.0;
+        out -> axis [0] = st.axis [0];
+        out -> axis [1] = st.axis [1];
+        out -> axis [2] = st.axis [2];
+        return mig_hull_ok;
+    }
+    if (!isfinite (st.depth)) { return mig_hull_bad_mesh; /* no usable axis */ }
+    out -> overlap = 1;
+    out -> depth = st.depth;
+    out -> axis [0] = st.axis [0];
+    out -> axis [1] = st.axis [1];
+    out -> axis [2] = st.axis [2];
+    return mig_hull_ok;
+}
+
 /* ---- APPENDED WP2.6 2.6.1: exact-coordinate hull shapes ----
  * See mig_hull.h for the contract. Fixed literals only: √3 and the
  * golden ratio, spelled out like mig_mass's fixed-π rule — no trig, no

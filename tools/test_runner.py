@@ -3,7 +3,7 @@
 
 Profiles:
   quick    Python runner-contract tests and the canonical C regression suite
-           (66 cases incl. 2 informational diags; full suite re-run under 5
+           (67 cases incl. 2 informational diags; full suite re-run under 5
            regimes default/light/heavy/brittle/sticky via MPE_TEST_REGIME).
   physics  quick + every isolated legacy case (30) and all paranoia cases (15).
   full     physics + ASan/UBSan suite, MFS robotics (37 gated), TUI snapshots
@@ -16,7 +16,7 @@ only the Python standard library.
 
 Strict contract: suite cases that print [SKIP] (self-skipped coverage) fail
 the run unless --allow-skip is given; [XFAIL] markers are surfaced in the
-summary counts but never block. Registry floors: MIN_SUITE_ENTRIES=66,
+summary counts but never block. Registry floors: MIN_SUITE_ENTRIES=67,
 MIN_LEGACY_ENTRIES=30, MIN_PARANOIA_ENTRIES=15; summary contract requires
 Total == registry size and Blocking failures == 0.
 """
@@ -197,7 +197,14 @@ MPE_TEST_REGIMES = ("default", "light", "heavy", "brittle", "sticky")
 # (c) WP2.6 opens — the hull shape catalog (2.6.1) adds mig_hull_shape_
 # catalog: exact prism/pyramid/icosahedron point sets + exposed face
 # tables, closed-form oracles doubling as the mechanical winding proof.
-MIN_SUITE_ENTRIES = 66
+# -> 66 (2026-11-12, WP2.6 2.6.1: mig_hull_shape_catalog above).
+# (d) 2.6.4 adds mig_hull_sat_hulls: generic hull-vs-hull SAT (boolean +
+# MTD), transcribed from the side study's pp_sat.c; the study's
+# hand-derived scenario oracles (prism stack, off-mirror-plane prism vs
+# box, pyramid-vs-floor, apex-to-apex side-face win, 1e200 ceiling pin)
+# plus a hull-box depth-parity cross-pin and the engine-consistent
+# refusal battery (bad_count/bad_index/bad_point).
+MIN_SUITE_ENTRIES = 67
 # DESPOT-2026-10-01: pin per-suite floors so deleting a legacy/paranoia target
 # + its make target together cannot shrink the headline silently (the 220->204
 # drift). Canonical floor above; legacy 30 + paranoia 15 pinned here.

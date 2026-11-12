@@ -127,6 +127,7 @@ int mpe_t_mig_hull_2d_proof (void);
 int mpe_t_mig_hull_mass_props (void);
 int mpe_t_mig_hull_sat_pairs (void);
 int mpe_t_mig_hull_shape_catalog (void);
+int mpe_t_mig_hull_sat_hulls (void);
 typedef struct {
     const char *name;
     int (*fn) (void);
@@ -281,6 +282,11 @@ static const mpe_entry_t mpe_registry [] = {
      * point sets + exposed face tables, closed-form oracles doubling as
      * the mechanical winding proof. */
     {"mig_hull_shape_catalog", mpe_t_mig_hull_shape_catalog, 0},
+    /* MIG WP2.6 2.6.4: generic hull-vs-hull SAT (boolean + MTD) — the
+     * side study's pp_sat.c transcription; the study's hand-derived
+     * scenario oracles S1–S5 plus the refusal battery and a hull-box
+     * depth-parity cross-pin. */
+    {"mig_hull_sat_hulls", mpe_t_mig_hull_sat_hulls, 0},
 };
 #define MPE_NTESTS ((int) (sizeof (mpe_registry) / sizeof (mpe_registry [0])))
 /* Returns 0 pass, 1 fail, 2 skipped.
