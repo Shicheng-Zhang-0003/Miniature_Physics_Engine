@@ -3,10 +3,10 @@
 
 Profiles:
   quick    Python runner-contract tests and the canonical C regression suite
-           (54 cases incl. 2 informational diags; full suite re-run under 5
+           (65 cases incl. 2 informational diags; full suite re-run under 5
            regimes default/light/heavy/brittle/sticky via MPE_TEST_REGIME).
   physics  quick + every isolated legacy case (30) and all paranoia cases (15).
-  full     physics + ASan/UBSan suite, MFS robotics (30 gated), TUI snapshots
+  full     physics + ASan/UBSan suite, MFS robotics (37 gated), TUI snapshots
            (9 files), engine build + check-flags.
 
 All run artifacts are written below the project-local temp/qa_runs directory.
@@ -182,6 +182,18 @@ MPE_TEST_REGIMES = ("default", "light", "heavy", "brittle", "sticky")
 # require bitwise identity; re-run WP2 physics checks (mass, COM, bound,
 # per-part materials from file) on the editor-created body. Pins
 # "editor and terminal create the same objects through the same parser".)
+# -> 62-65 (2026-11-11, two moves): (a) the WP6 6.2 amendment consolidated
+# the floor 46 -> 61 to name the MIG build-plan gates (WP1-WP5, entries
+# 47-61 above) that had landed while this narration was not extended —
+# the exact quiet-drift class this block exists to prevent, repaid here;
+# (b) WP2.5 convex hulls (P3 ruling: in scope, incremental) added four
+# gates — mig_hull_point_collection (2.5.1, point-set discipline:
+# capacity/garbage rejection, box/tetra builders), mig_hull_2d_proof
+# (2.5.2, Green's-theorem polygon integrals vs closed forms),
+# mig_hull_mass_props (2.5.3, divergence-theorem mass properties vs
+# closed forms), mig_hull_sat_pairs (2.5.4, SAT boolean + MTD reference
+# pairs for hull-vs-box and hull-vs-sphere); the hardening pass then
+# extended those gates with scale-robustness pins without new entries.
 MIN_SUITE_ENTRIES = 65
 # DESPOT-2026-10-01: pin per-suite floors so deleting a legacy/paranoia target
 # + its make target together cannot shrink the headline silently (the 220->204

@@ -94,6 +94,7 @@ A change is done when:
 | Config | `config/mpe_config.h`, `config/mpe_config_schema.c` |
 | World | `core/physics_world.h`, `core/physics_world.c` |
 | Rigid body | `core/rigidbody.h`, `core/rigidbody.c` |
+| MIG composite math (mass properties, convex hulls, spec grammar) | `core/mig_mass.c`, `core/mig_hull.c`, `core/mig_spec.c` (headers alongside) |
 | Rendering | `render/` |
 | Scene I/O | `scene/` |
 | UI / input / terminal | `ui_input/` |

@@ -259,6 +259,21 @@
 > the §9 ledger entry). Suite floor 65, suite 65/65, quick 79/79 at the
 > landing; everything ships behind `composite.hull 0` default. WP2.5 is
 > DONE — the next parts are up to the user.
+> WP2.5 HARDENING LANDED 2026-11-11 (`da6d9ac`): the construction bug
+> hunt found and fixed one real defect — the SAT axis normalization
+> computed len = sqrt(c²+…) raw, so a cross of two ~1e200 edges
+> overflowed to Inf and a zero axis fabricated depth-0 touches (face
+> normals lost their axes as Inf/Inf = NaN; sane O(1) gates never reach
+> that regime) — fixed by max-abs pre-scaling before squaring wired
+> into all five normalization sites, plus full finiteness sweeps
+> (all six polygon accumulators; mesh derived com/Jc/trace/mass).
+> Scale pins added inside the existing gates, floor stays 65: sliver →
+> bad_point; huge density/vertices/underflow → bad_mesh; huge hull →
+> 1e200@x, box half 1e308 → 2@y, sphere r 1e308 → 1e308@x, ceiling
+> center → cleanly separated. Doc consolidation swept the stale counts
+> everywhere (readme, RELEASE_POLICY, RELEASE_GATES, GLOSSARY, INDEX,
+> install instructions, runner docstring + floor narration, MFS
+> TESTING.md 33→37 amendment, DEV_GUIDE MIG math row).
 
 ---
 
@@ -1507,6 +1522,37 @@ Ledger (new entries get a line, never an edit of a past line):
   61 → 65 (four gates registered: mig_hull_point_collection,
   mig_hull_2d_proof, mig_hull_mass_props, mig_hull_sat_pairs); quick
   checks 75 → 79; suite 65/65, quick 79/79 at the landing.
+
+- 2026-11-11 — WP2.5 HARDENING + DOC CONSOLIDATION (`da6d9ac` engine,
+  this line + the sweep in the consolidation commit): the construction
+  bug hunt over mig_hull found one real defect — the SAT axis
+  normalization computed len = sqrt(c²+…) directly on cross
+  components, so a cross of two ~1e200 edges overflowed the square to
+  Inf, len came back Inf, and u = c/len collapsed to a zero vector
+  that still passed the len > eps gate, fabricating a depth-0 touching
+  verdict for a genuinely deep pair (face normals lost their axes as
+  Inf/Inf = NaN); sane O(1) gates never reach that regime, which is
+  why the suite stayed green. Fixed by max-abs pre-scaling before
+  squaring ((αe1)×(βe2) = αβ(e1×e2) preserves direction and sign) via
+  axis_unit/cross_unit helpers wired into all five normalization
+  sites, a pre-scaled edge projection in the sphere edge-to-center
+  path, and an upfront all-component finiteness check. polygon_props
+  guards all six accumulators (the overflow sliver keeps area finite
+  while second moments blow up); mesh_props sweeps the derived
+  com/Jc/trace/mass = ρ·V. The discipline rule is unchanged and now
+  pinned by gates: refuse (named error) when the OUTPUT would be
+  non-finite, accept finite-but-huge inputs whose math stays
+  representable — SAT on ceiling-scale geometry returns the true MTD
+  where supports stay finite. Scale pins added inside existing gates,
+  no new registry entries, floor stays 65, suite 65/65, quick 79/79,
+  make engine + build_suite green. Doc sweep fixed every stale count
+  found: readme status line (44-era → 65/79), RELEASE_POLICY (61 → 65
+  + strict blocking convention), RELEASE_GATES (46/44 → 65/63 with the
+  dated trail), GLOSSARY (46 → 65 entries), install instructions
+  (42 → 65), runner docstring (54 → 65; MFS 30 → 37 gated) + the floor
+  narration extended through 62-65 per its own say-so contract, MFS
+  TESTING.md (33 → 37 amendment after WP5), DEV_GUIDE gains the MIG
+  math row, mig_hull.h documents the SAT robustness contract.
 
 ## §10 Definition of done for v16S (the cut checklist)
 

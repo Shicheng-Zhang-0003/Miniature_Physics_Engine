@@ -4,7 +4,7 @@ What the suite contains, what each gate proves, and how to run it.
 
 ## Suite layout
 
-- **Unified suite** (`tests/mfs_suite_main.c` + `mfs_suite_a/b/c.c`, 33 gated
+- **Unified suite** (`tests/mfs_suite_main.c` + `mfs_suite_a/b/c.c`, 37 gated
   tests, registry with exact-name dispatch, config save/restore, NaN
   watchdog). This is what `build_tests.sh` runs and what the release gates
   count.
@@ -23,6 +23,14 @@ What the suite contains, what each gate proves, and how to run it.
   pin **128 solver iterations** (40:1 chassis/wheel mass ratio).
 
 ## Current status (2026-11-09): 33/33, gated 5/0
+
+2026-11-11 amendment: MIG WP5 5.1-5.4 landed four composite gates
+(`composite_build`, `composite_toggle`, `composite_ab`,
+`composite_odometry`) — the unified registry is now 37 gates, all
+blocking (the four PASS at WP5 landing; `ftc_hotload` has a documented
+pre-existing plugin-path failure that is CWD-dependent — green in the
+2026-11-09 status run, failing in the 2026-11-11 WP5 run). Layout
+section updated to 37.
 
 All gates green at the 13.7:1 spawn default, including the new
 `thermal_137` (the first gate over the 150 °C motor ceiling — see its row

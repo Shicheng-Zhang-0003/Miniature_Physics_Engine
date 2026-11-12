@@ -104,7 +104,13 @@ mig_hull_err mig_hull_mesh_props (const mig_hull_point *verts, int vert_count,
 
 /* ---- WP2.5 2.5.4: SAT reference pairs (boolean + MTD only) ----
  * No contact manifold is generated here — that is future work. Both
- * functions report one separating-axis result per pair. */
+ * functions report one separating-axis result per pair. Axis
+ * normalization pre-scales by the max absolute component before
+ * squaring, so directions survive ceiling-scale geometry (a raw cross
+ * of two ~1e200 edges would overflow len to Inf and fabricate a zero
+ * axis). Consistent with the mass paths: refuse (bad_mesh) only when
+ * the VERDICT itself would be non-finite — finite-but-huge inputs
+ * whose supports stay representable get their true MTD. */
 
 typedef struct {
     int overlap;      /* 1 = penetrating or touching on every axis */
