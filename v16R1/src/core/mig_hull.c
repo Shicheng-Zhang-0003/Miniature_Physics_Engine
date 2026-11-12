@@ -549,3 +549,130 @@ mig_hull_err mig_hull_sat_hull_sphere (const mig_hull_point *verts, int vert_cou
     out -> axis [2] = st.axis [2];
     return mig_hull_ok;
 }
+
+/* ---- APPENDED WP2.6 2.6.1: exact-coordinate hull shapes ----
+ * See mig_hull.h for the contract. Fixed literals only: √3 and the
+ * golden ratio, spelled out like mig_mass's fixed-π rule — no trig, no
+ * pow, no π, and no math.h macro ever enters a coordinate. (√5 appears
+ * only in the closed-form doc comments; no formula here needs it.)
+ * Dimension
+ * validation mirrors build_box/build_tetra: non-finite or non-positive
+ * dims are mig_hull_bad_point, a full caller buffer is mig_hull_bad_count
+ * (the set keeps the points that fit — never silently grows). */
+#define MIG_HULL_SQRT3 1.73205080756887729353
+#define MIG_HULL_PHI   1.61803398874989484820 /* golden ratio */
+
+/* Right triangular prism, equilateral cross-section. Bottom cap normal
+ * -z, top cap +z, side A-B outward -y, side B-C outward (√3/2, 1/2),
+ * side C-A outward (−√3/2, 1/2) — all 8 windings hand-verified and
+ * re-proven by the gate through mesh_props (V > 0). */
+const int mig_hull_prism_faces [MIG_HULL_PRISM_FACES * 3] = {
+    0, 2, 1,             /* bottom cap, normal -z */
+    3, 4, 5,             /* top cap, normal +z */
+    0, 1, 4,   0, 4, 3,  /* side A-B */
+    1, 2, 5,   1, 5, 4,  /* side B-C */
+    2, 0, 3,   2, 3, 5,  /* side C-A */
+};
+
+mig_hull_err mig_hull_build_prism_equilateral (double s, double h,
+                                               mig_hull_point_set *out) {
+    if (!out) { return mig_hull_null; }
+    if (!isfinite (s) || !isfinite (h) || s <= 0.0 || h <= 0.0) {
+        return mig_hull_bad_point;
+    }
+    /* Base triangle in z=0, then the top copy: verts 0..5 = A,B,C,A',B',C'. */
+    static const double q [3][2] = {
+        {0.0, 0.0}, {1.0, 0.0}, {0.5, MIG_HULL_SQRT3 / 2.0},
+    };
+    for (int i = 0; i < 6; i++) {
+        const int k = i % 3;
+        mig_hull_err e = mig_hull_point_set_add (out,
+            q [k][0] * s, q [k][1] * s, (i < 3) ? 0.0 : h);
+        if (e != mig_hull_ok) { return e; }
+    }
+    return mig_hull_ok;
+}
+
+/* Right square pyramid. Base -z, sides -y/+x/+y/-x in ring order —
+ * 6 windings hand-verified and re-proven by the gate. */
+const int mig_hull_pyr4_faces [MIG_HULL_PYR4_FACES * 3] = {
+    0, 3, 2,   0, 2, 1,  /* base cap, normal -z */
+    0, 1, 4,             /* side -y */
+    1, 2, 4,             /* side +x */
+    2, 3, 4,             /* side +y */
+    3, 0, 4,             /* side -x */
+};
+
+mig_hull_err mig_hull_build_pyr4_square (double s, double h,
+                                         mig_hull_point_set *out) {
+    if (!out) { return mig_hull_null; }
+    if (!isfinite (s) || !isfinite (h) || s <= 0.0 || h <= 0.0) {
+        return mig_hull_bad_point;
+    }
+    static const double q [4][2] = {
+        {-0.5, -0.5}, {0.5, -0.5}, {0.5, 0.5}, {-0.5, 0.5},
+    };
+    for (int i = 0; i < 4; i++) {
+        mig_hull_err e = mig_hull_point_set_add (out,
+            q [i][0] * s, q [i][1] * s, 0.0);
+        if (e != mig_hull_ok) { return e; }
+    }
+    return mig_hull_point_set_add (out, 0.0, 0.0, h);
+}
+
+/* Right triangular pyramid (equilateral base). Base -z, three sides in
+ * ring order — 4 windings hand-verified and re-proven by the gate. */
+const int mig_hull_pyr3_faces [MIG_HULL_PYR3_FACES * 3] = {
+    0, 2, 1,             /* base cap, normal -z */
+    0, 1, 3,             /* side A-B */
+    1, 2, 3,             /* side B-C */
+    2, 0, 3,             /* side C-A */
+};
+
+mig_hull_err mig_hull_build_pyr3_equilateral (double s, double h,
+                                              mig_hull_point_set *out) {
+    if (!out) { return mig_hull_null; }
+    if (!isfinite (s) || !isfinite (h) || s <= 0.0 || h <= 0.0) {
+        return mig_hull_bad_point;
+    }
+    static const double q [3][2] = {
+        {0.0, 0.0}, {1.0, 0.0}, {0.5, MIG_HULL_SQRT3 / 2.0},
+    };
+    for (int i = 0; i < 3; i++) {
+        mig_hull_err e = mig_hull_point_set_add (out,
+            q [i][0] * s, q [i][1] * s, 0.0);
+        if (e != mig_hull_ok) { return e; }
+    }
+    return mig_hull_point_set_add (out, 0.5 * s, MIG_HULL_SQRT3 / 6.0 * s, h);
+}
+
+/* Regular icosahedron, edge 2 unscaled, scaled by a/2. The standard
+ * 20-face table — outward winding proven by the gate (V > 0 and the
+ * exact isotropic closed form). */
+const int mig_hull_icosahedron_faces [MIG_HULL_ICOSA_FACES * 3] = {
+    0, 11, 5,   0, 5, 1,   0, 1, 7,    0, 7, 10,   0, 10, 11,
+    1, 5, 9,    5, 11, 4,  11, 10, 2,  10, 7, 6,   7, 1, 8,
+    3, 9, 4,    3, 4, 2,   3, 2, 6,    3, 6, 8,    3, 8, 9,
+    4, 9, 5,    2, 4, 11,  6, 2, 10,   8, 6, 7,    9, 8, 1,
+};
+
+mig_hull_err mig_hull_build_icosahedron (double a, mig_hull_point_set *out) {
+    if (!out) { return mig_hull_null; }
+    if (!isfinite (a) || a <= 0.0) { return mig_hull_bad_point; }
+    /* The classic (0,±1,±φ) permutations; edges have length 2 unscaled. */
+    static const double base [12][3] = {
+        {-1,  MIG_HULL_PHI,  0}, { 1,  MIG_HULL_PHI,  0},
+        {-1, -MIG_HULL_PHI,  0}, { 1, -MIG_HULL_PHI,  0},
+        { 0, -1,  MIG_HULL_PHI}, { 0,  1,  MIG_HULL_PHI},
+        { 0, -1, -MIG_HULL_PHI}, { 0,  1, -MIG_HULL_PHI},
+        { MIG_HULL_PHI,  0, -1}, { MIG_HULL_PHI,  0,  1},
+        {-MIG_HULL_PHI,  0, -1}, {-MIG_HULL_PHI,  0,  1},
+    };
+    const double k = 0.5 * a;
+    for (int i = 0; i < 12; i++) {
+        mig_hull_err e = mig_hull_point_set_add (out,
+            base [i][0] * k, base [i][1] * k, base [i][2] * k);
+        if (e != mig_hull_ok) { return e; }
+    }
+    return mig_hull_ok;
+}

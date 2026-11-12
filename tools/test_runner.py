@@ -3,7 +3,7 @@
 
 Profiles:
   quick    Python runner-contract tests and the canonical C regression suite
-           (65 cases incl. 2 informational diags; full suite re-run under 5
+           (66 cases incl. 2 informational diags; full suite re-run under 5
            regimes default/light/heavy/brittle/sticky via MPE_TEST_REGIME).
   physics  quick + every isolated legacy case (30) and all paranoia cases (15).
   full     physics + ASan/UBSan suite, MFS robotics (37 gated), TUI snapshots
@@ -16,7 +16,7 @@ only the Python standard library.
 
 Strict contract: suite cases that print [SKIP] (self-skipped coverage) fail
 the run unless --allow-skip is given; [XFAIL] markers are surfaced in the
-summary counts but never block. Registry floors: MIN_SUITE_ENTRIES=65,
+summary counts but never block. Registry floors: MIN_SUITE_ENTRIES=66,
 MIN_LEGACY_ENTRIES=30, MIN_PARANOIA_ENTRIES=15; summary contract requires
 Total == registry size and Blocking failures == 0.
 """
@@ -194,7 +194,10 @@ MPE_TEST_REGIMES = ("default", "light", "heavy", "brittle", "sticky")
 # closed forms), mig_hull_sat_pairs (2.5.4, SAT boolean + MTD reference
 # pairs for hull-vs-box and hull-vs-sphere); the hardening pass then
 # extended those gates with scale-robustness pins without new entries.
-MIN_SUITE_ENTRIES = 65
+# (c) WP2.6 opens — the hull shape catalog (2.6.1) adds mig_hull_shape_
+# catalog: exact prism/pyramid/icosahedron point sets + exposed face
+# tables, closed-form oracles doubling as the mechanical winding proof.
+MIN_SUITE_ENTRIES = 66
 # DESPOT-2026-10-01: pin per-suite floors so deleting a legacy/paranoia target
 # + its make target together cannot shrink the headline silently (the 220->204
 # drift). Canonical floor above; legacy 30 + paranoia 15 pinned here.

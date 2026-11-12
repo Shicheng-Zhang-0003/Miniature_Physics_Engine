@@ -285,9 +285,9 @@ truth in this order and do not write a new line of code until green:
 ```bash
 cd 475-MPE/v16R1/src
 make build_suite            # zero complaints expected (-Werror is default)
-./test_mpe_suite --all      # expect: Total: 61 | Blocking failures: 0
+./test_mpe_suite --all      # expect: Total: 66 | Blocking failures: 0
 cd ../..
-python3 tools/test_runner.py --profile quick   # expect Checks: 75 | passed: 75
+python3 tools/test_runner.py --profile quick   # expect Checks: 80 | passed: 80
 git status --short          # manifest must match §1 exactly — no half-written files
 ```
 
@@ -1198,6 +1198,47 @@ reference gates force it.
   Whichever of 2.5.1–2.5.4 are green at the v16S cut ride to release; a
   ledger line names the shipped increment set.
 
+## §8.6 WP2.6 — hull shape catalog (the side-study integration train)
+
+Appended 2026-11-12. The prism/pyramid side study (untracked,
+`studies/prisms_pyramids/`; pp_test 123/123, pp_cat_test 796/796, its
+`pp_math.md` §1–§9) is the verification source; this WP connects it
+into the engine one brick per commit, §8.5's discipline unchanged:
+green-or-rollback, one ledger line per landing, suite floor raised in
+the same commit that registers the new gate. Physics-touching bricks
+ship behind `composite.hull`; pure-data bricks (2.6.1) run flag-off.
+Transcription is EXACT — no trig/pow/π in coordinates, fixed literals
+only (√3, φ; verified bit-identical to the study's spellings) — and
+the study's closed-form oracles are the gates' oracles, unchanged.
+
+- [x] **2.6.1 Exact-coordinate builders + exposed face tables (LANDED
+  2026-11-12, see the §9 ledger line).** Four builders in
+  `core/mig_hull.{h,c}` — `mig_hull_build_prism_equilateral`,
+  `mig_hull_build_pyr4_square`, `mig_hull_build_pyr3_equilateral`,
+  `mig_hull_build_icosahedron` — each shipping its outward-wound face
+  table beside the point set (face tables were previously caller-side
+  test literals; core now owns them for the shapes it builds). Gate
+  `mig_hull_shape_catalog` (the 66th entry): the study's closed forms
+  (V/com/inertia per shape, the study's size list) fed through
+  `mig_hull_mesh_props` — every pass doubles as the mechanical winding
+  proof — plus the regular-tetra isotropy pin (I = m·s²/20) and the
+  icosahedron isotropy + circumradius pins; refusal battery maps the
+  study's `pp_bad_dim` to `mig_hull_bad_point` (bad dims) and
+  `mig_hull_bad_count` (full caller buffer), write-on-success
+  preserved. Suite floor 65 → 66; suite 66/66, quick 80/80 at the
+  landing.
+- [ ] **2.6.2 n-gonal ring family (frustum/pyramid/bipyramid,
+  `pp_math.md` §5–§6).** Needs the documented trig-exception ruling
+  FIRST: the study's ring builders parametrize with sin/cos, the
+  engine's coordinates are literal-only, so either a ruling admits
+  trig for ring generation with the exact special cases gated
+  separately, or the family ships as an exact-literal subset (n=3,4).
+- [ ] **2.6.3 Ellipsoid UV builder (`pp_math.md` §7).** Band-sum mass
+  properties gate; affine covariance of the inertia tensor is the
+  oracle the study proved.
+- [ ] **2.6.4 Generic hull-vs-hull SAT.** Behind `composite.hull 1`;
+  reference-pair gates only, no scene-format default flip.
+
 ## §9 Risk register + the standing ledger
 
 - **Cross-part warm-start aliasing** — highest. Mitigations: part-scoped
@@ -1553,6 +1594,29 @@ Ledger (new entries get a line, never an edit of a past line):
   narration extended through 62-65 per its own say-so contract, MFS
   TESTING.md (33 → 37 amendment after WP5), DEV_GUIDE gains the MIG
   math row, mig_hull.h documents the SAT robustness contract.
+
+- 2026-11-12 — WP2.6 opens, 2.6.1 (this commit): the hull shape
+  catalog — four exact-coordinate builders (equilateral prism, square
+  pyramid, equilateral-base triangular pyramid, icosahedron) with
+  exposed outward-wound face tables in `core/mig_hull.{h,c}`,
+  transcribed from the prism/pyramid side study (pp_shapes.c vertex
+  conventions unchanged; fixed literals √3/φ, each verified
+  bit-identical to the study's sqrt()-based spellings; √5 appears only
+  in doc comments). New gate `mig_hull_shape_catalog` (66th entry,
+  blocking): the study's closed-form oracles — V/com/inertia per
+  shape at the study's size list, regular-tetra isotropy I = m·s²/20,
+  icosahedron isotropy I = m·a²(3+√5)/20 plus all 12 vertices on
+  Rc² = a²(5+√5)/8 — fed through `mig_hull_mesh_props` with the
+  exposed tables, so every closed-form pass is also the mechanical
+  winding proof; refusal battery: NULL → `mig_hull_null`, bad dims
+  (0/negative/NaN/±Inf) → `mig_hull_bad_point` (study `pp_bad_dim`
+  maps here), full caller buffer → `mig_hull_bad_count` with the
+  exact fitting prefix kept, write-on-success preserved. ASan/UBSan
+  spot-check of the new gate and the sibling hull gates clean (the
+  study's §5.3 lesson — face buffers sized in ints, not tris — held:
+  no engine-side repeat). Suite floor 65 → 66; suite 65/65 → 66/66,
+  quick 79/79 → 80/80 at the landing; pure data + mesh_props, runs
+  `composite.hull`-off.
 
 ## §10 Definition of done for v16S (the cut checklist)
 

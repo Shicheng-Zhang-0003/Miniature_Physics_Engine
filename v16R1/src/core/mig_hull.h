@@ -138,4 +138,66 @@ mig_hull_err mig_hull_sat_hull_sphere (const mig_hull_point *verts, int vert_cou
                                        const double center[3], double radius,
                                        mig_hull_sat_result *out);
 
+/* ---- APPENDED WP2.6 2.6.1: exact-coordinate hull shapes (pure data) ----
+ * Transcribed from the prism/pyramid side study (its sections 1-2;
+ * conventions unchanged). Extrusion-family shapes put the base at z=0
+ * and extend toward +z, matching the box table's ±z-cap convention;
+ * the icosahedron is centred at the origin like build_tetra. Every
+ * vertex set below is EXACT in literals — no trig, no ring
+ * parametrization, no π (the n-gonal ring families land separately,
+ * behind their own ruling). Each shape ships its outward-wound face
+ * table (right-hand rule): consumers pass (set.points, set.count) and
+ * the table straight into mig_hull_mesh_props / the SAT pair
+ * functions. The suite gate proves the windings mechanically — an
+ * inward or open mesh cannot produce a positive volume, so every
+ * closed-form pass through mesh_props is also a winding pass.
+ *
+ * Vertex/face counts (also the minimum point-set capacity):
+ *   prism 6 verts / 8 tris,  pyr4 5 / 6,  pyr3 4 / 4,
+ *   icosahedron 12 / 20. */
+
+#define MIG_HULL_PRISM_VERTS 6
+#define MIG_HULL_PRISM_FACES 8
+#define MIG_HULL_PYR4_VERTS 5
+#define MIG_HULL_PYR4_FACES 6
+#define MIG_HULL_PYR3_VERTS 4
+#define MIG_HULL_PYR3_FACES 4
+#define MIG_HULL_ICOSA_VERTS 12
+#define MIG_HULL_ICOSA_FACES 20
+
+/* Right triangular prism, equilateral cross-section, side s > 0,
+ * height h > 0: base triangle A=(0,0,0), B=(s,0,0), C=(s/2, √3/2·s, 0)
+ * in z=0, top copy at z=h. Vertex order 0..5 = A,B,C,A',B',C'.
+ * Closed forms (density 1): V = √3/4·s²h, com (s/2, √3/6·s, h/2),
+ * Ixx = Iyy = m(h²/12 + s²/24), Izz = m·s²/12. */
+mig_hull_err mig_hull_build_prism_equilateral (double s, double h,
+                                               mig_hull_point_set *out);
+extern const int mig_hull_prism_faces [MIG_HULL_PRISM_FACES * 3];
+
+/* Right square pyramid, base side s > 0 centred at the origin in z=0,
+ * apex (0,0,h), h > 0. Vertex order 0..3 = base corners
+ * (−s/2,−s/2), (s/2,−s/2), (s/2,s/2), (−s/2,s/2), 4 = apex.
+ * Closed forms (density 1): V = s²h/3, com (0,0,h/4),
+ * Ixx = Iyy = m(s²/20 + 3h²/80), Izz = m·s²/10. */
+mig_hull_err mig_hull_build_pyr4_square (double s, double h,
+                                         mig_hull_point_set *out);
+extern const int mig_hull_pyr4_faces [MIG_HULL_PYR4_FACES * 3];
+
+/* Right triangular pyramid (equilateral base, side s > 0), apex above
+ * the base centroid (s/2, √3/6·s, h), h > 0. Vertices 0..2 = A,B,C,
+ * 3 = apex. Closed forms (density 1): V = √3/12·s²h,
+ * com (s/2, √3/6·s, h/4), Ixx = Iyy = m(s²/40 + 3h²/80),
+ * Izz = m·s²/20. h = √(2/3)·s is the REGULAR tetrahedron
+ * (isotropic I = m·s²/20 — pinned by the gate). */
+mig_hull_err mig_hull_build_pyr3_equilateral (double s, double h,
+                                              mig_hull_point_set *out);
+extern const int mig_hull_pyr3_faces [MIG_HULL_PYR3_FACES * 3];
+
+/* Regular icosahedron, edge a > 0, centred at the origin: the classic
+ * (0,±1,±φ) permutation vertex set scaled by a/2 (unscaled edge 2),
+ * circumradius Rc = (a/2)·√((5+√5)/2), V = (5/12)(3+√5)a³,
+ * I = m·a²(3+√5)/20 about every axis through the centre. */
+mig_hull_err mig_hull_build_icosahedron (double a, mig_hull_point_set *out);
+extern const int mig_hull_icosahedron_faces [MIG_HULL_ICOSA_FACES * 3];
+
 #endif /* mig_hull_h */

@@ -126,6 +126,7 @@ int mpe_t_mig_hull_point_collection (void);
 int mpe_t_mig_hull_2d_proof (void);
 int mpe_t_mig_hull_mass_props (void);
 int mpe_t_mig_hull_sat_pairs (void);
+int mpe_t_mig_hull_shape_catalog (void);
 typedef struct {
     const char *name;
     int (*fn) (void);
@@ -276,6 +277,10 @@ static const mpe_entry_t mpe_registry [] = {
     {"mig_hull_2d_proof", mpe_t_mig_hull_2d_proof, 0},
     {"mig_hull_mass_props", mpe_t_mig_hull_mass_props, 0},
     {"mig_hull_sat_pairs", mpe_t_mig_hull_sat_pairs, 0},
+    /* MIG WP2.6 2.6.1: hull shape catalog — exact prism/pyramids/icosa
+     * point sets + exposed face tables, closed-form oracles doubling as
+     * the mechanical winding proof. */
+    {"mig_hull_shape_catalog", mpe_t_mig_hull_shape_catalog, 0},
 };
 #define MPE_NTESTS ((int) (sizeof (mpe_registry) / sizeof (mpe_registry [0])))
 /* Returns 0 pass, 1 fail, 2 skipped.

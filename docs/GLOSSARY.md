@@ -60,7 +60,7 @@
 | Term | Meaning |
 |---|---|
 | **profiles (quick / physics / full)** | The test-runner scopes: contracts + canonical suite; + legacy & paranoia bins; + sanitizers, MFS, TUI, build gates. |
-| **canonical suite** | The C regression suite (`v16R1/src/tests/mpe_suite_main.c`): registry floors prevent entries silently disappearing (currently 65 entries, 2 informational). |
+| **canonical suite** | The C regression suite (`v16R1/src/tests/mpe_suite_main.c`): registry floors prevent entries silently disappearing (currently 66 entries, 2 informational). |
 | **registry floor** | The minimum entry-count contract in the runner (`MIN_SUITE_ENTRIES` etc.) — deleting a test fails verification rather than quietly greening it. |
 | **QA run artifacts** | Timestamped per-run logs/JSON/JUnit under `temp/qa_runs/<UTC-stamp>/` (newest 10 kept). |
 | **paranoia suites** | The adversarial suite family (`tests/paranoia_*.c`): FP edges, integration corners, UAF/lifetime traps, determinism. |

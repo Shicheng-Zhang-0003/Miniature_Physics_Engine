@@ -3294,3 +3294,346 @@ int mpe_t_mig_hull_sat_pairs (void) {
     mpe_test_end (&t);
     return t.failures;
 }
+
+/* ---- WP2.6 2.6.1: the hull shape catalog — exact prism/pyramids/icosa ----
+ *
+ * Four exact-coordinate builders + exposed outward-wound face tables in
+ * core/mig_hull.{h,c}, transcribed from the prism/pyramid side study
+ * (pp_shapes.c conventions unchanged; the icosahedron from its phase-2
+ * catalog). Oracles are the study's hand-derived closed forms (its
+ * pp_test.c / pp_cat_test.c, 123/123 + 796/796 there) and are
+ * INDEPENDENT of the implementation: the built vertex set is fed through
+ * the SAME mig_hull_mesh_props integrator the engine uses, so every
+ * closed-form pass is simultaneously a mechanical winding proof — an
+ * inward or open face table cannot reproduce V, the com and the inertia
+ * triple at once (fully reversed winding gives V < 0 → bad_mesh).
+ * Pure data + mesh_props, no solver, no flag: runs composite.hull-off.
+ * Fixed literals only (√3, √5, √(2/3)) — each verified to round to the
+ * same double as the study's sqrt() spellings; no math.h call produces
+ * a coordinate or an oracle here.
+ */
+int mpe_t_mig_hull_shape_catalog (void) {
+    mpe_test_t t;
+    mpe_test_begin (&t, "mig_hull_shape_catalog");
+
+    const double R3 = 1.73205080756887729353; /* sqrt 3    */
+    const double R5 = 2.23606797749978969641; /* sqrt 5    */
+    const double RT = 0.81649658092772603273; /* sqrt(2/3) */
+
+    /* ---- 1. prism: V = √3/4·s²h, com (s/2, √3/6·s, h/2),
+     * Ixx = Iyy = m(h²/12 + s²/24), Izz = m·s²/12, off-diagonals 0 —
+     * the study's three sizes, density 1. */
+    static const double prism_sz [3][2] = {{2.0, 3.0}, {1.0, 1.0}, {5.0, 0.5}};
+    for (int c = 0; c < 3; c++) {
+        const double s = prism_sz [c][0], h = prism_sz [c][1];
+        mig_hull_point buf [MIG_HULL_PRISM_VERTS];
+        mig_hull_point_set set;
+        mig_hull_mass m;
+        MPE_CHECK (&t, mig_hull_point_set_init (&set, buf, MIG_HULL_PRISM_VERTS)
+                   == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_build_prism_equilateral (s, h, &set)
+                   == mig_hull_ok);
+        MPE_CHECK (&t, set.count == MIG_HULL_PRISM_VERTS);
+        MPE_CHECK (&t, mig_hull_mesh_props (set.points, set.count,
+                                            mig_hull_prism_faces,
+                                            MIG_HULL_PRISM_FACES, 1.0, &m)
+                   == mig_hull_ok);
+        const double V = R3 / 4.0 * s * s * h;
+        MPE_CHECK_NEAR (&t, m.mass, V, 1e-9, "prism V = √3/4 s²h");
+        MPE_CHECK_NEAR (&t, m.com [0], s / 2.0, 1e-9, "prism com x");
+        MPE_CHECK_NEAR (&t, m.com [1], R3 * s / 6.0, 1e-9, "prism com y");
+        MPE_CHECK_NEAR (&t, m.com [2], h / 2.0, 1e-9, "prism com z");
+        MPE_CHECK_NEAR (&t, m.inertia [0][0], V * (h * h / 12.0 + s * s / 24.0),
+                        1e-9, "prism Ixx");
+        MPE_CHECK_NEAR (&t, m.inertia [1][1], V * (h * h / 12.0 + s * s / 24.0),
+                        1e-9, "prism Iyy");
+        MPE_CHECK_NEAR (&t, m.inertia [2][2], V * s * s / 12.0, 1e-9, "prism Izz");
+        MPE_CHECK_NEAR (&t, m.inertia [0][1], 0.0, 1e-9, "prism Ixy");
+        MPE_CHECK_NEAR (&t, m.inertia [0][2], 0.0, 1e-9, "prism Ixz");
+        MPE_CHECK_NEAR (&t, m.inertia [1][2], 0.0, 1e-9, "prism Iyz");
+    }
+    /* Vertex-convention pins (canonical s=2, h=3): base in z=0 with A at
+     * the origin, B along +x, top copy at z=h — the contract callers
+     * build poses against. */
+    {
+        mig_hull_point buf [MIG_HULL_PRISM_VERTS];
+        mig_hull_point_set set;
+        MPE_CHECK (&t, mig_hull_point_set_init (&set, buf, MIG_HULL_PRISM_VERTS)
+                   == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_build_prism_equilateral (2.0, 3.0, &set)
+                   == mig_hull_ok);
+        MPE_CHECK_NEAR (&t, set.points [0].x, 0.0, 1e-9, "prism v0 x (A)");
+        MPE_CHECK_NEAR (&t, set.points [0].y, 0.0, 1e-9, "prism v0 y (A)");
+        MPE_CHECK_NEAR (&t, set.points [0].z, 0.0, 1e-9, "prism v0 z (A)");
+        MPE_CHECK_NEAR (&t, set.points [1].x, 2.0, 1e-9, "prism v1 x (B)");
+        MPE_CHECK_NEAR (&t, set.points [1].y, 0.0, 1e-9, "prism v1 y (B)");
+        MPE_CHECK_NEAR (&t, set.points [2].x, 1.0, 1e-9, "prism v2 x (C)");
+        MPE_CHECK_NEAR (&t, set.points [2].y, R3 / 2.0 * 2.0, 1e-9, "prism v2 y (C)");
+        MPE_CHECK_NEAR (&t, set.points [5].z, 3.0, 1e-9, "prism v5 z (C')");
+    }
+    /* Density: mass and inertia scale with ρ, com does not (2.5.3 idiom). */
+    {
+        mig_hull_point buf [MIG_HULL_PRISM_VERTS];
+        mig_hull_point_set set;
+        mig_hull_mass m;
+        MPE_CHECK (&t, mig_hull_point_set_init (&set, buf, MIG_HULL_PRISM_VERTS)
+                   == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_build_prism_equilateral (2.0, 3.0, &set)
+                   == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_mesh_props (set.points, set.count,
+                                            mig_hull_prism_faces,
+                                            MIG_HULL_PRISM_FACES, 2.5, &m)
+                   == mig_hull_ok);
+        const double V = R3 / 4.0 * 4.0 * 3.0;
+        MPE_CHECK_NEAR (&t, m.mass, 2.5 * V, 1e-9, "prism density mass");
+        MPE_CHECK_NEAR (&t, m.inertia [2][2], 2.5 * V * 4.0 / 12.0, 1e-9,
+                        "prism density Izz");
+        MPE_CHECK_NEAR (&t, m.com [2], 1.5, 1e-9, "prism density com z");
+    }
+
+    /* ---- 2. square pyramid: V = s²h/3, com (0,0,h/4),
+     * Ixx = Iyy = m(s²/20 + 3h²/80), Izz = m·s²/10 — the study's sizes. */
+    static const double pyr4_sz [3][2] = {{2.0, 3.0}, {1.0, 1.0}, {4.0, 0.25}};
+    for (int c = 0; c < 3; c++) {
+        const double s = pyr4_sz [c][0], h = pyr4_sz [c][1];
+        mig_hull_point buf [MIG_HULL_PYR4_VERTS];
+        mig_hull_point_set set;
+        mig_hull_mass m;
+        MPE_CHECK (&t, mig_hull_point_set_init (&set, buf, MIG_HULL_PYR4_VERTS)
+                   == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_build_pyr4_square (s, h, &set) == mig_hull_ok);
+        MPE_CHECK (&t, set.count == MIG_HULL_PYR4_VERTS);
+        MPE_CHECK (&t, mig_hull_mesh_props (set.points, set.count,
+                                            mig_hull_pyr4_faces,
+                                            MIG_HULL_PYR4_FACES, 1.0, &m)
+                   == mig_hull_ok);
+        const double V = s * s * h / 3.0;
+        MPE_CHECK_NEAR (&t, m.mass, V, 1e-9, "pyr4 V = s²h/3");
+        MPE_CHECK_NEAR (&t, m.com [0], 0.0, 1e-9, "pyr4 com x");
+        MPE_CHECK_NEAR (&t, m.com [1], 0.0, 1e-9, "pyr4 com y");
+        MPE_CHECK_NEAR (&t, m.com [2], h / 4.0, 1e-9, "pyr4 com z");
+        MPE_CHECK_NEAR (&t, m.inertia [0][0], V * (s * s / 20.0 + 3.0 * h * h / 80.0),
+                        1e-9, "pyr4 Ixx");
+        MPE_CHECK_NEAR (&t, m.inertia [1][1], V * (s * s / 20.0 + 3.0 * h * h / 80.0),
+                        1e-9, "pyr4 Iyy");
+        MPE_CHECK_NEAR (&t, m.inertia [2][2], V * s * s / 10.0, 1e-9, "pyr4 Izz");
+        MPE_CHECK_NEAR (&t, m.inertia [0][1], 0.0, 1e-9, "pyr4 Ixy");
+        MPE_CHECK_NEAR (&t, m.inertia [0][2], 0.0, 1e-9, "pyr4 Ixz");
+        MPE_CHECK_NEAR (&t, m.inertia [1][2], 0.0, 1e-9, "pyr4 Iyz");
+    }
+    /* Convention pins: corners (±s/2,±s/2,0), apex (0,0,h). */
+    {
+        mig_hull_point buf [MIG_HULL_PYR4_VERTS];
+        mig_hull_point_set set;
+        MPE_CHECK (&t, mig_hull_point_set_init (&set, buf, MIG_HULL_PYR4_VERTS)
+                   == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_build_pyr4_square (2.0, 3.0, &set) == mig_hull_ok);
+        MPE_CHECK_NEAR (&t, set.points [0].x, -1.0, 1e-9, "pyr4 v0 x");
+        MPE_CHECK_NEAR (&t, set.points [0].y, -1.0, 1e-9, "pyr4 v0 y");
+        MPE_CHECK_NEAR (&t, set.points [2].x, 1.0, 1e-9, "pyr4 v2 x");
+        MPE_CHECK_NEAR (&t, set.points [2].y, 1.0, 1e-9, "pyr4 v2 y");
+        MPE_CHECK_NEAR (&t, set.points [4].z, 3.0, 1e-9, "pyr4 apex z");
+    }
+
+    /* ---- 3. triangular pyramid: V = √3/12·s²h, com (s/2, √3/6·s, h/4),
+     * Ixx = Iyy = m(s²/40 + 3h²/80), Izz = m·s²/20 — the study's sizes. */
+    static const double pyr3_sz [3][2] = {{2.0, 3.0}, {1.0, 1.0}, {5.0, 0.5}};
+    for (int c = 0; c < 3; c++) {
+        const double s = pyr3_sz [c][0], h = pyr3_sz [c][1];
+        mig_hull_point buf [MIG_HULL_PYR3_VERTS];
+        mig_hull_point_set set;
+        mig_hull_mass m;
+        MPE_CHECK (&t, mig_hull_point_set_init (&set, buf, MIG_HULL_PYR3_VERTS)
+                   == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_build_pyr3_equilateral (s, h, &set) == mig_hull_ok);
+        MPE_CHECK (&t, set.count == MIG_HULL_PYR3_VERTS);
+        MPE_CHECK (&t, mig_hull_mesh_props (set.points, set.count,
+                                            mig_hull_pyr3_faces,
+                                            MIG_HULL_PYR3_FACES, 1.0, &m)
+                   == mig_hull_ok);
+        const double V = R3 * s * s * h / 12.0;
+        MPE_CHECK_NEAR (&t, m.mass, V, 1e-9, "pyr3 V = √3/12 s²h");
+        MPE_CHECK_NEAR (&t, m.com [0], s / 2.0, 1e-9, "pyr3 com x");
+        MPE_CHECK_NEAR (&t, m.com [1], R3 * s / 6.0, 1e-9, "pyr3 com y");
+        MPE_CHECK_NEAR (&t, m.com [2], h / 4.0, 1e-9, "pyr3 com z");
+        MPE_CHECK_NEAR (&t, m.inertia [0][0], V * (s * s / 40.0 + 3.0 * h * h / 80.0),
+                        1e-9, "pyr3 Ixx");
+        MPE_CHECK_NEAR (&t, m.inertia [1][1], V * (s * s / 40.0 + 3.0 * h * h / 80.0),
+                        1e-9, "pyr3 Iyy");
+        MPE_CHECK_NEAR (&t, m.inertia [2][2], V * s * s / 20.0, 1e-9, "pyr3 Izz");
+        MPE_CHECK_NEAR (&t, m.inertia [0][1], 0.0, 1e-9, "pyr3 Ixy");
+        MPE_CHECK_NEAR (&t, m.inertia [0][2], 0.0, 1e-9, "pyr3 Ixz");
+        MPE_CHECK_NEAR (&t, m.inertia [1][2], 0.0, 1e-9, "pyr3 Iyz");
+    }
+    /* Convention pins: apex over the base centroid (s/2, √3/6·s, h). */
+    {
+        mig_hull_point buf [MIG_HULL_PYR3_VERTS];
+        mig_hull_point_set set;
+        MPE_CHECK (&t, mig_hull_point_set_init (&set, buf, MIG_HULL_PYR3_VERTS)
+                   == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_build_pyr3_equilateral (2.0, 3.0, &set)
+                   == mig_hull_ok);
+        MPE_CHECK_NEAR (&t, set.points [2].y, R3 / 2.0 * 2.0, 1e-9, "pyr3 v2 y (C)");
+        MPE_CHECK_NEAR (&t, set.points [3].x, 1.0, 1e-9, "pyr3 apex x");
+        MPE_CHECK_NEAR (&t, set.points [3].y, R3 / 3.0, 1e-9, "pyr3 apex y");
+        MPE_CHECK_NEAR (&t, set.points [3].z, 3.0, 1e-9, "pyr3 apex z");
+    }
+
+    /* ---- 4. regular tetra: pyr3 at h = √(2/3)·s is REGULAR — the
+     * isotropy cross-check (study pp_test.c): all three principal
+     * moments collapse to m·s²/20. */
+    static const double tet_sz [2] = {2.0, 1.0};
+    for (int c = 0; c < 2; c++) {
+        const double s = tet_sz [c];
+        const double h = RT * s;
+        mig_hull_point buf [MIG_HULL_PYR3_VERTS];
+        mig_hull_point_set set;
+        mig_hull_mass m;
+        MPE_CHECK (&t, mig_hull_point_set_init (&set, buf, MIG_HULL_PYR3_VERTS)
+                   == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_build_pyr3_equilateral (s, h, &set) == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_mesh_props (set.points, set.count,
+                                            mig_hull_pyr3_faces,
+                                            MIG_HULL_PYR3_FACES, 1.0, &m)
+                   == mig_hull_ok);
+        const double iso = R3 * s * s * h / 12.0 * s * s / 20.0;
+        MPE_CHECK_NEAR (&t, m.inertia [0][0], iso, 1e-9, "regtetra Ixx");
+        MPE_CHECK_NEAR (&t, m.inertia [1][1], iso, 1e-9, "regtetra Iyy");
+        MPE_CHECK_NEAR (&t, m.inertia [2][2], iso, 1e-9, "regtetra Izz");
+        MPE_CHECK_NEAR (&t, m.inertia [0][1], 0.0, 1e-9, "regtetra Ixy");
+        MPE_CHECK_NEAR (&t, m.inertia [0][2], 0.0, 1e-9, "regtetra Ixz");
+        MPE_CHECK_NEAR (&t, m.inertia [1][2], 0.0, 1e-9, "regtetra Iyz");
+    }
+
+    /* ---- 5. icosahedron, edge a: V = (5/12)(3+√5)a³, com 0, isotropic
+     * I = m·a²(3+√5)/20 (study's Platonic identity, pp_math.md 8), and
+     * every vertex on the circumsphere |v|² = a²(5+√5)/8. */
+    static const double ico_sz [2] = {1.0, 2.0};
+    for (int c = 0; c < 2; c++) {
+        const double a = ico_sz [c];
+        mig_hull_point buf [MIG_HULL_ICOSA_VERTS];
+        mig_hull_point_set set;
+        mig_hull_mass m;
+        MPE_CHECK (&t, mig_hull_point_set_init (&set, buf, MIG_HULL_ICOSA_VERTS)
+                   == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_build_icosahedron (a, &set) == mig_hull_ok);
+        MPE_CHECK (&t, set.count == MIG_HULL_ICOSA_VERTS);
+        MPE_CHECK (&t, mig_hull_mesh_props (set.points, set.count,
+                                            mig_hull_icosahedron_faces,
+                                            MIG_HULL_ICOSA_FACES, 1.0, &m)
+                   == mig_hull_ok);
+        const double V = (5.0 / 12.0) * (3.0 + R5) * a * a * a;
+        MPE_CHECK_NEAR (&t, m.mass, V, 1e-9, "icosa V");
+        MPE_CHECK_NEAR (&t, m.com [0], 0.0, 1e-9, "icosa com x");
+        MPE_CHECK_NEAR (&t, m.com [1], 0.0, 1e-9, "icosa com y");
+        MPE_CHECK_NEAR (&t, m.com [2], 0.0, 1e-9, "icosa com z");
+        MPE_CHECK_NEAR (&t, m.inertia [0][0], V * a * a * (3.0 + R5) / 20.0,
+                        1e-9, "icosa Ixx");
+        MPE_CHECK_NEAR (&t, m.inertia [1][1], V * a * a * (3.0 + R5) / 20.0,
+                        1e-9, "icosa Iyy");
+        MPE_CHECK_NEAR (&t, m.inertia [2][2], V * a * a * (3.0 + R5) / 20.0,
+                        1e-9, "icosa Izz");
+        MPE_CHECK_NEAR (&t, m.inertia [0][1], 0.0, 1e-9, "icosa Ixy");
+        MPE_CHECK_NEAR (&t, m.inertia [0][2], 0.0, 1e-9, "icosa Ixz");
+        MPE_CHECK_NEAR (&t, m.inertia [1][2], 0.0, 1e-9, "icosa Iyz");
+        for (int i = 0; i < MIG_HULL_ICOSA_VERTS; i++) {
+            const double n2 = set.points [i].x * set.points [i].x
+                            + set.points [i].y * set.points [i].y
+                            + set.points [i].z * set.points [i].z;
+            MPE_CHECK_NEAR (&t, n2, a * a * (5.0 + R5) / 8.0, 1e-9,
+                            "icosa circumradius²");
+        }
+    }
+
+    /* ---- 6. refusal battery (the study's, mapped to engine errors) ----
+     * NULL out → mig_hull_null; non-finite or non-positive dims →
+     * mig_hull_bad_point (study pp_bad_dim), nothing stored; a full
+     * caller buffer → mig_hull_bad_count with the fitting prefix kept. */
+    {
+        mig_hull_point buf [MIG_HULL_ICOSA_VERTS];
+        mig_hull_point_set set;
+        MPE_CHECK (&t, mig_hull_point_set_init (&set, buf, MIG_HULL_ICOSA_VERTS)
+                   == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_build_prism_equilateral (1.0, 1.0, NULL)
+                   == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_build_pyr4_square (1.0, 1.0, NULL) == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_build_pyr3_equilateral (1.0, 1.0, NULL)
+                   == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_build_icosahedron (1.0, NULL) == mig_hull_null);
+        /* Zero, negative, NaN, ±Inf dims — every spelling of garbage. */
+        MPE_CHECK (&t, mig_hull_build_prism_equilateral (0.0, 1.0, &set)
+                   == mig_hull_bad_point);
+        MPE_CHECK (&t, mig_hull_build_prism_equilateral (-1.0, 1.0, &set)
+                   == mig_hull_bad_point);
+        MPE_CHECK (&t, mig_hull_build_prism_equilateral (1.0, 0.0, &set)
+                   == mig_hull_bad_point);
+        MPE_CHECK (&t, mig_hull_build_prism_equilateral (1.0, -1.0, &set)
+                   == mig_hull_bad_point);
+        MPE_CHECK (&t, mig_hull_build_prism_equilateral (0.0 / 0.0, 1.0, &set)
+                   == mig_hull_bad_point);
+        MPE_CHECK (&t, mig_hull_build_prism_equilateral (1.0, 0.0 / 0.0, &set)
+                   == mig_hull_bad_point);
+        MPE_CHECK (&t, mig_hull_build_prism_equilateral (1.0 / 0.0, 1.0, &set)
+                   == mig_hull_bad_point);
+        MPE_CHECK (&t, mig_hull_build_prism_equilateral (1.0, -1.0 / 0.0, &set)
+                   == mig_hull_bad_point);
+        MPE_CHECK (&t, mig_hull_build_pyr4_square (0.0, 1.0, &set)
+                   == mig_hull_bad_point);
+        MPE_CHECK (&t, mig_hull_build_pyr4_square (1.0, 0.0 / 0.0, &set)
+                   == mig_hull_bad_point);
+        MPE_CHECK (&t, mig_hull_build_pyr3_equilateral (0.0, 1.0, &set)
+                   == mig_hull_bad_point);
+        MPE_CHECK (&t, mig_hull_build_pyr3_equilateral (1.0, -1.0 / 0.0, &set)
+                   == mig_hull_bad_point);
+        MPE_CHECK (&t, mig_hull_build_icosahedron (0.0, &set) == mig_hull_bad_point);
+        MPE_CHECK (&t, mig_hull_build_icosahedron (-1.0, &set) == mig_hull_bad_point);
+        MPE_CHECK (&t, mig_hull_build_icosahedron (0.0 / 0.0, &set)
+                   == mig_hull_bad_point);
+        MPE_CHECK (&t, mig_hull_build_icosahedron (1.0 / 0.0, &set)
+                   == mig_hull_bad_point);
+        MPE_CHECK (&t, set.count == 0); /* nothing stored by any failure */
+        /* Write-on-success: a failed build leaves prior content untouched. */
+        MPE_CHECK (&t, mig_hull_point_set_add (&set, 7.0, 8.0, 9.0) == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_build_pyr4_square (0.0, 1.0, &set)
+                   == mig_hull_bad_point);
+        MPE_CHECK (&t, set.count == 1);
+        MPE_CHECK_NEAR (&t, set.points [0].x, 7.0, 1e-9, "write-on-success x");
+        MPE_CHECK_NEAR (&t, set.points [0].y, 8.0, 1e-9, "write-on-success y");
+        MPE_CHECK_NEAR (&t, set.points [0].z, 9.0, 1e-9, "write-on-success z");
+    }
+    /* Capacity: builders stop at the caller buffer, propagate bad_count,
+     * and keep the exact fitting prefix — never silently grow. */
+    {
+        mig_hull_point buf5 [5];
+        mig_hull_point_set set5;
+        MPE_CHECK (&t, mig_hull_point_set_init (&set5, buf5, 5) == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_build_prism_equilateral (2.0, 3.0, &set5)
+                   == mig_hull_bad_count);
+        MPE_CHECK (&t, set5.count == 5);
+        MPE_CHECK_NEAR (&t, set5.points [0].x, 0.0, 1e-9, "prism cap v0 x");
+        MPE_CHECK_NEAR (&t, set5.points [4].x, 2.0, 1e-9, "prism cap v4 x (B')");
+        MPE_CHECK_NEAR (&t, set5.points [4].z, 3.0, 1e-9, "prism cap v4 z (B')");
+
+        mig_hull_point buf3 [3];
+        mig_hull_point_set set3;
+        MPE_CHECK (&t, mig_hull_point_set_init (&set3, buf3, 3) == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_build_pyr3_equilateral (2.0, 3.0, &set3)
+                   == mig_hull_bad_count);
+        MPE_CHECK (&t, set3.count == 3);
+
+        mig_hull_point buf11 [11];
+        mig_hull_point_set set11;
+        MPE_CHECK (&t, mig_hull_point_set_init (&set11, buf11, 11) == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_build_icosahedron (1.0, &set11)
+                   == mig_hull_bad_count);
+        MPE_CHECK (&t, set11.count == 11);
+    }
+
+    MPE_INFO ("prism 6v/8f, pyr4 5v/6f, pyr3 4v/4f, icosa 12v/20f — "
+              "closed-form V/com/I passes through mesh_props at the "
+              "study's sizes; regtetra iso m·s²/20; icosa isotropic "
+              "I = m·a²(3+√5)/20 + all 12 verts on Rc² = a²(5+√5)/8; "
+              "NULL/bad_point/bad_count refusal + write-on-success");
+    mpe_test_end (&t);
+    return t.failures;
+}
