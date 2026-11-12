@@ -44,6 +44,55 @@ static float ccd_min_thickness (const rigidbody *body) {
     if (body -> type == object_custom) { return body -> radius; }
     if (body -> type == object_cylinder) { return fminf (body -> radius, body -> cylinder_half_length); }
     return fminf (body -> half_extensions.x, fminf (body -> half_extensions.y, body -> half_extensions.z));
+} /* MIG WP2.6 2.6.5: hull CCD support. Same reasoning as the composite
+ * walk above: the body-level fields of a hull are its authored
+ * covering sphere (radius = bounding circumradius), not its collision
+ * surface — reading them as a box both overstates the lowest point and
+ * discards the horizontal lever arm. ccd_support_depth/ccd_min_thickness
+ * (no world parameter) get NO hull branch on purpose: without the world
+ * the pool slice is unreadable, and the hull's zero half_extensions
+ * make the body-level fallback return 0, which SKIPS the sweep rather
+ * than fabricating one — the same degraded-but-safe posture a composite
+ * gets when its part walk fails. */
+static bool ccd_hull_support_point (const physics_world *world, const rigidbody *body, vector3 *out) {
+    if ((!world) || (!body) || (!out) || (body -> type != object_hull)) { return false; }
+    if ((body -> hull_vert_base < 0) || (body -> hull_vert_count <= 0)) { return false; }
+    if ((long) body -> hull_vert_base + (long) body -> hull_vert_count > (long) world -> hull_vert_count) { return false; }
+    const vector4 q = body -> orientation;
+    bool found = false;
+    float lowest_y = 0.0f;
+    vector3 lowest = vector3_zero ();
+    for (int i = 0; i < body -> hull_vert_count; i++) {
+        const mig_hull_point *v = &world -> hull_verts [body -> hull_vert_base + i];
+        vector3 p = vector4_rotate_to_vector3 (q, (vector3) {(float) v -> x, (float) v -> y, (float) v -> z});
+        if ((!isfinite (p.x)) || (!isfinite (p.y)) || (!isfinite (p.z))) { continue; }
+        if ((!found) || (p.y < lowest_y)) {
+            lowest_y = p.y;
+            lowest = p;
+            found = true;
+        }
+    }
+    if (!found) { return false; }
+    *out = lowest;
+    return true;
+} static float ccd_hull_min_thickness (const physics_world *world, const rigidbody *body) {
+    /* Smallest COM-local AABB extent: an honest lower size bound for the
+     * catalog shapes (prism: its height axis; pyramids: similar). */
+    if ((!world) || (!body) || (body -> type != object_hull)) { return 0.0f; }
+    if ((body -> hull_vert_base < 0) || (body -> hull_vert_count <= 0)) { return 0.0f; }
+    if ((long) body -> hull_vert_base + (long) body -> hull_vert_count > (long) world -> hull_vert_count) { return 0.0f; }
+    float minx = FLT_MAX, maxx = -FLT_MAX;
+    float miny = FLT_MAX, maxy = -FLT_MAX;
+    float minz = FLT_MAX, maxz = -FLT_MAX;
+    for (int i = 0; i < body -> hull_vert_count; i++) {
+        const mig_hull_point *v = &world -> hull_verts [body -> hull_vert_base + i];
+        const float x = (float) v -> x, y = (float) v -> y, z = (float) v -> z;
+        if (x < minx) { minx = x; } if (x > maxx) { maxx = x; }
+        if (y < miny) { miny = y; } if (y > maxy) { maxy = y; }
+        if (z < minz) { minz = z; } if (z > maxz) { maxz = z; }
+    }
+    if ((minx > maxx) || (miny > maxy) || (minz > maxz)) { return 0.0f; }
+    return fminf (maxx - minx, fminf (maxy - miny, maxz - minz));
 } /* MIG WP2 2.6: composite floor support. The body-level fields of a
  * composite are its authored covering sphere (bound), not its collision
  * surface: reading them as a box both overstates the lowest point and
@@ -150,6 +199,11 @@ static bool ccd_part_support_down (const rigidbody *parent, const composite_part
     }
     return 0.0f;
 } static float ccd_min_thickness_world (const physics_world *world, const rigidbody *body) {
+    /* MIG WP2.6 2.6.5: hull branch before the composite guard. */
+    if ((body) && (body -> type == object_hull)) {
+        float t = ccd_hull_min_thickness (world, body);
+        return ((t > 0.0f) && isfinite (t)) ? t : ccd_min_thickness (body);
+    }
     if ((!world) || (!body) || (body -> type != object_composite)) { return ccd_min_thickness (body); }
     bool found = false;
     float best = FLT_MAX;
@@ -250,6 +304,11 @@ static int ccd_toi_range_internal (const physics_world *world, rigidbody *bodies
             ccd_composite_support_point (world, mover, &r_lowest)) {
             /* WP2 2.6: the actual lowest part point, with its horizontal
              * lever arm for the angular term below. */
+            lowest = mover -> position.y + r_lowest.y;
+        } else if ((mover -> type == object_hull) && world &&
+                   ccd_hull_support_point (world, mover, &r_lowest)) {
+            /* WP2.6 2.6.5: the actual lowest COM-rotated vertex, with the
+             * same lever-arm benefit. */
             lowest = mover -> position.y + r_lowest.y;
         } else {
             float r_lowest_y = ccd_support_depth (mover);

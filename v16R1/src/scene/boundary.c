@@ -70,6 +70,54 @@ static float get_obb_max_along_axis (rigidbody *rigid_body, vector3 axis) {
  * are computed, not a symmetric radius. World-less callers (NULL) keep
  * the legacy body-level projection — the documented degraded mode, the
  * CCD's low-memory precedent. */
+/* ---- MIG WP2.6 2.6.5: hull-aware boundary extrema. ----
+ * The world-edge safety net read an object_hull body through its
+ * BODY-LEVEL shape fields. A hull is sphere-initialised (radius = the
+ * bounding circumradius, half_extensions = (r, r, r) mirroring it), so
+ * the net's OBB readers saw a phantom cube of half-extent r: a pyr4
+ * resting at COM h/4 = 0.5 read min_y = 0.5 − 1.5 = −1.0, the net
+ * clamped it to COVERING-SPHERE REST and the body hovered a metre above
+ * the floor in a perpetual clamp/fall cycle (same failure class the
+ * 2.8 composite fix removed for assemblies — the covering sphere is a
+ * physics ENVELOPE, not geometry). The exact extrema below walk the
+ * world's hull-vertex pool (the same slice the narrowphase consumes):
+ * the stored vertices are COM-local, so the axis is conjugated into the
+ * body frame and both supports are taken in one pass (a hull is convex,
+ * but its ±axis supports differ — min = −S(−axis), max = +S(+axis)).
+ * World-less or defective-slice callers return 0 and the caller keeps
+ * the legacy body-level projection — the documented degraded mode,
+ * conservative in the same sense as the composite NULL-world path. */
+static int boundary_hull_extrema_along_axis (const physics_world *world, const rigidbody *rigid_body,
+                                             vector3 axis, float *min_out, float *max_out) {
+    if ((!world) || (!rigid_body) || (!min_out) || (!max_out)) { return 0; }
+    if (rigid_body -> type != object_hull) { return 0; }
+    if ((rigid_body -> hull_vert_base < 0) || (rigid_body -> hull_vert_count <= 0)) { return 0; }
+    if ((long) rigid_body -> hull_vert_base + (long) rigid_body -> hull_vert_count >
+        (long) world -> hull_vert_count) { return 0; }
+    if (!isfinite (axis.x) || !isfinite (axis.y) || !isfinite (axis.z)) { return 0; }
+    const vector4 q = rigid_body -> orientation;
+    if (!isfinite (q.w) || !isfinite (q.x) || !isfinite (q.y) || !isfinite (q.z)) { return 0; }
+    const vector4 inv = {q.w, -q.x, -q.y, -q.z};
+    const vector3 axis_local = vector4_rotate_to_vector3 (inv, axis);
+    float s_plus = -INFINITY;  /* max dot(v, +axis_local) */
+    float s_minus = -INFINITY; /* max dot(v, -axis_local) */
+    for (int i = 0; i < rigid_body -> hull_vert_count; i++) {
+        const mig_hull_point *v = &world -> hull_verts [rigid_body -> hull_vert_base + i];
+        const vector3 lv = {(float) v -> x, (float) v -> y, (float) v -> z};
+        if (!isfinite (lv.x) || !isfinite (lv.y) || !isfinite (lv.z)) { return 0; }
+        const float d = vector3_dot (lv, axis_local);
+        if (!isfinite (d)) { return 0; }
+        if (d > s_plus) { s_plus = d; }
+        if (-d > s_minus) { s_minus = -d; }
+    }
+    const float along = vector3_dot (rigid_body -> position, axis);
+    const float lo = along - s_minus;
+    const float hi = along + s_plus;
+    if ((!isfinite (lo)) || (!isfinite (hi))) { return 0; }
+    *min_out = lo;
+    *max_out = hi;
+    return 1;
+}
 static int boundary_composite_extrema_along_axis (const physics_world *world, const rigidbody *rigid_body,
                                                   vector3 axis, float *min_out, float *max_out) {
     if ((!world) || (!rigid_body) || (!min_out) || (!max_out)) { return 0; }
@@ -130,11 +178,13 @@ static int boundary_composite_extrema_along_axis (const physics_world *world, co
  * body-level projection otherwise. */
 static float get_obb_min_along_axis_w (const physics_world *world, const rigidbody *rigid_body, vector3 axis) {
     float cmin = 0.0f, cmax = 0.0f;
+    if (boundary_hull_extrema_along_axis (world, rigid_body, axis, &cmin, &cmax)) { return cmin; }
     if (boundary_composite_extrema_along_axis (world, rigid_body, axis, &cmin, &cmax)) { return cmin; }
     return get_obb_min_along_axis ((rigidbody *) rigid_body, axis);
 }
 static float get_obb_max_along_axis_w (const physics_world *world, const rigidbody *rigid_body, vector3 axis) {
     float cmin = 0.0f, cmax = 0.0f;
+    if (boundary_hull_extrema_along_axis (world, rigid_body, axis, &cmin, &cmax)) { return cmax; }
     if (boundary_composite_extrema_along_axis (world, rigid_body, axis, &cmin, &cmax)) { return cmax; }
     return get_obb_max_along_axis ((rigidbody *) rigid_body, axis);
 } /* World-edge safety net: PERFECTLY PLASTIC positional clamp.

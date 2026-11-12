@@ -63,6 +63,10 @@ static traj_line_mesh main_traj;
 static float *sphere_instances = NULL;
 static float *cube_instances = NULL;
 static float *cylinder_instances = NULL;
+/* MIG WP2.6 2.6.5: hull bodies are skipped in the draw loop (no instanced
+ * hull mesh yet); the skip is counted, not silent. */
+static unsigned long g_render_hull_skip_count = 0;
+static bool g_render_hull_skip_reported = false;
 /* MIG WP4 4.4: COM marker cross (cyan, 3 axis-aligned lines at the edited
  * spec's COM). Static VAO/VBO initialized on first use. */
 static GLuint com_cross_vao = 0;
@@ -364,6 +368,20 @@ void render_scene_current (int widget_width, int widget_height) {
             (!isfinite (rigid_body -> orientation.x)) || (!isfinite (rigid_body -> orientation.y)) ||
             (!isfinite (rigid_body -> orientation.z))) {
             fprintf (stderr, "[render] WARNING: skipping non-finite body %d\n", object_index);
+            continue;
+        }
+        /* MIG WP2.6 2.6.5: a hull body has no instanced mesh yet — draw
+         * NOTHING rather than falling into the default-else cube branch
+         * (a hull's zero half_extensions would draw a garbage box at the
+         * body origin). Counted loudly; the solid/wireframe mesh brick
+         * replaces this skip. */
+        if (rigid_body -> type == object_hull) {
+            g_render_hull_skip_count++;
+            if (!g_render_hull_skip_reported) {
+                g_render_hull_skip_reported = true;
+                fprintf (stderr, "[render] object_hull bodies are not drawn yet (counted; %d so far this frame)\n",
+                         object_index);
+            }
             continue;
         }
         /* Sphere-vs-frustum: culled only when fully outside one plane. */

@@ -23,6 +23,8 @@
 #include <stdatomic.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h> /* 2.6.5: sqrt/fabs/fmax on the hull spawn path */
+#include <float.h> /* 2.6.5: FLT_MAX in the hull-hull support scan */
 #include <alloca.h>
 /* =====================================================================
  * PERSISTENT DETERMINISTIC THREAD POOL
@@ -868,6 +870,13 @@ void physics_world_cleanup (physics_world *world) {
     physics_world_free_ptr ((void **) &world -> composite_parts);
     world -> composite_part_count = 0;
     world -> composite_part_capacity = 0;
+    /* MIG WP2.6 2.6.5: hull pools die with the world. */
+    physics_world_free_ptr ((void **) &world -> hull_verts);
+    world -> hull_vert_count = 0;
+    world -> hull_vert_capacity = 0;
+    physics_world_free_ptr ((void **) &world -> hull_faces);
+    world -> hull_face_count = 0;
+    world -> hull_face_capacity = 0;
     physics_world_free_ptr ((void **) &world -> world_contact_cache);
     physics_world_free_ptr ((void **) &world -> contact_hash_head);
     broadphase_cleanup (world); /* frees the node pool; struct freed below */
@@ -1803,6 +1812,415 @@ static void physics_world_composite_part_from_mig (composite_part *dst, const mi
         dst -> restitution = cfg -> body_defaults.sphere_restitution;
     }
 }
+/* ---- MIG WP2.6 2.6.5: hull mesh pools + hull bodies ----
+ * Pool discipline mirrors the composite parts pool: grow by doubling,
+ * contiguous slices anchored on the body, counts reset by
+ * physics_world_clear (the only compaction point), storage freed by
+ * cleanup, write-on-success appends. Ceiling = mpe_max_bodies * the
+ * largest catalog mesh (the icosahedron: 12 verts / 60 face indices) —
+ * the most pool any legal body population can own. */
+static int physics_world_grow_hull_verts (physics_world *world) {
+    if (!world) { return -1; }
+    const int ceiling = mpe_max_bodies * MIG_HULL_ICOSA_VERTS;
+    if (world -> hull_vert_capacity >= ceiling) { return -1; }
+    int want = (world -> hull_vert_capacity > 0) ? world -> hull_vert_capacity * 2 : MIG_HULL_ICOSA_VERTS;
+    if (want > ceiling) { want = ceiling; }
+    mig_hull_point *grown =
+        (mig_hull_point *) realloc (world -> hull_verts, (size_t) want * sizeof (mig_hull_point));
+    if (!grown) { return -1; }
+    world -> hull_verts = grown;
+    world -> hull_vert_capacity = want;
+    return 0;
+}
+static int physics_world_grow_hull_faces (physics_world *world) {
+    if (!world) { return -1; }
+    const int ceiling = mpe_max_bodies * (MIG_HULL_ICOSA_FACES * 3);
+    if (world -> hull_face_capacity >= ceiling) { return -1; }
+    int want = (world -> hull_face_capacity > 0) ? world -> hull_face_capacity * 2 : (MIG_HULL_ICOSA_FACES * 3);
+    if (want > ceiling) { want = ceiling; }
+    int *grown = (int *) realloc (world -> hull_faces, (size_t) want * sizeof (int));
+    if (!grown) { return -1; }
+    world -> hull_faces = grown;
+    world -> hull_face_capacity = want;
+    return 0;
+}
+static int physics_world_hull_verts_append (physics_world *world, const mig_hull_point *verts, int count) {
+    if (!world || !verts || count <= 0) { return -1; }
+    while (world -> hull_vert_count + count > world -> hull_vert_capacity) {
+        if (physics_world_grow_hull_verts (world) != 0) { return -1; }
+    }
+    const int base = world -> hull_vert_count;
+    for (int i = 0; i < count; i++) { world -> hull_verts [base + i] = verts [i]; }
+    world -> hull_vert_count = base + count;
+    return base;
+}
+static int physics_world_hull_faces_append (physics_world *world, const int *faces, int count) {
+    if (!world || !faces || count <= 0) { return -1; }
+    while (world -> hull_face_count + count > world -> hull_face_capacity) {
+        if (physics_world_grow_hull_faces (world) != 0) { return -1; }
+    }
+    const int base = world -> hull_face_count;
+    for (int i = 0; i < count; i++) { world -> hull_faces [base + i] = faces [i]; }
+    world -> hull_face_count = base + count;
+    return base;
+}
+static void physics_world_hull_verts_retreat (physics_world *world, int count) {
+    /* Rollback after a failed face append: the vertex slice is unclaimed
+     * (no body references it yet), so dropping the tail restores the
+     * pool exactly. */
+    if (world && (count > 0) && (world -> hull_vert_count >= count)) { world -> hull_vert_count -= count; }
+}
+int physics_world_add_hull (physics_world *world, mpe_hull_shape_kind kind,
+                            double s, double h, float mass, vector3 position) {
+    if ((!world) || (!world -> bodies)) { return -1; }
+    /* Build the canonical mesh in scratch: the largest catalog mesh is
+     * the icosahedron (12 verts / 20 faces). */
+    mig_hull_point v [MIG_HULL_ICOSA_VERTS];
+    mig_hull_point_set set;
+    if (mig_hull_point_set_init (&set, v, MIG_HULL_ICOSA_VERTS) != mig_hull_ok) { return -1; }
+    const int *faces = NULL;
+    int nf = 0;
+    switch (kind) {
+    case mpe_hull_shape_prism:
+        if (!(s > 0.0) || !(h > 0.0)) { return -1; }
+        if (mig_hull_build_prism_equilateral (s, h, &set) != mig_hull_ok) { return -1; }
+        faces = mig_hull_prism_faces;
+        nf = MIG_HULL_PRISM_FACES;
+        break;
+    case mpe_hull_shape_pyr4:
+        if (!(s > 0.0) || !(h > 0.0)) { return -1; }
+        if (mig_hull_build_pyr4_square (s, h, &set) != mig_hull_ok) { return -1; }
+        faces = mig_hull_pyr4_faces;
+        nf = MIG_HULL_PYR4_FACES;
+        break;
+    case mpe_hull_shape_pyr3:
+        if (!(s > 0.0) || !(h > 0.0)) { return -1; }
+        if (mig_hull_build_pyr3_equilateral (s, h, &set) != mig_hull_ok) { return -1; }
+        faces = mig_hull_pyr3_faces;
+        nf = MIG_HULL_PYR3_FACES;
+        break;
+    case mpe_hull_shape_icosa:
+        if (!(s > 0.0)) { return -1; } /* h unused for the icosahedron */
+        if (mig_hull_build_icosahedron (s, &set) != mig_hull_ok) { return -1; }
+        faces = mig_hull_icosahedron_faces;
+        nf = MIG_HULL_ICOSA_FACES;
+        break;
+    default:
+        return -1;
+    }
+    if (mig_hull_point_set_validate (&set) != mig_hull_ok) { return -1; }
+    /* Unit-density truth: V (= mass at density 1), COM, inertia about
+     * the COM through the same divergence-theorem path the 2.5.3 gate
+     * pins against closed forms. */
+    mig_hull_mass unit;
+    if (mig_hull_mesh_props (set.points, set.count, faces, nf, 1.0, &unit) != mig_hull_ok) { return -1; }
+    /* Engine policy windows, pre-validated so sanitize substitutes
+     * nothing: mass [1e-4, 1e6] (add_composite's windows). */
+    if (!(mass >= 1e-4f) || (mass > 1e6f)) { return -1; }
+    /* Inertia scales linearly with density: I_real = I_unit · mass / V_unit. */
+    const double iscale = (double) mass / unit.mass;
+    if (!isfinite (iscale) || !(iscale > 0.0)) { return -1; }
+    const double max_diag = fmax (unit.inertia [0][0],
+                                  fmax (unit.inertia [1][1], unit.inertia [2][2]));
+    /* The catalog shapes are diagonal in their canonical axes (2.6.1's
+     * gate pins the off-diagonals through mesh_props). A non-negligible
+     * off-diagonal here would mean a non-catalog mesh slipped in —
+     * refuse rather than silently drop angular coupling. */
+    if (fabs (unit.inertia [0][1]) > 1e-9 * max_diag ||
+        fabs (unit.inertia [0][2]) > 1e-9 * max_diag ||
+        fabs (unit.inertia [1][2]) > 1e-9 * max_diag) { return -1; }
+    /* Rebase the vertices to the COM frame (engine invariant: position
+     * IS the COM) and measure the bounding circumradius. */
+    mig_hull_point local [MIG_HULL_ICOSA_VERTS];
+    double bound2 = 0.0;
+    for (int i = 0; i < set.count; i++) {
+        local [i].x = set.points [i].x - unit.com [0];
+        local [i].y = set.points [i].y - unit.com [1];
+        local [i].z = set.points [i].z - unit.com [2];
+        const double d2 = local [i].x * local [i].x + local [i].y * local [i].y +
+                          local [i].z * local [i].z;
+        if (!isfinite (d2)) { return -1; }
+        if (d2 > bound2) { bound2 = d2; }
+    }
+    const double bound = sqrt (bound2);
+    if ((!isfinite (bound)) || (!(bound >= 0.01)) || (bound > 100.0)) { return -1; }
+    /* Reserve before the pool appends so the only remaining failure is
+     * the append itself; a failed append leaves body_count untouched. */
+    if (world -> body_count >= world -> body_capacity && physics_world_grow_bodies (world) != 0) { return -1; }
+    const int vbase = physics_world_hull_verts_append (world, local, set.count);
+    if (vbase < 0) { return -1; }
+    const int fbase = physics_world_hull_faces_append (world, faces, nf * 3);
+    if (fbase < 0) { physics_world_hull_verts_retreat (world, set.count); return -1; }
+    rigidbody *rb = &world -> bodies [world -> body_count];
+    rigidbody_initialisation_sphere (rb, (float) bound, mass, position);
+    /* Per-world material stamp (sphere defaults — a hull material
+     * surface is a later brick, same as the composite body level). */
+    const mpe_config_t *wcfg = mpe_world_cfg (world);
+    rb -> friction_static = wcfg -> body_defaults.sphere_fric_s;
+    rb -> friction_kinetic = wcfg -> body_defaults.sphere_fric_k;
+    rb -> restitution = wcfg -> body_defaults.sphere_restitution;
+    rb -> type = object_hull;
+    rb -> inertia_tensor_local = (math3) {{{(float) (iscale * unit.inertia [0][0]), 0.0f, 0.0f},
+                                           {0.0f, (float) (iscale * unit.inertia [1][1]), 0.0f},
+                                           {0.0f, 0.0f, (float) (iscale * unit.inertia [2][2])}}};
+    /* The initializer left the SPHERE inverse for this radius/mass; the
+     * composed truth replaces the whole pair (add_composite's convention:
+     * both the authored tensor and its inverse come from the mesh, never
+     * a type-default formula). */
+    rb -> inverse_inertia_tensor_local =
+        (math3) {{{1.0f / (float) (iscale * unit.inertia [0][0]), 0.0f, 0.0f},
+                  {0.0f, 1.0f / (float) (iscale * unit.inertia [1][1]), 0.0f},
+                  {0.0f, 0.0f, 1.0f / (float) (iscale * unit.inertia [2][2])}}};
+    /* mass_is_composed: the tensor arrived through mesh_props (authored
+     * truth), not a type-default formula — same protection class as the
+     * composite's authored tensor (sanitize restores the inverse pair
+     * from the authored tensor, never a sphere/cube formula). */
+    rb -> mass_is_composed = true;
+    rb -> hull_vert_base = vbase;
+    rb -> hull_vert_count = set.count;
+    rb -> hull_face_base = fbase;
+    rb -> hull_face_count = nf;
+    if (world -> next_object_id == 0 || world -> next_object_id == 0xFFFFFFFFu) { world -> next_object_id = 1; }
+    rb -> object_id = world -> next_object_id++;
+    if (world -> next_object_id == 0 || world -> next_object_id == 0xFFFFFFFFu) { world -> next_object_id = 1; }
+    rb -> object_generation = 1;
+    rb -> body_index = world -> body_count;
+    rigidbody_sanitize (rb); /* composed guard: authored tensor passes through */
+    rigidbody_update_axes (rb);
+    physics_world_bump_revision (world);
+    return world -> body_count++;
+}
+/* ---- MIG WP2.6 2.6.5: hull collision consumption (composite.hull-gated) ----
+ * Every entry refuses on flag 0 (one hull_flag_skips each), on pool-slice
+ * defects, and on non-finite geometry. Manifold convention matches the
+ * builtins: normal points FROM the first argument TOWARD the second;
+ * contacts carry world positions only (collision_prepare_solver computes
+ * ra/rb). Depths are the SAT MTDs (2.5.4 / 2.6.4); contact points are
+ * single-point approximations, documented per function — the manifold
+ * brick replaces them with feature-based contact sets. */
+static bool mpe_hull_slice_ok (const physics_world *world, const rigidbody *rb) {
+    if ((!world) || (!rb) || (rb -> type != object_hull)) { return false; }
+    if ((rb -> hull_vert_base < 0) || (rb -> hull_vert_count <= 0) ||
+        (rb -> hull_face_base < 0) || (rb -> hull_face_count <= 0)) { return false; }
+    if ((long) rb -> hull_vert_base + (long) rb -> hull_vert_count > (long) world -> hull_vert_count) { return false; }
+    if ((long) rb -> hull_face_base + (long) rb -> hull_face_count > (long) world -> hull_face_count) { return false; }
+    return true;
+}
+bool physics_world_hull_floor_detect (physics_world *world, rigidbody *hull,
+                                      float plane_y, collision_data *out) {
+    if ((!world) || (!hull) || (!out) || (!world -> bodies)) { return false; }
+    if (hull -> type != object_hull) { return false; }
+    if (!mpe_world_cfg (world) -> composite.hull) {
+        world -> hull_flag_skips++;
+        return false;
+    }
+    if (!mpe_hull_slice_ok (world, hull)) { return false; }
+    const mpe_config_t *cfg = mpe_world_cfg (world);
+    const vector4 q = hull -> orientation;
+    vector3 candidate_positions [MIG_HULL_ICOSA_VERTS];
+    float candidate_penetrations [MIG_HULL_ICOSA_VERTS];
+    int candidate_count = 0;
+    for (int i = 0; i < hull -> hull_vert_count; i++) {
+        const mig_hull_point *v = &world -> hull_verts [hull -> hull_vert_base + i];
+        vector3 p = vector4_rotate_to_vector3 (q, (vector3) {(float) v -> x, (float) v -> y, (float) v -> z});
+        p = simd_add (p, hull -> position);
+        if ((!isfinite (p.x)) || (!isfinite (p.y)) || (!isfinite (p.z))) { return false; }
+        const float penetration = plane_y - p.y;
+        /* Slop-gated like collision_static_plane_cube: admit within slop
+         * as zero-depth for persistent friction, no bounce. */
+        if (penetration > -cfg -> solver.penetration_slop) {
+            candidate_positions [candidate_count] = p;
+            candidate_penetrations [candidate_count] = (penetration > 0.0f) ? penetration : 0.0f;
+            candidate_count++;
+        }
+    }
+    if (candidate_count == 0) { return false; }
+    out -> object_a = hull;
+    out -> object_b = &world -> static_plane_body;
+    out -> normal_vector = (vector3) {0.0f, -1.0f, 0.0f};
+    out -> contact_count = 0;
+    int max_contacts = (candidate_count < 4) ? candidate_count : 4;
+    for (int i = 0; i < max_contacts; i++) {
+        int best = i;
+        for (int j = i + 1; j < candidate_count; j++) {
+            if (candidate_penetrations [j] > candidate_penetrations [best]) { best = j; }
+        }
+        if (best != i) {
+            vector3 temp_position = candidate_positions [i];
+            candidate_positions [i] = candidate_positions [best];
+            candidate_positions [best] = temp_position;
+            float temp_pen = candidate_penetrations [i];
+            candidate_penetrations [i] = candidate_penetrations [best];
+            candidate_penetrations [best] = temp_pen;
+        }
+        contact_point_data *cp = &out -> contacts [out -> contact_count];
+        cp -> position = candidate_positions [i];
+        cp -> penetration = candidate_penetrations [i];
+        out -> contact_count++;
+    }
+    return true;
+}
+bool mpe_hull_collide_sphere (rigidbody *hull, rigidbody *sphere, void *out_p, mpe_world_t *world) {
+    collision_data *out = (collision_data *) out_p;
+    if ((!hull) || (!sphere) || (!out) || (!world)) { return false; }
+    if ((hull -> type != object_hull) || (sphere -> type != object_sphere)) { return false; }
+    if (!mpe_world_cfg (world) -> composite.hull) { world -> hull_flag_skips++; return false; }
+    if (!mpe_hull_slice_ok (world, hull)) { return false; }
+    if (!isfinite (sphere -> radius) || sphere -> radius <= 0.0f) { return false; }
+    /* Sphere centre in the hull's COM-local frame (conjugate rotation;
+     * vector4_rotate_to_vector3 normalises internally). */
+    const vector4 q = hull -> orientation;
+    const vector4 q_conj = {q.w, -q.x, -q.y, -q.z};
+    const vector3 d = simd_sub (sphere -> position, hull -> position);
+    const vector3 c_local = vector4_rotate_to_vector3 (q_conj, d);
+    if ((!isfinite (c_local.x)) || (!isfinite (c_local.y)) || (!isfinite (c_local.z))) { return false; }
+    mig_hull_sat_result r;
+    const double center [3] = {(double) c_local.x, (double) c_local.y, (double) c_local.z};
+    const mig_hull_err e = mig_hull_sat_hull_sphere (&world -> hull_verts [hull -> hull_vert_base],
+                                                     hull -> hull_vert_count,
+                                                     &world -> hull_faces [hull -> hull_face_base],
+                                                     hull -> hull_face_count,
+                                                     center, (double) sphere -> radius, &r);
+    if (e != mig_hull_ok) { return false; }
+    if (!r.overlap) { return false; }
+    /* Axis: hull-local, FROM the hull TOWARD the sphere → world. */
+    const vector3 n_local = {(float) r.axis [0], (float) r.axis [1], (float) r.axis [2]};
+    const vector3 n = vector4_rotate_to_vector3 (q, n_local);
+    if ((!isfinite (n.x)) || (!isfinite (n.y)) || (!isfinite (n.z))) { return false; }
+    float depth = (float) r.depth;
+    if (depth < 0.0f) { depth = 0.0f; } /* touching = overlap at depth 0 */
+    out -> object_a = hull;
+    out -> object_b = sphere;
+    out -> normal_vector = n;
+    out -> contact_count = 1;
+    contact_point_data *cp = &out -> contacts [0];
+    /* Deepest sphere point toward the hull (on the sphere surface). */
+    cp -> position = simd_sub (sphere -> position, simd_scale (n, sphere -> radius));
+    cp -> penetration = depth;
+    return true;
+}
+bool mpe_hull_collide_cube (rigidbody *hull, rigidbody *cube, void *out_p, mpe_world_t *world) {
+    collision_data *out = (collision_data *) out_p;
+    if ((!hull) || (!cube) || (!out) || (!world)) { return false; }
+    if ((hull -> type != object_hull) || (cube -> type != object_cube)) { return false; }
+    if (!mpe_world_cfg (world) -> composite.hull) { world -> hull_flag_skips++; return false; }
+    if (!mpe_hull_slice_ok (world, hull)) { return false; }
+    const vector3 he = cube -> half_extensions;
+    if ((!isfinite (he.x)) || (!isfinite (he.y)) || (!isfinite (he.z))) { return false; }
+    /* Hull vertices into the cube's COM-local frame: there the box is
+     * AXIS-ALIGNED by construction (half extensions), so the 2.5.4
+     * hull-vs-box reference applies unchanged. Rotations preserve
+     * distances, so the SAT depth is frame-independent. */
+    const vector4 qc = cube -> orientation;
+    const vector4 qc_conj = {qc.w, -qc.x, -qc.y, -qc.z};
+    const vector4 qh = hull -> orientation;
+    mig_hull_point local [MIG_HULL_ICOSA_VERTS];
+    for (int i = 0; i < hull -> hull_vert_count; i++) {
+        const mig_hull_point *v = &world -> hull_verts [hull -> hull_vert_base + i];
+        vector3 p = vector4_rotate_to_vector3 (qh, (vector3) {(float) v -> x, (float) v -> y, (float) v -> z});
+        p = simd_add (p, hull -> position);
+        p = simd_sub (p, cube -> position);
+        p = vector4_rotate_to_vector3 (qc_conj, p);
+        if ((!isfinite (p.x)) || (!isfinite (p.y)) || (!isfinite (p.z))) { return false; }
+        local [i].x = (double) p.x;
+        local [i].y = (double) p.y;
+        local [i].z = (double) p.z;
+    }
+    mig_hull_sat_result r;
+    const double center [3] = {0.0, 0.0, 0.0};
+    const double half [3] = {(double) he.x, (double) he.y, (double) he.z};
+    const mig_hull_err e = mig_hull_sat_hull_box (local, hull -> hull_vert_count,
+                                                  &world -> hull_faces [hull -> hull_face_base],
+                                                  hull -> hull_face_count, center, half, &r);
+    if (e != mig_hull_ok) { return false; }
+    if (!r.overlap) { return false; }
+    /* Axis: cube-local, FROM the hull TOWARD the box → world. */
+    const vector3 n_local = {(float) r.axis [0], (float) r.axis [1], (float) r.axis [2]};
+    const vector3 n = vector4_rotate_to_vector3 (qc, n_local);
+    if ((!isfinite (n.x)) || (!isfinite (n.y)) || (!isfinite (n.z))) { return false; }
+    float depth = (float) r.depth;
+    if (depth < 0.0f) { depth = 0.0f; }
+    out -> object_a = hull;
+    out -> object_b = cube;
+    out -> normal_vector = n;
+    out -> contact_count = 1;
+    contact_point_data *cp = &out -> contacts [0];
+    /* Cube-surface point on the hull side: centre − n·(box support along
+     * −n). Deterministic and inside the overlap for convex pairs. */
+    const vector3 ax0 = vector4_rotate_to_vector3 (qc, (vector3) {1.0f, 0.0f, 0.0f});
+    const vector3 ax1 = vector4_rotate_to_vector3 (qc, (vector3) {0.0f, 1.0f, 0.0f});
+    const vector3 ax2 = vector4_rotate_to_vector3 (qc, (vector3) {0.0f, 0.0f, 1.0f});
+    const float support = he.x * fabsf (vector3_dot (ax0, n)) + he.y * fabsf (vector3_dot (ax1, n)) +
+                          he.z * fabsf (vector3_dot (ax2, n));
+    cp -> position = simd_sub (cube -> position, simd_scale (n, support));
+    cp -> penetration = depth;
+    return true;
+}
+bool mpe_hull_collide_hull (rigidbody *a, rigidbody *b, void *out_p, mpe_world_t *world) {
+    collision_data *out = (collision_data *) out_p;
+    if ((!a) || (!b) || (!out) || (!world)) { return false; }
+    if ((a -> type != object_hull) || (b -> type != object_hull)) { return false; }
+    if (!mpe_world_cfg (world) -> composite.hull) { world -> hull_flag_skips++; return false; }
+    if ((!mpe_hull_slice_ok (world, a)) || (!mpe_hull_slice_ok (world, b))) { return false; }
+    /* B's vertices into A's COM-local frame; A's stored slice is already
+     * local, so the 2.6.4 generic pair applies unchanged. */
+    const vector4 qa = a -> orientation;
+    const vector4 qa_conj = {qa.w, -qa.x, -qa.y, -qa.z};
+    const vector4 qb = b -> orientation;
+    mig_hull_point localb [MIG_HULL_ICOSA_VERTS];
+    for (int i = 0; i < b -> hull_vert_count; i++) {
+        const mig_hull_point *v = &world -> hull_verts [b -> hull_vert_base + i];
+        vector3 p = vector4_rotate_to_vector3 (qb, (vector3) {(float) v -> x, (float) v -> y, (float) v -> z});
+        p = simd_add (p, b -> position);
+        p = simd_sub (p, a -> position);
+        p = vector4_rotate_to_vector3 (qa_conj, p);
+        if ((!isfinite (p.x)) || (!isfinite (p.y)) || (!isfinite (p.z))) { return false; }
+        localb [i].x = (double) p.x;
+        localb [i].y = (double) p.y;
+        localb [i].z = (double) p.z;
+    }
+    mig_hull_sat_result r;
+    const mig_hull_err e = mig_hull_sat_hull_hull (&world -> hull_verts [a -> hull_vert_base], a -> hull_vert_count,
+                                                   &world -> hull_faces [a -> hull_face_base], a -> hull_face_count,
+                                                   localb, b -> hull_vert_count,
+                                                   &world -> hull_faces [b -> hull_face_base], b -> hull_face_count,
+                                                   &r);
+    if (e != mig_hull_ok) { return false; }
+    if (!r.overlap) { return false; }
+    /* Axis: A-local, FROM A TOWARD B → world. */
+    const vector3 n_local = {(float) r.axis [0], (float) r.axis [1], (float) r.axis [2]};
+    const vector3 n = vector4_rotate_to_vector3 (qa, n_local);
+    if ((!isfinite (n.x)) || (!isfinite (n.y)) || (!isfinite (n.z))) { return false; }
+    float depth = (float) r.depth;
+    if (depth < 0.0f) { depth = 0.0f; }
+    /* Contact: midpoint of the two SAT support points along ±n (the
+     * standard single-point SAT contact approximation). */
+    float best_a = -FLT_MAX;
+    float best_b = FLT_MAX;
+    vector3 pa = a -> position, pb = b -> position;
+    for (int i = 0; i < a -> hull_vert_count; i++) {
+        const mig_hull_point *v = &world -> hull_verts [a -> hull_vert_base + i];
+        vector3 p = vector4_rotate_to_vector3 (qa, (vector3) {(float) v -> x, (float) v -> y, (float) v -> z});
+        p = simd_add (p, a -> position);
+        const float d = vector3_dot (p, n);
+        if (d > best_a) { best_a = d; pa = p; }
+    }
+    for (int i = 0; i < b -> hull_vert_count; i++) {
+        const mig_hull_point *v = &world -> hull_verts [b -> hull_vert_base + i];
+        vector3 p = vector4_rotate_to_vector3 (qb, (vector3) {(float) v -> x, (float) v -> y, (float) v -> z});
+        p = simd_add (p, b -> position);
+        const float d = vector3_dot (p, n);
+        if (d < best_b) { best_b = d; pb = p; }
+    }
+    out -> object_a = a;
+    out -> object_b = b;
+    out -> normal_vector = n;
+    out -> contact_count = 1;
+    contact_point_data *cp = &out -> contacts [0];
+    cp -> position = simd_scale (simd_add (pa, pb), 0.5f);
+    cp -> penetration = depth;
+    return true;
+}
 int physics_world_add_composite (physics_world *world, const mig_part *parts, int count) {
     if ((!world) || (!world -> bodies) || (!parts) || count <= 0) { return -1; }
     const int cap = physics_world_composite_cap (world);
@@ -1887,6 +2305,11 @@ void physics_world_clear (physics_world *world) {
      * slice dies with its body, so the count returns to 0 while the
      * allocated capacity is kept for reuse. */
     world -> composite_part_count = 0;
+    /* MIG WP2.6 2.6.5: hull pool slices die with their bodies the same
+     * way; capacity is kept for reuse. */
+    world -> hull_vert_count = 0;
+    world -> hull_face_count = 0;
+    world -> hull_flag_skips = 0;
     world -> world_contact_cache_count = 0; /* MFS_131A */
     world -> manifold_overflow_count = 0;
     world -> contact_cache_hits = 0;
@@ -2238,6 +2661,26 @@ void physics_world_step (physics_world *world, float dt) {
                         manifold_count++;
                         appended = true;
                     } if (appended && world -> has_contact) { world -> has_contact [i] = 1; }
+                }
+            } else if (rb -> type == object_hull) {
+                /* MIG WP2.6 2.6.5: one hull floor manifold from the
+                 * support-vertex walk (physics_world_hull_floor_detect;
+                 * it counts the composite.hull refusal itself). */
+                collision_data floor_collision = {0};
+                if (physics_world_hull_floor_detect (world, rb, 0.0f, &floor_collision)) {
+                    if (manifold_count >= world -> manifold_capacity) {
+                        if (physics_world_grow_manifolds (world) != 0) {
+                            world -> manifold_overflow_count++;
+                            continue;
+                        }
+                    } float deepest = 0.0f;
+                    for (int fi = 0; fi < floor_collision.contact_count; fi++) {
+                        if (floor_collision.contacts [fi].penetration > deepest) { deepest = floor_collision.contacts [fi].penetration; }
+                    }
+                    if (was_sleeping && deepest > step_cfg -> depenetration.wake_depth_thresh) { rigidbody_wake (rb); }
+                    collision_prepare_solver (world, &floor_collision, &world -> manifolds [manifold_count], dt);
+                    manifold_count++;
+                    if (world -> has_contact) { world -> has_contact [i] = 1; }
                 }
             } else {
                 collision_data floor_collision = {0};

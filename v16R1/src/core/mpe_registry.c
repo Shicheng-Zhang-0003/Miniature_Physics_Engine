@@ -607,6 +607,14 @@ static bool wrap_cc (rigidbody *a, rigidbody *b, void *out, mpe_world_t *w) {ret
 static bool wrap_cyl_s (rigidbody *a, rigidbody *b, void *out, mpe_world_t *w) {return collision_cylinder_sphere (a, b, (collision_data *) out, wrap_cfg (w));}
 static bool wrap_cyl_c (rigidbody *a, rigidbody *b, void *out, mpe_world_t *w) {return collision_cylinder_cube (a, b, (collision_data *) out, wrap_cfg (w));}
 static bool wrap_cyl_cyl (rigidbody *a, rigidbody *b, void *out, mpe_world_t *w) {return collision_cylinder_cylinder (a, b, (collision_data *) out, wrap_cfg (w));}
+/* MIG WP2.6 2.6.5: hull pair handlers. Canonical order is (hull, other) —
+ * the dispatcher's swap path feeds mirrored pairs in with the arguments
+ * reordered, so the handlers always see (hull, X). All hull consumption
+ * is gated on cfg->composite.hull inside the handlers (they count one
+ * hull_flag_skips per refusal). */
+static bool wrap_h_s (rigidbody *a, rigidbody *b, void *out, mpe_world_t *w) {return mpe_hull_collide_sphere (a, b, out, w);}
+static bool wrap_h_c (rigidbody *a, rigidbody *b, void *out, mpe_world_t *w) {return mpe_hull_collide_cube (a, b, out, w);}
+static bool wrap_h_h (rigidbody *a, rigidbody *b, void *out, mpe_world_t *w) {return mpe_hull_collide_hull (a, b, out, w);}
 /* Builtin stage backends: exact current behaviour, registered under
  * canonical names so `mod use-broadphase hash` / `mod use-solver
  * seq-impulse` round-trips to the defaults. */
@@ -644,6 +652,12 @@ static void mpe_register_builtins_once (void) {
     mpe_register_pair_handler (2, 0, -1, -1, wrap_cyl_s, "cyl-sphere");
     mpe_register_pair_handler (2, 1, -1, -1, wrap_cyl_c, "cyl-cube");
     mpe_register_pair_handler (2, 2, -1, -1, wrap_cyl_cyl, "cyl-cyl");
+    /* MIG WP2.6 2.6.5: object_hull=5 (append-only enum). Hull-vs-cylinder
+     * is a later brick (no SAT reference pair exists for it yet); an
+     * unregistered pair dispatches to no contact, never a guess. */
+    mpe_register_pair_handler ((int) object_hull, (int) object_sphere, -1, -1, wrap_h_s, "hull-sphere");
+    mpe_register_pair_handler ((int) object_hull, (int) object_cube, -1, -1, wrap_h_c, "hull-cube");
+    mpe_register_pair_handler ((int) object_hull, (int) object_hull, -1, -1, wrap_h_h, "hull-hull");
     mpe_register_broadphase ("hash", &s_builtin_broadphase);
     mpe_register_solver ("seq-impulse", &s_builtin_solver);
     /* Pin the builtin pair slots: indices below this count refuse

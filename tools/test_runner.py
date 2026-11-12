@@ -3,7 +3,7 @@
 
 Profiles:
   quick    Python runner-contract tests and the canonical C regression suite
-           (67 cases incl. 2 informational diags; full suite re-run under 5
+           (68 cases incl. 2 informational diags; full suite re-run under 5
            regimes default/light/heavy/brittle/sticky via MPE_TEST_REGIME).
   physics  quick + every isolated legacy case (30) and all paranoia cases (15).
   full     physics + ASan/UBSan suite, MFS robotics (37 gated), TUI snapshots
@@ -16,7 +16,7 @@ only the Python standard library.
 
 Strict contract: suite cases that print [SKIP] (self-skipped coverage) fail
 the run unless --allow-skip is given; [XFAIL] markers are surfaced in the
-summary counts but never block. Registry floors: MIN_SUITE_ENTRIES=67,
+summary counts but never block. Registry floors: MIN_SUITE_ENTRIES=68,
 MIN_LEGACY_ENTRIES=30, MIN_PARANOIA_ENTRIES=15; summary contract requires
 Total == registry size and Blocking failures == 0.
 """
@@ -204,7 +204,20 @@ MPE_TEST_REGIMES = ("default", "light", "heavy", "brittle", "sticky")
 # box, pyramid-vs-floor, apex-to-apex side-face win, 1e200 ceiling pin)
 # plus a hull-box depth-parity cross-pin and the engine-consistent
 # refusal battery (bad_count/bad_index/bad_point).
-MIN_SUITE_ENTRIES = 67
+# (e) 2.6.5 adds mig_hull_spawn: hull BODIES + spawn consumption —
+# object_hull on per-world mesh pools, contacts gated on composite.hull
+# (spawning is not), mesh-props spawn consistency (prism I(1.5,1.5,1.0),
+# r = √(7/3), 6v/8f pool slice), flag-0 ghost behaviour (both registry
+# orders refuse + count, sphere rests while the ghost falls through —
+# the safety net is off for that scenario per the f10/f11 precedent),
+# flag-1 prism floor rest at the inradius √3/3 with the 4-corner
+# AB-face manifold, sphere bounce off the pyr4 apex, hull-hull MTD 0.1
+# in both registry orders + drop-from-6 smoke; engine side also gave
+# boundary.c exact hull extrema (the covering-sphere rest class, same
+# failure the 2.8 composite fix removed) and the mass-pair inverse in
+# add_hull. Regime-robust: e = ½ and the heavier base twin are pinned
+# in-scenario (light/brittle/heavy gravity×restitution rewrites).
+MIN_SUITE_ENTRIES = 68
 # DESPOT-2026-10-01: pin per-suite floors so deleting a legacy/paranoia target
 # + its make target together cannot shrink the headline silently (the 220->204
 # drift). Canonical floor above; legacy 30 + paranoia 15 pinned here.

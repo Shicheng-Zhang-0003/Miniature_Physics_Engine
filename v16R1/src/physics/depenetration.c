@@ -56,6 +56,14 @@ void a3_positional_depenetration_pass_dt (struct physics_world *world, broadphas
             rigidbody *rigid_body = &bodies [object_index];
             if (rigid_body -> static_state || rigid_body -> kinematic) { continue; }
             collision_data floor_collision = {0};
+            /* MIG WP2.6 2.6.5: hull floor support-vertex manifold (the
+             * detector gates on composite.hull and counts refusals). */
+            if (rigid_body -> type == object_hull) {
+                if (physics_world_hull_floor_detect (world, rigid_body, 0.0f, &floor_collision)) {
+                    a3_positional_depenetrate_manifold_w (world, &floor_collision);
+                }
+                continue;
+            }
             if (collision_static_plane_body (&world -> static_plane_body, rigid_body, 0.0f, &floor_collision,
                                              mpe_world_cfg (world))) {
                 a3_positional_depenetrate_manifold_w (world, &floor_collision);

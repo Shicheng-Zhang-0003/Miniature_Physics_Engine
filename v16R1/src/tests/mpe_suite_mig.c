@@ -3920,3 +3920,315 @@ int mpe_t_mig_hull_sat_hulls (void) {
     mpe_test_end (&t);
     return t.failures;
 }
+
+/* ---- MIG WP2.6 2.6.5: hull bodies + spawn consumption ----
+ *
+ * mig_hull_spawn — the engine side of the shape catalog: spawn a catalog
+ * mesh as a physical hull body and consume it in contacts, all behind
+ * composite.hull for CONTACTS ONLY (spawning itself is deliberately not
+ * flag-gated, so a flag-0 world can hold ghost hulls that fall through
+ * everything — observable, counted, never silent).
+ *
+ * Oracles, all hand-derived from the study's closed forms in mig_hull.h:
+ *  1. spawn consistency (flag OFF): prism s=h=2, mass 3 → V = √3/4·s²h,
+ *     Ixx = Iyy = m(h²/12 + s²/24) = 1.5, Izz = m·s²/12 = 1.0, inverse
+ *     (2/3, 2/3, 1); every rebased vertex sits at |v−com| = √(7/3) (the
+ *     authored radius); pool slice exactly 6 verts / 8 faces. Plus the
+ *     refusal battery: wrong kind, zero/negative/NaN sizes, mass outside
+ *     [1e-4, 1e6], sub-0.01 and overflow bounds — every rejection stores
+ *     NOTHING (body count and both pool counts unchanged).
+ *  2. flag OFF consumption: an upright pyr4 and an overlapping sphere
+ *     make no contacts in either registry order (the mirrored pair really
+ *     routes into the hull handler — one hull_flag_skips per refusal);
+ *     the sphere rests on the floor while the hull falls THROUGH it.
+ *  3. flag ON rest: the prism spawns on its AB rectangle face and holds
+ *     COM y = inradius = √3/3 (the face center is under the COM, so the
+ *     rest is stable); the direct floor manifold carries exactly the 4
+ *     face corners with the down normal and honest slop-band depths.
+ *  4. flag ON bounce: a sphere dropped onto the upright pyr4's apex
+ *     bounces (some tick vy > 0.5 at restitution ½), never sinks below
+ *     y = −0.5, and the pyramid stays resting near h/4 = 0.5.
+ *  5. flag ON hull-hull: teleported pyr4-over-pyr4 gives the exact MTD
+ *     0.1 along y in BOTH registry orders (normal flips, depth does not);
+ *     the dynamic drop from y = 6.0 meets at the apex and never tunnels.
+ */
+int mpe_t_mig_hull_spawn (void) {
+    mpe_test_t t;
+    mpe_test_begin (&t, "mig_hull_spawn");
+    mpe_clamp_counters_reset ();
+    const float dt = 1.0f / 60.0f;
+    /* The suite saves/restores g_cfg per test; this gate still sets every
+     * scenario's flag explicitly and leaves the documented default (0). */
+    g_cfg.composite.hull = 0;
+    /* The study's meshes are z-up (extrusion toward +z, pyramid apex at
+     * +z); the engine is y-up. q = (cos(−45°), sin(−45°), 0, 0) rotates
+     * mesh +z onto world +y (−90° about X), standing a pyramid on its
+     * base. The prism needs no rotation: identity already rests it on
+     * its AB face (see scenario 3). */
+    const vector4 pyr_up = (vector4) {0.70710678118654752f, -0.70710678118654752f, 0.0f, 0.0f};
+
+    /* --- 1. spawn consistency, flag OFF -------------------------------- */
+    {
+        physics_world w1;
+        mpe_world_begin (&w1);
+        mpe_config_t c1 = g_cfg;
+        c1.composite.hull = 0;
+        physics_world_set_config (&w1, &c1);
+        w1.static_plane_enabled = true;
+        const int ih = physics_world_add_hull (&w1, mpe_hull_shape_prism, 2.0, 2.0, 3.0f,
+                                               (vector3) {0.0f, 5.0f, 0.0f});
+        MPE_CHECK (&t, ih >= 0);
+        MPE_CHECK (&t, w1.body_count == 1);
+        rigidbody *h1 = &w1.bodies [ih];
+        MPE_CHECK (&t, h1 -> type == object_hull && h1 -> mass_is_composed);
+        MPE_CHECK (&t, h1 -> hull_vert_base >= 0 && h1 -> hull_face_base >= 0);
+        MPE_CHECK (&t, h1 -> hull_vert_count == MIG_HULL_PRISM_VERTS &&
+                          h1 -> hull_face_count == MIG_HULL_PRISM_FACES);
+        MPE_CHECK (&t, w1.hull_vert_count == MIG_HULL_PRISM_VERTS &&
+                          w1.hull_face_count == MIG_HULL_PRISM_FACES * 3);
+        MPE_CHECK_NEAR (&t, h1 -> mass, 3.0f, 1e-6f, "prism mass");
+        MPE_CHECK_NEAR (&t, h1 -> inertia_tensor_local.matrix [0][0], 1.5f, 1e-5f,
+                        "prism Ixx = m(h²/12 + s²/24)");
+        MPE_CHECK_NEAR (&t, h1 -> inertia_tensor_local.matrix [1][1], 1.5f, 1e-5f, "prism Iyy");
+        MPE_CHECK_NEAR (&t, h1 -> inertia_tensor_local.matrix [2][2], 1.0f, 1e-5f, "prism Izz = m·s²/12");
+        MPE_CHECK (&t, h1 -> inertia_tensor_local.matrix [0][1] == 0.0f &&
+                          h1 -> inertia_tensor_local.matrix [0][2] == 0.0f &&
+                          h1 -> inertia_tensor_local.matrix [1][2] == 0.0f);
+        MPE_CHECK_NEAR (&t, h1 -> inverse_inertia_tensor_local.matrix [0][0], 2.0f / 3.0f, 1e-5f,
+                        "prism inverse Ixx");
+        MPE_CHECK_NEAR (&t, h1 -> inverse_inertia_tensor_local.matrix [1][1], 2.0f / 3.0f, 1e-5f,
+                        "prism inverse Iyy");
+        MPE_CHECK_NEAR (&t, h1 -> inverse_inertia_tensor_local.matrix [2][2], 1.0f, 1e-5f,
+                        "prism inverse Izz");
+        MPE_CHECK_NEAR (&t, h1 -> radius, (float) sqrt (7.0 / 3.0), 1e-5f, "prism circumradius √(7/3)");
+        /* The pool slice is COM-local: centroid at the origin, and the
+         * max |v| equals the authored radius (all six vertices here). */
+        double sx = 0.0, sy = 0.0, sz = 0.0, maxr2 = 0.0;
+        for (int i = 0; i < h1 -> hull_vert_count; i++) {
+            const mig_hull_point *v = &w1.hull_verts [h1 -> hull_vert_base + i];
+            sx += v -> x;
+            sy += v -> y;
+            sz += v -> z;
+            const double r2 = v -> x * v -> x + v -> y * v -> y + v -> z * v -> z;
+            if (r2 > maxr2) { maxr2 = r2; }
+        }
+        MPE_CHECK (&t, fabs (sx) < 1e-9 && fabs (sy) < 1e-9 && fabs (sz) < 1e-9);
+        MPE_CHECK_NEAR (&t, (float) sqrt (maxr2), h1 -> radius, 1e-5f, "pool bound = authored radius");
+        /* Refusal battery: every rejection stores NOTHING. */
+        const int nb = w1.body_count, nv = w1.hull_vert_count, nf = w1.hull_face_count;
+        const vector3 p0 = {0.0f, 1.0f, 0.0f};
+        MPE_CHECK (&t, physics_world_add_hull (NULL, mpe_hull_shape_prism, 1.0, 1.0, 1.0f, p0) == -1);
+        MPE_CHECK (&t, physics_world_add_hull (&w1, (mpe_hull_shape_kind) 99, 1.0, 1.0, 1.0f, p0) == -1);
+        MPE_CHECK (&t, physics_world_add_hull (&w1, mpe_hull_shape_prism, 0.0, 1.0, 1.0f, p0) == -1);
+        MPE_CHECK (&t, physics_world_add_hull (&w1, mpe_hull_shape_prism, 1.0, -1.0, 1.0f, p0) == -1);
+        MPE_CHECK (&t, physics_world_add_hull (&w1, mpe_hull_shape_prism, 0.0 / 0.0, 1.0, 1.0f, p0) == -1);
+        MPE_CHECK (&t, physics_world_add_hull (&w1, mpe_hull_shape_pyr4, 1.0, 1.0, 0.0f, p0) == -1);
+        MPE_CHECK (&t, physics_world_add_hull (&w1, mpe_hull_shape_pyr4, 1.0, 1.0, 2.0e6f, p0) == -1);
+        MPE_CHECK (&t, physics_world_add_hull (&w1, mpe_hull_shape_pyr4, 1.0, 1.0, 0.0f / 0.0f, p0) == -1);
+        MPE_CHECK (&t, physics_world_add_hull (&w1, mpe_hull_shape_icosa, 0.0, 1.0, 1.0f, p0) == -1);
+        MPE_CHECK (&t, physics_world_add_hull (&w1, mpe_hull_shape_pyr3, 1.0e-3, 1.0e-3, 1.0f, p0) == -1);
+        MPE_CHECK (&t, physics_world_add_hull (&w1, mpe_hull_shape_prism, 1.0e300, 1.0e300, 1.0f, p0) == -1);
+        MPE_CHECK (&t, w1.body_count == nb && w1.hull_vert_count == nv && w1.hull_face_count == nf);
+        physics_world_cleanup (&w1);
+    }
+
+    /* --- 2. composite.hull 0: the hull is a ghost ----------------------- */
+    {
+        physics_world w2;
+        mpe_world_begin (&w2);
+        mpe_config_t c2 = g_cfg;
+        c2.composite.hull = 0;
+        c2.body_defaults.sphere_restitution = 0.0f;
+        /* The world-edge safety net is a KINEMATIC fail-safe: with the
+         * exact hull extrema it would hold the ghost ~slop above the
+         * floor forever, making "nothing fell through" vacuous. The
+         * f10/f11 fallen-counter precedent switches it off to measure
+         * the contact path's own behaviour — here, that the contact
+         * path refuses the hull outright. */
+        c2.boundary.safety_net_enabled = 0;
+        physics_world_set_config (&w2, &c2);
+        w2.static_plane_enabled = true;
+        /* pyr4 s=h=2 upright, spawned AT its rest pose: COM y = h/4 = 0.5,
+         * base plane on the floor, apex y = 2.0. */
+        const int p2 = physics_world_add_hull (&w2, mpe_hull_shape_pyr4, 2.0, 2.0, 1.0f,
+                                               (vector3) {0.0f, 0.5f, 0.0f});
+        MPE_CHECK (&t, p2 >= 0);
+        rigidbody *g2 = &w2.bodies [p2];
+        g2 -> orientation = pyr_up;
+        rigidbody_update_axes (g2);
+        const int s2 = physics_world_add_sphere (&w2, 0.5f, 1.0f, (vector3) {0.0f, 2.4f, 0.0f});
+        MPE_CHECK (&t, s2 >= 0);
+        /* Both registry orders refuse, and BOTH count one skip — proof
+         * the mirrored (sphere, hull) pair really routes into the hull
+         * handler rather than dying as an unregistered pair. */
+        collision_data cd2 = {0};
+        MPE_CHECK (&t, !mpe_shape_dispatch (&w2, g2, &w2.bodies [s2], &cd2));
+        const int skips0 = w2.hull_flag_skips;
+        MPE_CHECK (&t, skips0 >= 1);
+        MPE_CHECK (&t, !mpe_shape_dispatch (&w2, &w2.bodies [s2], g2, &cd2));
+        MPE_CHECK (&t, w2.hull_flag_skips == skips0 + 1);
+        /* 120 ticks: enough for the slowest regime's kinematics (light
+         * runs gravity ×0.25 — the sphere needs ~1.4 s to reach the
+         * floor). The ghost falls freely the whole window (flag 0:
+         * floor, sphere and hull-hull all refuse; nothing stops it). */
+        MPE_CHECK (&t, mpe_step (&w2, 120, dt));
+        MPE_CHECK (&t, w2.hull_flag_skips > skips0 + 1);
+        MPE_CHECK (&t, g2 -> position.y < -1.0f);
+        MPE_CHECK (&t, w2.bodies [s2].position.y > 0.45f && w2.bodies [s2].position.y < 0.55f);
+        MPE_CHECK (&t, fabsf (w2.bodies [s2].velocity.y) < 0.2f);
+        physics_world_cleanup (&w2);
+    }
+
+    /* --- 3. composite.hull 1: the prism rests on its AB face ------------ */
+    {
+        physics_world w3;
+        mpe_world_begin (&w3);
+        mpe_config_t c3 = g_cfg;
+        c3.composite.hull = 1;
+        c3.body_defaults.sphere_restitution = 0.0f;
+        physics_world_set_config (&w3, &c3);
+        w3.static_plane_enabled = true;
+        /* Identity orientation: the prism's AB rectangle face (the bottom
+         * triangle edge A,B extruded along z) sits at local y = −√3/3, so
+         * the COM at the inradius height √3/3 lays it flat on the floor
+         * with the face center directly under the COM — a stable rest. */
+        const float rest3 = (float) (sqrt (3.0) / 3.0);
+        const int p3 = physics_world_add_hull (&w3, mpe_hull_shape_prism, 2.0, 2.0, 1.0f,
+                                               (vector3) {0.0f, rest3 + 0.02f, 0.0f});
+        MPE_CHECK (&t, p3 >= 0);
+        MPE_CHECK (&t, mpe_step (&w3, 90, dt));
+        rigidbody *pr3 = &w3.bodies [p3];
+        MPE_CHECK (&t, w3.hull_flag_skips == 0); /* flag on: nothing refused */
+        MPE_CHECK_NEAR (&t, pr3 -> position.y, rest3, 0.012f,
+                        "prism rests at the inradius height √3/3");
+        MPE_CHECK (&t, fabsf (pr3 -> velocity.y) < 0.02f);
+        const float y3 = pr3 -> position.y;
+        MPE_CHECK (&t, mpe_step (&w3, 90, dt));
+        MPE_CHECK (&t, fabsf (pr3 -> position.y - y3) < 3e-3f); /* holds: no sink, no pump */
+        /* Direct floor manifold: exactly the AB face's 4 corners, down
+         * normal, honest depths (resting sits inside the slop band). */
+        collision_data fl3 = {0};
+        MPE_CHECK (&t, physics_world_hull_floor_detect (&w3, pr3, 0.0f, &fl3));
+        MPE_CHECK (&t, fl3.contact_count == 4);
+        MPE_CHECK (&t, fl3.object_a == pr3 && fl3.object_b == &w3.static_plane_body);
+        MPE_CHECK_NEAR (&t, fl3.normal_vector.y, -1.0f, 1e-6f, "floor normal points down");
+        for (int i = 0; i < fl3.contact_count; i++) {
+            MPE_CHECK (&t, fl3.contacts [i].penetration >= 0.0f && fl3.contacts [i].penetration < 0.05f);
+            MPE_CHECK (&t, fl3.contacts [i].position.y < 0.05f); /* the bottom face */
+        }
+        physics_world_cleanup (&w3);
+    }
+
+    /* --- 4. composite.hull 1: sphere bounces off the upright pyr4 ------- */
+    {
+        physics_world w4;
+        mpe_world_begin (&w4);
+        mpe_config_t c4 = g_cfg;
+        c4.composite.hull = 1;
+        /* The regime matrix rewrites the sphere default (brittle forces
+         * e = 0, light 0.10); the bounce IS this oracle, so e = ½ is
+         * pinned like the flag above — the gate measures the hull
+         * contact's restitution path, not the regime's material mix. */
+        c4.body_defaults.sphere_restitution = 0.5f;
+        physics_world_set_config (&w4, &c4);
+        w4.static_plane_enabled = true;
+        /* Mass 10: the rebound shares its impulse with the pyramid; a
+         * 1 kg base would be rammed below the oracle window under the
+         * heavy regime's ×3 gravity. The rest pose is mass-free. */
+        const int p4 = physics_world_add_hull (&w4, mpe_hull_shape_pyr4, 2.0, 2.0, 10.0f,
+                                               (vector3) {0.0f, 0.52f, 0.0f});
+        MPE_CHECK (&t, p4 >= 0);
+        rigidbody *py4 = &w4.bodies [p4];
+        py4 -> orientation = pyr_up;
+        rigidbody_update_axes (py4);
+        MPE_CHECK (&t, mpe_step (&w4, 90, dt));
+        MPE_CHECK (&t, py4 -> position.y > 0.35f && py4 -> position.y < 0.65f);
+        const int s4 = physics_world_add_sphere (&w4, 0.5f, 1.0f, (vector3) {0.0f, 6.0f, 0.0f});
+        MPE_CHECK (&t, s4 >= 0);
+        rigidbody *sp4 = &w4.bodies [s4];
+        float max_vy = -1e9f, min_sy = 1e9f, min_py = 1e9f, max_py = -1e9f;
+        for (int tick = 0; tick < 240; tick++) {
+            physics_world_step (&w4, dt);
+            if (sp4 -> velocity.y > max_vy) { max_vy = sp4 -> velocity.y; }
+            if (sp4 -> position.y < min_sy) { min_sy = sp4 -> position.y; }
+            if (py4 -> position.y < min_py) { min_py = py4 -> position.y; }
+            if (py4 -> position.y > max_py) { max_py = py4 -> position.y; }
+        }
+        MPE_CHECK (&t, mpe_world_finite (&w4));
+        MPE_CHECK (&t, max_vy > 0.5f);  /* it bounced off the apex */
+        MPE_CHECK (&t, min_sy > -0.5f); /* the sphere never sank through */
+        MPE_CHECK (&t, min_py > 0.3f && max_py < 0.8f); /* the pyramid stayed resting */
+        physics_world_cleanup (&w4);
+    }
+
+    /* --- 5. composite.hull 1: hull-hull --------------------------------- */
+    {
+        physics_world w5;
+        mpe_world_begin (&w5);
+        mpe_config_t c5 = g_cfg;
+        c5.composite.hull = 1;
+        c5.body_defaults.sphere_restitution = 0.0f;
+        physics_world_set_config (&w5, &c5);
+        w5.static_plane_enabled = true;
+        /* Mass 10 for the base twin (the dropped one stays 1 kg): the
+         * landing impulse would otherwise drive the resting pyramid
+         * below the oracle window under the heavy regime's ×3 gravity. */
+        const int p5 = physics_world_add_hull (&w5, mpe_hull_shape_pyr4, 2.0, 2.0, 10.0f,
+                                               (vector3) {0.0f, 0.52f, 0.0f});
+        MPE_CHECK (&t, p5 >= 0);
+        rigidbody *lo5 = &w5.bodies [p5];
+        lo5 -> orientation = pyr_up;
+        rigidbody_update_axes (lo5);
+        MPE_CHECK (&t, mpe_step (&w5, 90, dt));
+        MPE_CHECK (&t, lo5 -> position.y > 0.35f && lo5 -> position.y < 0.65f);
+        const int q5 = physics_world_add_hull (&w5, mpe_hull_shape_pyr4, 2.0, 2.0, 1.0f,
+                                               (vector3) {0.0f, 6.0f, 0.0f});
+        MPE_CHECK (&t, q5 >= 0);
+        rigidbody *hi5 = &w5.bodies [q5];
+        hi5 -> orientation = pyr_up;
+        rigidbody_update_axes (hi5);
+        /* Direct SAT oracle, teleported relative to the LIVE resting pose
+         * (the lower's apex sits at com_y + 1.5; its base plane at
+         * com_y + 1.4 overlaps it by exactly 0.1). */
+        hi5 -> position.y = lo5 -> position.y + 2.1f; /* base plane apex +0.1: separated */
+        collision_data hh0 = {0};
+        MPE_CHECK (&t, !mpe_shape_dispatch (&w5, hi5, lo5, &hh0));
+        hi5 -> position.y = lo5 -> position.y + 1.9f; /* base plane apex −0.1 */
+        collision_data hh1 = {0};
+        MPE_CHECK (&t, mpe_shape_dispatch (&w5, hi5, lo5, &hh1));
+        MPE_CHECK (&t, hh1.contact_count >= 1);
+        MPE_CHECK_NEAR (&t, hh1.contacts [0].penetration, 0.1f, 2e-3f, "hull-hull MTD 0.1");
+        MPE_CHECK (&t, hh1.normal_vector.y < -0.9f); /* from upper TOWARD lower */
+        collision_data hh2 = {0};
+        MPE_CHECK (&t, mpe_shape_dispatch (&w5, lo5, hi5, &hh2));
+        MPE_CHECK (&t, hh2.normal_vector.y > 0.9f);  /* mirrored: normal flips */
+        MPE_CHECK_NEAR (&t, hh2.contacts [0].penetration, 0.1f, 2e-3f, "hull-hull mirrored depth");
+        /* Dynamic smoke: drop from y = 6.0, meet at the apex, never tunnel. */
+        hi5 -> position.y = 6.0f;
+        hi5 -> velocity = (vector3) {0.0f, 0.0f, 0.0f};
+        int met = 0;
+        for (int tick = 0; tick < 240; tick++) {
+            physics_world_step (&w5, dt);
+            /* Touch pose: upper COM = lower COM + 2.0 (apex + half height). */
+            if (fabsf (hi5 -> position.y - (lo5 -> position.y + 2.0f)) < 0.25f) { met = 1; }
+        }
+        MPE_CHECK (&t, met);
+        MPE_CHECK (&t, hi5 -> position.y > 0.4f); /* never tunneled below */
+        MPE_CHECK (&t, lo5 -> position.y > 0.3f && lo5 -> position.y < 0.8f);
+        MPE_CHECK (&t, mpe_world_finite (&w5));
+        physics_world_cleanup (&w5);
+    }
+
+    MPE_CHECK (&t, mpe_clamp_composite_total () == 0ul && mpe_clamp_mass_total () == 0ul);
+    if (t.failures == 0) {
+        printf ("[PASS] mig WP2.6 2.6.5: hull spawn + consumption — mesh-props body, "
+                "composite.hull-gated contacts, touch-class oracles\n");
+        MPE_INFO ("prism s=h=2 m=3: I(1.5,1.5,1.0) inv(2/3,2/3,1) r=√(7/3) 6v/8f; flag0: "
+                  "both registry orders refuse+count, sphere rests while pyr4 falls through; "
+                  "flag1: prism rests at √3/3 with the 4-corner AB-face manifold, sphere "
+                  "bounces off the pyr4 apex (vy>0.5, never y<−0.5), hull-hull MTD 0.1 "
+                  "both orders + drop-from-6 smoke; refusal battery stores nothing");
+    }
+    mpe_test_end (&t);
+    return t.failures;
+}

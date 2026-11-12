@@ -237,7 +237,8 @@ void rigidbody_sanitize (rigidbody *rigid_body) {
     }
     /* TRUTH: corrupt type enum (uninit garbage) must not silently become cube. */
     if (rigid_body -> type != object_sphere && rigid_body -> type != object_cube && rigid_body -> type != object_cylinder &&
-        rigid_body -> type != object_custom && rigid_body -> type != object_composite) {
+        rigid_body -> type != object_custom && rigid_body -> type != object_composite &&
+        rigid_body -> type != object_hull) { /* MIG WP2.6 2.6.5: hull is a legal type */
         rigid_body -> type = object_cube;
     }
     if (rigid_body -> type == object_custom && rigid_body -> custom_shape < 100) { rigid_body -> custom_shape = 100; }
@@ -386,6 +387,26 @@ void rigidbody_sanitize (rigidbody *rigid_body) {
          * clamp paths are unreachable from add_composite (it pre-validates
          * the same windows) and NEVER request tensor regeneration: a
          * composite keeps its authored tensor. */
+        if (!isfinite (rigid_body -> radius) || (rigid_body -> radius <= 0.0f)) {
+            double req = (double) rigid_body -> radius;
+            rigid_body -> radius = 0.01f;
+            mpe_note_clamp ("sanitize radius", &mpe_clamp_radius_events, req, 0.01);
+        }
+        if (rigid_body -> radius > 100.0f) {
+            double req = (double) rigid_body -> radius;
+            rigid_body -> radius = 100.0f;
+            mpe_note_clamp ("sanitize radius", &mpe_clamp_radius_events, req, 100.0);
+        }
+        rigid_body -> half_extensions = (vector3) {rigid_body -> radius, rigid_body -> radius, rigid_body -> radius};
+    } else if (rigid_body -> type == object_hull) {
+        /* MIG WP2.6 2.6.5: radius is the AUTHORED bounding circumradius
+         * (max |v - com| over the pool slice); half_extensions mirror it
+         * for existing OBB readers, exactly like the composite branch.
+         * The clamps are unreachable from add_hull (it pre-validates the
+         * same windows) and never request tensor regeneration. Without
+         * this branch a hull would fall into the generic cube-like else
+         * below and have its zero half_extensions "repaired" to 0.01
+         * every tick, collapsing the broadphase sphere. */
         if (!isfinite (rigid_body -> radius) || (rigid_body -> radius <= 0.0f)) {
             double req = (double) rigid_body -> radius;
             rigid_body -> radius = 0.01f;
@@ -584,6 +605,10 @@ void rigidbody_initialisation_sphere (rigidbody *rigid_body, float radius, float
     rigid_body -> mass_is_composed = false;
     rigid_body -> composite_part_count = 0;
     rigid_body -> part_base = 0; /* WP2 2.1 pool slice anchor */
+    rigid_body -> hull_vert_base = 0; /* WP2.6 2.6.5 hull pool slice anchors */
+    rigid_body -> hull_vert_count = 0;
+    rigid_body -> hull_face_base = 0;
+    rigid_body -> hull_face_count = 0;
     rigid_body -> ext_force_this_tick = 0;
     rigid_body -> no_collide = false;
     /* DETERMINISM: the body pool is malloc'd, so this _Bool would otherwise
@@ -1171,6 +1196,10 @@ void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_inpu
     rigid_body -> mass_is_composed = false;
     rigid_body -> composite_part_count = 0;
     rigid_body -> part_base = 0; /* WP2 2.1 pool slice anchor */
+    rigid_body -> hull_vert_base = 0; /* WP2.6 2.6.5 hull pool slice anchors */
+    rigid_body -> hull_vert_count = 0;
+    rigid_body -> hull_face_base = 0;
+    rigid_body -> hull_face_count = 0;
     rigid_body -> ext_force_this_tick = 0;
     rigid_body -> no_collide = false;
     /* DETERMINISM: the body pool is malloc'd, so this _Bool would otherwise
@@ -1413,6 +1442,10 @@ void rigidbody_initialisation_cylinder (rigidbody *rigid_body, float radius, flo
     rigid_body -> mass_is_composed = false;
     rigid_body -> composite_part_count = 0;
     rigid_body -> part_base = 0; /* WP2 2.1 pool slice anchor */
+    rigid_body -> hull_vert_base = 0; /* WP2.6 2.6.5 hull pool slice anchors */
+    rigid_body -> hull_vert_count = 0;
+    rigid_body -> hull_face_base = 0;
+    rigid_body -> hull_face_count = 0;
     rigid_body -> ext_force_this_tick = 0;
     rigid_body -> no_collide = false;
     /* DETERMINISM: the body pool is malloc'd, so this _Bool would otherwise

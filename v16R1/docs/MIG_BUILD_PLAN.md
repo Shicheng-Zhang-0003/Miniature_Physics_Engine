@@ -285,9 +285,9 @@ truth in this order and do not write a new line of code until green:
 ```bash
 cd 475-MPE/v16R1/src
 make build_suite            # zero complaints expected (-Werror is default)
-./test_mpe_suite --all      # expect: Total: 67 | Blocking failures: 0
+./test_mpe_suite --all      # expect: Total: 68 | Blocking failures: 0
 cd ../..
-python3 tools/test_runner.py --profile quick   # expect Checks: 81 | passed: 81
+python3 tools/test_runner.py --profile quick   # expect Checks: 82 | passed: 82
 git status --short          # manifest must match §1 exactly — no half-written files
 ```
 
@@ -1243,17 +1243,31 @@ the study's closed-form oracles are the gates' oracles, unchanged.
   `composite.hull` gate applies when a consumer exists (2.6.5 spawn).
   The plan's original "behind composite.hull 1" phrasing named the
   consumption precondition, not the function itself.
-- [ ] **2.6.5 Hull body + spawn consumption.** `object_hull` appended
-  to `object_type` (append-only ABI), per-world hull data pool,
-  `physics_world_add_hull` (density-1 mesh_props → rebase to COM →
-  diagonal inertia × mass → circumradius in `radius`), pair handlers
-  (hull-sphere / hull-cube / hull-hull) ALL gated on `composite.hull`,
-  floor support-vertex manifold, CCD branches, broadphase radius,
-  renderer explicit hull skip + counter, scene-save veto (loader
-  already rejects unknown types), `touch prism|pyr4|pyr3|icosa` verbs
-  that refuse loudly when the flag is 0. Gate `mig_hull_spawn`
-  (68th): flag-off refusal, floor-rest closed form, sphere
-  bounce-off, mesh-props consistency.
+- [x] **2.6.5 Hull body + spawn consumption (LANDED 2026-11-12, gate
+  `mig_hull_spawn`, 68th).** `object_hull` appended to `object_type`
+  (append-only ABI), per-world hull vertex/face pools (grow-doubling,
+  clear = compaction only), `physics_world_add_hull` (density-1
+  mesh_props → rebase to COM → diagonal inertia × mass/V with
+  off-diagonal refusal, both the tensor AND its inverse stamped,
+  circumradius in `radius` + mirrored `half_extensions`), pair
+  handlers (hull-sphere / hull-cube / hull-hull) ALL gated on
+  `composite.hull` (spawning itself is not — a flag-0 world holds
+  countable ghost hulls), floor support-vertex manifold (up to 4
+  deepest, slop-gated), CCD mover-side branches (sweep obstacles skip
+  hulls — same conservative class as cube/cylinder obstacles),
+  broadphase radius, renderer explicit hull skip + counter, scene-save
+  veto SVF06, `touch prism|pyr4|pyr3|icosa` verbs that refuse loudly
+  when the flag is 0. `boundary.c` gained exact hull extrema off the
+  pool slice — the covering-sphere net rest (the 2.8 composite
+  failure class) would otherwise hold every hull a metre up. Gate
+  `mig_hull_spawn`: mesh-props consistency (prism I(1.5,1.5,1.0),
+  r = √(7/3), 6v/8f slice + refusal battery storing nothing), flag-0
+  ghost (both registry orders refuse + count, sphere rests while the
+  ghost falls through — net off per the f10/f11 precedent), flag-1
+  prism rest at √3/3 with the 4-corner AB-face manifold, sphere
+  bounce off the pyr4 apex, hull-hull MTD 0.1 both orders +
+  drop-from-6 smoke; regime-robust (e = ½ and the heavier base twin
+  pinned in-scenario).
 
 ## §9 Risk register + the standing ledger
 
@@ -1663,6 +1677,63 @@ Ledger (new entries get a line, never an edit of a past line):
   2.6.5 spawn gates its consumption on `composite.hull`). Suite floor
   66 → 67; suite 66/66 → 67/67, quick 80/80 → 81/81 at the landing;
   ASan/UBSan spot-check of the new gate clean.
+
+- 2026-11-12 — WP2.6 2.6.5 (this commit): hull BODIES + spawn
+  consumption. `object_hull` appended to `object_type` (6th value,
+  append-only ABI); per-world hull vertex/face pools beside the
+  composite part pool (grow-doubling, clear = compaction only,
+  cleanup frees, ceilings `mpe_max_bodies × 12` verts / `× 60` face
+  indices); `physics_world_add_hull(kind, s, h, mass, position)`
+  stamps density-1 `mesh_props` truth — COM-rebased pool slice,
+  diagonal inertia × mass/V with off-diagonal refusal (>1e-9·max_diag
+  means a non-catalog mesh slipped in), BOTH the tensor and its
+  inverse (the sphere initializer's stale inverse is replaced, the
+  add_composite convention), bounding circumradius in `radius` with
+  `half_extensions` mirroring it, `mass_is_composed` (authored-tensor
+  protect), sphere-default materials, policy windows mass
+  [1e-4, 1e6] / bound [0.01, 100]. Consumption is gated, spawning is
+  NOT: hull floor = support-vertex manifold (up to 4 deepest,
+  slop-gated, cube-path sort; refusals count in `hull_flag_skips`),
+  hull-sphere via conjugate-rotated centre + 2.5.4's
+  `mig_hull_sat_hull_sphere`, hull-cube via rotated verts +
+  `mig_hull_sat_hull_box`, hull-hull via B-into-A-local + 2.6.4's
+  `mig_hull_sat_hull_hull`; registry canonical order (hull, other)
+  (5,0)/(5,1)/(5,5), dispatcher swap feeds the mirrored pairs;
+  manifold normal FROM first TOWARD second, world-position contacts
+  (SAT MTD depths, single-point approximations documented — the
+  manifold brick replaces them). CCD: mover-side branches only
+  (`ccd_hull_support_point`, min thickness = min COM-local AABB
+  extent); sweep obstacles skip hulls like cube/cylinder obstacles;
+  `ccd_support_depth`/`ccd_min_thickness` deliberately get NO branch
+  (zero half_extensions → sweep skipped, safe degraded, mirrors
+  composite). Renderer skips hulls with a counter + one-time note;
+  scene save vetoes object_hull (new `SVF06`); `touch
+  prism|pyr4|pyr3|icosa` verbs refuse loudly at flag 0 with the env
+  hint, fixed sizes s=h=1 (icosa a=1), mass 1 kg. One INCIDENT, caught
+  by the gate on its first run (the mig_composite_stack class again):
+  `boundary.c`'s world-edge safety net read a hull through its
+  body-level fields — a hull is sphere-initialised (half_extensions =
+  (r, r, r)), so the net saw a phantom cube and clamped every hull to
+  COVERING-SPHERE REST (pyr4 at COM 1.5 instead of h/4 = 0.5), which
+  also pumped angular velocity until the mirrored hull-hull normal
+  came back upside-down. Fixed with exact hull extrema off the pool
+  slice (axis conjugated into the body frame, both ± supports in one
+  pass; defective-slice/NULL-world callers keep the legacy projection
+  — the documented degraded mode). Gate `mig_hull_spawn` (68th,
+  blocking): mesh-props consistency + refusal battery storing
+  nothing, flag-0 ghost (both registry orders refuse + count, sphere
+  rests while the ghost falls through — the net is switched OFF for
+  that scenario per the f10/f11 fallen-counter precedent, since an
+  exact net makes "nothing fell through" vacuous), flag-1 prism rest
+  at the inradius √3/3 with the 4-corner AB-face manifold, sphere
+  bounce off the pyr4 apex, hull-hull MTD 0.1 in both registry
+  orders + drop-from-6 smoke. Regime-robust: the bounce scenario pins
+  e = ½ in-scenario (brittle forces e = 0, light 0.10) and the base
+  twins are 10 kg (heavy's ×3 gravity otherwise rams a 1 kg resting
+  pyramid below its oracle window); green under all five regimes.
+  Suite floor 67 → 68; suite 67/67 → 68/68, quick 81/81 → 82/82 at
+  the landing; ASan spot-checks of the new gate, the boundary gate
+  and the sibling hull gates clean.
 
 ## §10 Definition of done for v16S (the cut checklist)
 

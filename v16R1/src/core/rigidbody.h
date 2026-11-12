@@ -28,16 +28,21 @@ typedef enum {
     object_cube,
     object_cylinder,
     object_custom,
-    object_composite /* MIG WP2 2.1: fifth value, appended so every existing
-                      * numeric value is unchanged; core-owned rigid assembly
-                      * whose primitives live in the per-world parts pool. */
-} object_type; /* MPE_FTC_090 + modular custom + MIG composite */
+    object_composite, /* MIG WP2 2.1: fifth value, appended so every existing
+                       * numeric value is unchanged; core-owned rigid assembly
+                       * whose primitives live in the per-world parts pool. */
+    object_hull /* MIG WP2.6 2.6.5: sixth value, appended (append-only ABI like
+                 * object_composite); one convex mesh per body, vertices in the
+                 * per-world hull pool, COM-local. Collision ships gated on
+                 * composite.hull (default 0). */
+} object_type; /* MPE_FTC_090 + modular custom + MIG composite + MIG hull */
 enum {
     OBJECT_SPHERE = object_sphere,
     OBJECT_CUBE = object_cube,
     OBJECT_CYLINDER = object_cylinder,
     OBJECT_CUSTOM = object_custom,
-    OBJECT_COMPOSITE = object_composite
+    OBJECT_COMPOSITE = object_composite,
+    OBJECT_HULL = object_hull
 };
 typedef struct {
     // Linear Kinematics
@@ -172,6 +177,18 @@ typedef struct {
      * bodies keep part_base 0 and are identified by composite_part_count
      * == 0, so slot 0 remains a legal composite base. */
     int part_base;
+    /* ---- MIG WP2.6 2.6.5 hull body contract (append-only) ----
+     * object_hull bodies index the per-world hull pools: hull_vert_base/
+     * hull_vert_count slice the vertex pool (COM-local mig_hull_point
+     * records), hull_face_base/hull_face_count the outward-wound face
+     * table. Both slices die with the body at physics_world_clear (the
+     * only pool compaction point), exactly like composite slices. Zeroed
+     * at every initializer: a 0/0 body is every pre-existing body,
+     * bit-identical; nothing in the pre-hull step path reads them. */
+    int hull_vert_base;
+    int hull_vert_count;
+    int hull_face_base;
+    int hull_face_count;
 } rigidbody;
 void rigidbody_update_axes (rigidbody *rigid_body);
 void rigidbody_initialisation_sphere (rigidbody *rigid_body, float radius, float mass, vector3 position_input);

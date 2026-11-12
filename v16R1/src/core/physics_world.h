@@ -3,6 +3,7 @@
 #define physics_world_h
 #include "rigidbody.h"
 #include "mig_mass.h" /* WP1 1.4: mig_part/mig_totals for add_composite (allowed direction: engine includes the pure module) */
+#include "mig_hull.h" /* WP2.6 2.6.5: mig_hull_point records for the per-world hull vertex pool */
 #include "../config/mpe_constants.h" /* MFS_131 */
 #include "../config/mpe_config.h"
 #include "mpe_module.h"
@@ -75,6 +76,18 @@ typedef struct physics_world {
     composite_part *composite_parts;
     int composite_part_count;
     int composite_part_capacity;
+    /* MIG WP2.6 2.6.5: per-world hull mesh pools (contiguous slices, one
+     * vertex slice + one face slice per hull body; body.hull_*_base/
+     * hull_*_count index them). Grow by doubling on append; the counts
+     * reset on physics_world_clear (the only compaction point, mirroring
+     * the composite pool) and the storage is freed by cleanup.
+     * Zero-initialised by the init memset: no eager allocation. */
+    mig_hull_point *hull_verts;
+    int hull_vert_count;
+    int hull_vert_capacity;
+    int *hull_faces;
+    int hull_face_count;
+    int hull_face_capacity;
     /* Phase-1 modularisation: per-world config. Defaults to &g_cfg
      * (global singleton, back-compat). Call physics_world_set_config()
      * to bind a foreign/isolated mpe_config_t. Hot path must read
@@ -139,6 +152,10 @@ typedef struct physics_world {
      * visible, not silent. Legacy path counted via debug counter; world path
      * dropped silently and gave false free-flight gravity. */
     int manifold_overflow_count;
+    /* MIG WP2.6 2.6.5: hull diagnostics. composite.hull==0 refuses every
+     * hull contact (floor + pair registry) silently-by-COUNT: the refusal
+     * is observable here, never silent. Reset by physics_world_clear. */
+    int hull_flag_skips;
     /* Last-step telemetry. The GUI/TUI overlays used to read locals owned by
      * the duplicated legacy driver; physics_world_step publishes the same
      * numbers here so there is one step implementation and one source of
@@ -253,6 +270,49 @@ int physics_world_add_composite (physics_world *world, const mig_part *parts, in
  * receives the stored count only on success. */
 int physics_world_composite_parts_append (physics_world *world, const composite_part *parts, int count,
                                           int first_index, int *stored_out);
+/* ---- MIG WP2.6 2.6.5: hull bodies (composite.hull-gated consumption) ----
+ * Shape catalog for physics_world_add_hull: the four 2.6.1 builders.
+ * (s, h) means side/height for the prism and base-side/height for the
+ * pyramids; the icosahedron takes the edge length in `s` and ignores
+ * `h`. All sizes are double-exact (no trig: the builders' literals). */
+typedef enum {
+    mpe_hull_shape_prism = 0,
+    mpe_hull_shape_pyr4 = 1,
+    mpe_hull_shape_pyr3 = 2,
+    mpe_hull_shape_icosa = 3
+} mpe_hull_shape_kind;
+/* Spawn one hull body from a catalog shape. The mesh is built at the
+ * canonical origin, measured with mig_hull_mesh_props at density 1, the
+ * vertices are REBASED to the COM frame (engine invariant: position IS
+ * the COM) and stored in the per-world hull pools; the body's inertia is
+ * the mesh_props diagonal scaled by mass/V (the catalog shapes are
+ * diagonal in their canonical axes — pinned by the 2.6.1 gate — a
+ * non-negligible off-diagonal refuses), `radius` carries the bounding
+ * circumradius for broadphase/CCD/frustum culling. Policy windows match
+ * add_composite: mass [1e-4,1e6], bound [0.01,100]; wrong kind/sizes or
+ * any pool failure rejects with -1 and mutates nothing. Spawning is NOT
+ * flag-gated: collision consumption is (composite.hull), so a flag-0
+ * world can hold hull bodies that simply make no contacts. */
+int physics_world_add_hull (physics_world *world, mpe_hull_shape_kind kind,
+                            double s, double h, float mass, vector3 position);
+/* Hull-vs-floor support-vertex manifold: the up-to-4 deepest COM-rotated
+ * vertices below `plane_y` (slop-gated like collision_static_plane_cube).
+ * Refuses (false) for non-hull bodies, pool-slice defects, and flag-0
+ * worlds (counting one hull_flag_skips). */
+bool physics_world_hull_floor_detect (physics_world *world, rigidbody *hull,
+                                      float plane_y, collision_data *out);
+/* Registry pair handlers for hull bodies. Canonical registration order is
+ * (hull, other); the dispatcher's swap path feeds mirrored pairs in with
+ * the arguments in canonical order, so these see (hull, X) always.
+ * Every handler refuses when composite.hull is 0 (one hull_flag_skips).
+ * Manifold convention matches the builtins: normal points FROM the first
+ * argument TOWARD the second; contacts carry world positions only (the
+ * solver computes ra/rb). Single-contact approximations off the 2.5.4/
+ * 2.6.4 SAT depths (MTD), so depth is the honest MTD but the contact
+ * POINT is a documented approximation until the manifold brick. */
+bool mpe_hull_collide_sphere (rigidbody *hull, rigidbody *sphere, void *out, mpe_world_t *world);
+bool mpe_hull_collide_cube (rigidbody *hull, rigidbody *cube, void *out, mpe_world_t *world);
+bool mpe_hull_collide_hull (rigidbody *a, rigidbody *b, void *out, mpe_world_t *world);
 void physics_world_clear (physics_world *world);
 void physics_world_step (physics_world *world, float dt);
 /* Shared pair pipeline (narrowphase dispatch + 3-gate wake + solver prep).

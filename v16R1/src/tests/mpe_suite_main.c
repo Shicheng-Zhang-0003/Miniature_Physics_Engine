@@ -128,6 +128,7 @@ int mpe_t_mig_hull_mass_props (void);
 int mpe_t_mig_hull_sat_pairs (void);
 int mpe_t_mig_hull_shape_catalog (void);
 int mpe_t_mig_hull_sat_hulls (void);
+int mpe_t_mig_hull_spawn (void);
 typedef struct {
     const char *name;
     int (*fn) (void);
@@ -287,6 +288,11 @@ static const mpe_entry_t mpe_registry [] = {
      * scenario oracles S1–S5 plus the refusal battery and a hull-box
      * depth-parity cross-pin. */
     {"mig_hull_sat_hulls", mpe_t_mig_hull_sat_hulls, 0},
+    /* MIG WP2.6 2.6.5: hull bodies + spawn consumption — object_hull
+     * bodies on per-world mesh pools, contacts gated on composite.hull,
+     * mesh-props spawn consistency, flag-off ghost behavior, floor
+     * rest/bounce and hull-hull oracles. */
+    {"mig_hull_spawn", mpe_t_mig_hull_spawn, 0},
 };
 #define MPE_NTESTS ((int) (sizeof (mpe_registry) / sizeof (mpe_registry [0])))
 /* Returns 0 pass, 1 fail, 2 skipped.

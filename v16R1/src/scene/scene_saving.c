@@ -124,6 +124,16 @@ int save_scene (const char *file_destination_path) {
                 return 0;
             }
         }
+    }
+    /* MIG WP2.6 2.6.5: hull persistence is a later brick — refuse loudly
+     * rather than writing a type tag the loader vetoes as corruption.
+     * Fail at save time with the live scene still intact (SVF convention). */
+    for (int svf_i = 0; svf_i < world -> body_count; svf_i++) {
+        if (world -> bodies [svf_i].type == object_hull) {
+            fprintf (stderr, "Error SVF06: body %d is an object_hull; hull persistence is not implemented; scene NOT saved\n",
+                     svf_i);
+            return 0;
+        }
     } char tmp_template [520];
     if (snprintf (tmp_template, sizeof (tmp_template), "%s.XXXXXX", file_destination_path) >=
         (int) sizeof (tmp_template)) {

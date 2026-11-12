@@ -163,6 +163,12 @@ float broadphase_bounding_radius (rigidbody *rb) {
                        rb -> half_extensions.z * rb -> half_extensions.z);
             if (isfinite (b) && b > out) { out = b; }
         }
+    } else if (rb -> type == object_hull) {
+        /* MIG WP2.6 2.6.5: radius is the AUTHORED bounding circumradius
+         * (max |v - com|), the exact covering sphere of every vertex in
+         * any orientation — the same rotation-invariant authored-bound
+         * reasoning as the composite branch. */
+        out = (isfinite (rb -> radius) && rb -> radius > 0.0f) ? rb -> radius : 0.5f;
     } else {
         if (isfinite (rb -> half_extensions.x) && isfinite (rb -> half_extensions.y) && isfinite (rb -> half_extensions.z)) {
             out = sqrtf (rb -> half_extensions.x * rb -> half_extensions.x + rb -> half_extensions.y * rb -> half_extensions.y +
@@ -384,6 +390,13 @@ int broadphase_generate_pairing (struct physics_world *world, broadphase_pair *c
              * (the composed geometry keeps half_extensions = authored
              * radius), so the fallback stays conservative, never a
              * zero-size false negative. */
+        } else if (rb -> type == object_hull) {
+            /* MIG WP2.6 2.6.5: half_extensions are the mirrored
+             * circumradius (sanitize), but the honest symmetric hash-box
+             * extent is the authored circumradius itself — rotation-
+             * invariant, never smaller than any rotated vertex span. */
+            float r = (isfinite (rb -> radius) && rb -> radius > 0.0f) ? rb -> radius : 0.5f;
+            extent_x = extent_y = extent_z = r;
         } else {
             vector3 *axes = rb -> cached_axes;
             extent_x = fabsf (axes [0].x) * rb -> half_extensions.x + fabsf (axes [1].x) * rb -> half_extensions.y +

@@ -8,12 +8,13 @@ documentation, and hygiene only — no new features.
 system (MPI hot-plug), per-world config, data-structure upgrades
 (growable pools, O(1) caches), kernel global-state removal, and the TUI
 stress suite. It keeps the v15R3 physics-truth contract (defaults
-bit-identical unless noted) and extends the suite to 67 registered / 65
-blocking green + 2 diag-informational (41 physics + 24 MIG/composite
+bit-identical unless noted) and extends the suite to 68 registered / 66
+blocking green + 2 diag-informational (41 physics + 25 MIG/composite
 gates + 2 diag; 2026-11-11 raised the floor 46 -> 61, then 61 -> 65
 with the WP2.5 convex-hull gates, 65 -> 66 on 2026-11-12 with WP2.6's
-first hull-catalog gate, and 66 -> 67 later the same day with the
-generic hull-vs-hull SAT gate).
+first hull-catalog gate, 66 -> 67 later the same day with the
+generic hull-vs-hull SAT gate, and 67 -> 68 with the hull-body
+spawn/consumption gate).
 
 ## What v15 Delivered
 
@@ -29,7 +30,7 @@ The v15 series introduced the centralised configuration system:
 Under the v15R3 freeze:
 
 1. Correctness fixes with headless proof (new or extended tests).
-2. Stability fixes required by validation (F5–F11, 67-case suite (65 blocking)).
+2. Stability fixes required by validation (F5–F11, 68-case suite (66 blocking)).
 3. Build and repository hygiene.
 4. Documentation updates to match the architecture.
 5. Validation improvements (tests, TUI snapshot scenes, gates).
