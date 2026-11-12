@@ -45,7 +45,7 @@ After dependencies have been installed:
           which usually means a dependency is missing.
     Headless regression suite (no display needed):
         make build_suite && ./test_mpe_suite --all
-        (expects 68/68 green: 66 physics + 2 diag-informational)
+        (expects 69/67 green: 67 physics + 2 diag-informational)
     Robotics suite:
         ecosystem/mfs/build_tests.sh
         (expects 37 gated green (unified suite) + build checks + ungated diags; ftc_hotload has a documented CWD-dependent plugin-path quirk)

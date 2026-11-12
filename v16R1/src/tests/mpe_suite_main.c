@@ -129,6 +129,7 @@ int mpe_t_mig_hull_sat_pairs (void);
 int mpe_t_mig_hull_shape_catalog (void);
 int mpe_t_mig_hull_sat_hulls (void);
 int mpe_t_mig_hull_spawn (void);
+int mpe_t_mig_hull_ellipsoid (void);
 typedef struct {
     const char *name;
     int (*fn) (void);
@@ -293,6 +294,7 @@ static const mpe_entry_t mpe_registry [] = {
      * mesh-props spawn consistency, flag-off ghost behavior, floor
      * rest/bounce and hull-hull oracles. */
     {"mig_hull_spawn", mpe_t_mig_hull_spawn, 0},
+    {"mig_hull_ellipsoid", mpe_t_mig_hull_ellipsoid, 0},
 };
 #define MPE_NTESTS ((int) (sizeof (mpe_registry) / sizeof (mpe_registry [0])))
 /* Returns 0 pass, 1 fail, 2 skipped.

@@ -239,7 +239,7 @@ help:
 	@echo "           --list | --test NAME | --allow-skip (strict SKIP fails without it)"
 	@echo "           MPE_TEST_REGIME=default|light|heavy|brittle|sticky (quick re-runs full suite x5)"
 	@echo "         build_suite | build_suite_scalar | headless | test_suite | test_suite_all"
-	@echo "           (canonical C suite: 68 registered / 66 blocking, MIN_SUITE_ENTRIES=68)"
+	@echo "           (canonical C suite: 69 registered / 67 blocking, MIN_SUITE_ENTRIES=69)"
 	@echo "         mpe-tui (terminal debugger + snapshot suite) | tui-smoke TUI_OUT=<dir> | ecosystem/*/*.so"
 	@echo "         mfs_ecosystem.so (delegates to ecosystem/mfs/Makefile; OUTDIR=<dir> for build_tests.sh)"
 	@echo "         check-deps | check-deps-tui | check-flags | check-new-files (wildcard guard)"

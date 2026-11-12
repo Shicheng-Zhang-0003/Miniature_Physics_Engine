@@ -170,7 +170,7 @@ mig_hull_err mig_hull_sat_hull_hull (const mig_hull_point *va, int na,
  *
  * Vertex/face counts (also the minimum point-set capacity):
  *   prism 6 verts / 8 tris,  pyr4 5 / 6,  pyr3 4 / 4,
- *   icosahedron 12 / 20. */
+ * icosahedron 12 / 20,  ellipsoid 86 / 168. */
 
 #define MIG_HULL_PRISM_VERTS 6
 #define MIG_HULL_PRISM_FACES 8
@@ -215,5 +215,44 @@ extern const int mig_hull_pyr3_faces [MIG_HULL_PYR3_FACES * 3];
  * I = m·a²(3+√5)/20 about every axis through the centre. */
 mig_hull_err mig_hull_build_icosahedron (double a, mig_hull_point_set *out);
 extern const int mig_hull_icosahedron_faces [MIG_HULL_ICOSA_FACES * 3];
+
+/* ---- APPENDED WP2.6 2.6.3: UV ellipsoid (pp_math.md §7) ----
+ * `pp_ellipsoid_uv` transcribed at the FIXED 12×8 resolution (nlon=12
+ * longitudes, nlat=8 latitude bands — one of the study's green
+ * resolutions, and built entirely from exact algebraic literals:
+ * colatitude rings at φ = j·π/8 need cos/sin(π/8) = √(2±√2)/2,
+ * longitudes at θ = k·π/6 need the hexagon values √3/2 and 1/2).
+ * No trig, no pow, no π at runtime — the ring/longitude tables ARE
+ * the coordinates' constants, and each vertex is a product of table
+ * literals and the semi-axes (the prism's literal × s pattern).
+ * Poles on ±z (catalog z-up convention), centred at the origin.
+ * Verts (nlat−1)·nlon+2 = 86, tris 2·nlon·(nlat−1) = 168 — the
+ * LARGEST catalog mesh, so MIG_HULL_MAX_VERTS / MAX_FACE_INDICES size
+ * every engine scratch buffer and pool ceiling (physics_world.c keeps
+ * no other hard 12s).
+ *
+ * The tessellated mesh's EXACT mass properties are the study's band
+ * sums: every latitude band is an exact n-gonal frustum with linear
+ * taper (pp_math.md §7.2's chord argument — exact at ANY resolution,
+ * not asymptotic), so §7.3's closed forms pin mesh_props, and the
+ * affine-covariance law V' = abc·Vu, J'x = abc·a²·Jxu, J'y =
+ * abc·b²·Jxu, J'z = abc·c²·Jzu — the oracle the study proved — pins
+ * every scaled semi-axis triple. The mesh is the INSCRIBED polyhedron
+ * of the ellipsoid, so its V/I sit below the smooth 4πabc/3 values;
+ * that gap is documentation (printed in the study, O(1/nlat²)), not a
+ * gate. */
+#define MIG_HULL_ELL_VERTS 86
+#define MIG_HULL_ELL_FACES 168
+/* Scratch-buffer/pool-ceiling sizes: the largest catalog mesh. */
+#define MIG_HULL_MAX_VERTS MIG_HULL_ELL_VERTS
+#define MIG_HULL_MAX_FACE_INDICES (MIG_HULL_ELL_FACES * 3)
+
+/* Ellipsoid with semi-axes a, b, c > 0 along x, y, z: the unit 12×8
+ * UV sphere's vertices scaled per axis (the affine map keeps every
+ * face planar and the winding outward — mesh_props' positive volume
+ * re-proves both mechanically). */
+mig_hull_err mig_hull_build_ellipsoid (double a, double b, double c,
+                                       mig_hull_point_set *out);
+extern const int mig_hull_ell_faces [MIG_HULL_ELL_FACES * 3];
 
 #endif /* mig_hull_h */

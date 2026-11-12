@@ -8,7 +8,7 @@
 ## 1. Profiles
 
 ```bash
-python3 tools/test_runner.py --profile quick   # runner contracts + canonical C suite (68 cases)
+python3 tools/test_runner.py --profile quick   # runner contracts + canonical C suite (69 cases)
 python3 tools/test_runner.py --profile physics # quick + isolated legacy (30) + paranoia (15)
 python3 tools/test_runner.py --profile full    # physics + ASan/UBSan + MFS (37 gated) + TUI snapshots (9) + engine build
 python3 tools/test_runner.py --list            # discover registered test cases
@@ -21,18 +21,18 @@ to change the limit. The runner uses only the Python standard library.
 **Strict contract:**
 - Suite cases that print `[SKIP]` fail the run unless `--allow-skip`.
 - `[XFAIL]` markers are surfaced in summary counts but never block.
-- Registry floors: `MIN_SUITE_ENTRIES=68`, `MIN_LEGACY_ENTRIES=30`,
+- Registry floors: `MIN_SUITE_ENTRIES=69`, `MIN_LEGACY_ENTRIES=30`,
   `MIN_PARANOIA_ENTRIES=15`.
 - Summary contract: `Total == registry size` and `Blocking failures == 0`.
 
 The floor exists because a count floor that sits **below** the real registry
 size is worse than no floor — it reads as protection while silently
 covering deleted coverage (reproduced inside a week in 2026-09-29). The
-floor is now pinned at the exact registry size (68) with a contract test.
+floor is now pinned at the exact registry size (69) with a contract test.
 
 ---
 
-## 2. Canonical C Suite (68 cases)
+## 2. Canonical C Suite (69 cases)
 
 One binary `test_mpe_suite` (`make build_suite`), exact-name dispatch, one
 registry, no substring fan-out. Every test runs under a saved/restored

@@ -6,8 +6,8 @@
 
 ## Vibe Coded Industries Production 1
 
-> **STATUS: STABLE — VERIFIED.** Quick profile 82/82, canonical C suite 68
-> green (66 blocking physics + 2 diag-informational), MFS unified suite 37
+> **STATUS: STABLE — VERIFIED.** Quick profile 83/83, canonical C suite 69
+> green (67 blocking physics + 2 diag-informational), MFS unified suite 37
 > gates, determinism twins bitwise identical
 > at `MPE_THREADS=1/4/8`. Full-profile physics tests are green under
 > ASan/UBSan; the remaining reds are documented pre-existing limitations, not

@@ -285,7 +285,7 @@ truth in this order and do not write a new line of code until green:
 ```bash
 cd 475-MPE/v16R1/src
 make build_suite            # zero complaints expected (-Werror is default)
-./test_mpe_suite --all      # expect: Total: 68 | Blocking failures: 0
+./test_mpe_suite --all      # expect: Total: 69 | Blocking failures: 0
 make -C ecosystem/mgb && make mfs_ecosystem
 bash ecosystem/mfs/build_tests.sh   # modules embed engine sources — every new
                                     # core/*.c must join all three parallel lists
@@ -294,7 +294,7 @@ bash ecosystem/mfs/build_tests.sh   # modules embed engine sources — every new
                                     # links fail on undefined symbols;
                                     # expect: FTC RESULT: gated pass=5 fail=0 info-diags=12
 cd ../..
-python3 tools/test_runner.py --profile quick   # expect Checks: 82 | passed: 82
+python3 tools/test_runner.py --profile quick   # expect Checks: 83 | passed: 83
 git status --short          # manifest must match §1 exactly — no half-written files
 ```
 
@@ -1240,9 +1240,19 @@ the study's closed-form oracles are the gates' oracles, unchanged.
   engine's coordinates are literal-only, so either a ruling admits
   trig for ring generation with the exact special cases gated
   separately, or the family ships as an exact-literal subset (n=3,4).
-- [ ] **2.6.3 Ellipsoid UV builder (`pp_math.md` §7).** Band-sum mass
+- [x] **2.6.3 Ellipsoid UV builder (LANDED 2026-11-12, gate
+  `mig_hull_ellipsoid`, 69th, see the §9 ledger line).** Band-sum mass
   properties gate; affine covariance of the inertia tensor is the
-  oracle the study proved.
+  oracle the study proved. The builder is the 12×8 UV mesh (86 verts /
+  168 faces) with exact algebraic ring/longitude literals
+  (√2, cos/sin(π/8) = √(2±√2)/2 — no trig enters ENGINE coordinates);
+  `mpe_hull_shape_ellipsoid` appended to the enum; `add_hull` maps
+  (s, h) = equatorial/polar DIAMETERS (a = b = s/2, c = h/2); a
+  general (a, b, c) spawn API is a later brick. The SAT scenario pins
+  the faceted-sphere lesson with an independent brute-force oracle:
+  the min-overlap axis is a band FACE normal (depth = 0.1·n_y for the
+  unit pair at 1.9ŷ, 0.1·u_z on the north-fan face normal for the
+  prolate pair at 2.9ẑ), never the naive translation axis.
 - [x] **2.6.4 Generic hull-vs-hull SAT (LANDED 2026-11-12, see the §9
   ledger line).** Landed as a PURE-DATA brick — `mig_hull_sat_hull_hull`
   in `core/mig_hull.{h,c}` (boolean + MTD, first-min-wins ties, axis
@@ -1757,6 +1767,55 @@ Ledger (new entries get a line, never an edit of a past line):
   runs the module builds so the next brick's verify list cannot miss
   them again. Post-fix: mgb link green, `make mfs_ecosystem` green,
   FTC gated pass=5 fail=0 info-diags=12.
+
+- 2026-11-12 — WP2.6 2.6.3 (this commit): the UV ellipsoid. 12×8
+  parametrization (rings j·π/8, longitudes k·π/6; 86 verts / 168
+  faces = band quads 3·12·8 + two fans) transcribed from the study's
+  `pp_ellipsoid_uv` at FIXED resolution; coordinates are exact
+  algebraic literals — `MIG_HULL_SQRT2` (1.4142…), cos/sin(π/8) =
+  √(2±√2)/2 (`MIG_HULL_COS_PI_8` = 0.92388…, `MIG_HULL_SIN_PI_8` =
+  0.38268…) — honoring the no-trig-in-ENGINE-coordinates invariant
+  (libm trig stays in the TEST oracles, house style since mig_mass).
+  Builder: non-finite/non-positive (a, b, c) refuse
+  (`mig_hull_bad_point`), full caller buffer → `bad_count` (keeps the
+  points that fit, never silently grows); python-verified outward
+  winding (signed V = +3.8478 unit). `mpe_hull_shape_ellipsoid`
+  appended to the enum (append-only ABI, 7th value); `add_hull` maps
+  (s, h) = equatorial/polar DIAMETERS → a = b = s/2, c = h/2 (bound =
+  max(a, c); a general (a, b, c) spawn API is a later brick); all 7
+  former icosa-sized world buffers/pool ceilings switched to
+  `MIG_HULL_MAX_VERTS` / `MIG_HULL_MAX_FACE_INDICES` (pool initial
+  `want`s stay icosa-sized — grow-doubling covers the ell 86/168).
+  Gate `mig_hull_ellipsoid` (69th, blocking): band-sum V/I truth vs
+  libm-trig closed forms (unit V = 3.84778…, I diag (1.46642,
+  1.46642, 1.43331), off-diag ~1e-17); the affine-covariance law
+  I(αa, αb, αc) = α⁵·I(a, b, c) exact for (2,1,1)/(1,2,3)/(0.5,0.5,2)/
+  (3,2,1); refusals store nothing; flag-0 spheroid + prolate spawns
+  with COM/radius stamps; SAT MTD pins where one INCIDENT — both
+  original oracle expectations wrong — became the brick's
+  machine-pinned invariant: for translated faceted spheres the
+  min-overlap axis is a band FACE normal, not the translation axis
+  (unit pair @1.9ŷ: depth 0.09486 = 0.1·n_y on the band 3–4 face-64
+  normal (0.25417, 0.94858, 0.18868), the ŷ vertex lies ON that face
+  so its support = n_y; @2.1ŷ separated on the SAME normal; prolate
+  (1,1,2) @2.9ẑ: 0.09794 = 0.1·u_z on the north-fan face-0 normal
+  (0.19482, 0.05220, 0.97945), both poles on fan faces; @3.9ẑ
+  SEPARATED — the "poles at ±2 can't separate at 3.9" reading was the
+  oracle's error: A is the UNIT mesh, polar supports sum to 3·w_z <
+  3.9·w_z). All four verdicts machine-verified to 15 digits vs an
+  independent brute force over the SAT's OWN axis set (A faces ∪ B
+  faces ∪ unique edge crosses, max-abs pre-scale normalization,
+  1e-12 degeneracy rule) — in-gate helpers `ell5_*`; the SAT's
+  min-tracking and axis-set completeness are proved by AGREEMENT with
+  that brute force, and the closed-form identities cross-check the
+  oracle itself against pure geometry. Mirrored call pins axis = −n,
+  depth equal. Flag-1 smoke: sphere-hull single-vertex rest in
+  [0.95, 1.05] for ANY settled orientation, pair depenetration ≥
+  1.95. Regime-independent (pure-data SAT) + flag-1 regime-robust;
+  suite floor 68 → 69; suite 68/68 → 69/69, quick 82/82 → 83/83 at
+  the landing; ASan+UBSan spot-checks of the new gate and the sibling
+  hull gate clean; module builds green (mgb, mfs all, FTC pass=5
+  fail=0 info-diags=12).
 
 ## §10 Definition of done for v16S (the cut checklist)
 

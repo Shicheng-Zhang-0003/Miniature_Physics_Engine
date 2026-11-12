@@ -3,7 +3,7 @@
 
 Profiles:
   quick    Python runner-contract tests and the canonical C regression suite
-           (68 cases incl. 2 informational diags; full suite re-run under 5
+           (69 cases incl. 2 informational diags; full suite re-run under 5
            regimes default/light/heavy/brittle/sticky via MPE_TEST_REGIME).
   physics  quick + every isolated legacy case (30) and all paranoia cases (15).
   full     physics + ASan/UBSan suite, MFS robotics (37 gated), TUI snapshots
@@ -217,7 +217,17 @@ MPE_TEST_REGIMES = ("default", "light", "heavy", "brittle", "sticky")
 # failure the 2.8 composite fix removed) and the mass-pair inverse in
 # add_hull. Regime-robust: e = ½ and the heavier base twin are pinned
 # in-scenario (light/brittle/heavy gravity×restitution rewrites).
-MIN_SUITE_ENTRIES = 68
+# (f) 2.6.3 adds mig_hull_ellipsoid: the UV ellipsoid (12×8, 86v/168f,
+# exact algebraic ring/longitude literals — no trig in ENGINE coords)
+# -> 69 (2026-11-12, WP2.6 2.6.3: mig_hull_ellipsoid above). Band-sum
+# mass properties vs libm-trig truth, the affine-covariance law for
+# scaled semi-axes, the spheroid spawn stamps (equatorial/polar
+# diameters a=b=s/2, c=h/2), SAT MTD pins where the faceted-sphere
+# lesson is machine-pinned: the min-overlap axis is a band FACE normal
+# (depth = 0.1·n_y for the unit pair at 1.9ŷ, 0.1·u_z for the prolate
+# pair at 2.9ẑ), cross-checked against an independent brute force over
+# the SAT's own axis set — never the naive "translation axis" reading.
+MIN_SUITE_ENTRIES = 69
 # DESPOT-2026-10-01: pin per-suite floors so deleting a legacy/paranoia target
 # + its make target together cannot shrink the headline silently (the 220->204
 # drift). Canonical floor above; legacy 30 + paranoia 15 pinned here.

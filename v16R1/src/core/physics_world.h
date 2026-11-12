@@ -271,15 +271,19 @@ int physics_world_add_composite (physics_world *world, const mig_part *parts, in
 int physics_world_composite_parts_append (physics_world *world, const composite_part *parts, int count,
                                           int first_index, int *stored_out);
 /* ---- MIG WP2.6 2.6.5: hull bodies (composite.hull-gated consumption) ----
- * Shape catalog for physics_world_add_hull: the four 2.6.1 builders.
- * (s, h) means side/height for the prism and base-side/height for the
- * pyramids; the icosahedron takes the edge length in `s` and ignores
- * `h`. All sizes are double-exact (no trig: the builders' literals). */
+ * Shape catalog for physics_world_add_hull: the four 2.6.1 builders
+ * plus the 2.6.3 ellipsoid. (s, h) means side/height for the prism,
+ * base-side/height for the pyramids, edge length in `s` for the
+ * icosahedron (h ignored), and equatorial/polar DIAMETER for the
+ * ellipsoid (spheroid: a = b = s/2, c = h/2 through the tri-axial
+ * builder). All sizes are double-exact (no trig: the builders'
+ * literals). */
 typedef enum {
     mpe_hull_shape_prism = 0,
     mpe_hull_shape_pyr4 = 1,
     mpe_hull_shape_pyr3 = 2,
-    mpe_hull_shape_icosa = 3
+    mpe_hull_shape_icosa = 3,
+    mpe_hull_shape_ellipsoid = 4
 } mpe_hull_shape_kind;
 /* Spawn one hull body from a catalog shape. The mesh is built at the
  * canonical origin, measured with mig_hull_mesh_props at density 1, the

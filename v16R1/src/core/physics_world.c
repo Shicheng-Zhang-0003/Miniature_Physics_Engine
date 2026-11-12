@@ -1817,11 +1817,14 @@ static void physics_world_composite_part_from_mig (composite_part *dst, const mi
  * contiguous slices anchored on the body, counts reset by
  * physics_world_clear (the only compaction point), storage freed by
  * cleanup, write-on-success appends. Ceiling = mpe_max_bodies * the
- * largest catalog mesh (the icosahedron: 12 verts / 60 face indices) —
- * the most pool any legal body population can own. */
+ * largest catalog mesh (the 2.6.3 ellipsoid: 86 verts / 504 face
+ * indices — the icosa's 12/60 was the previous largest) — the most
+ * pool any legal body population can own. The pools grow lazily by
+ * doubling from the icosa size, so worlds with a few hulls stay
+ * small; the ceiling is the bound, not an allocation. */
 static int physics_world_grow_hull_verts (physics_world *world) {
     if (!world) { return -1; }
-    const int ceiling = mpe_max_bodies * MIG_HULL_ICOSA_VERTS;
+    const int ceiling = mpe_max_bodies * MIG_HULL_MAX_VERTS;
     if (world -> hull_vert_capacity >= ceiling) { return -1; }
     int want = (world -> hull_vert_capacity > 0) ? world -> hull_vert_capacity * 2 : MIG_HULL_ICOSA_VERTS;
     if (want > ceiling) { want = ceiling; }
@@ -1834,7 +1837,7 @@ static int physics_world_grow_hull_verts (physics_world *world) {
 }
 static int physics_world_grow_hull_faces (physics_world *world) {
     if (!world) { return -1; }
-    const int ceiling = mpe_max_bodies * (MIG_HULL_ICOSA_FACES * 3);
+    const int ceiling = mpe_max_bodies * MIG_HULL_MAX_FACE_INDICES;
     if (world -> hull_face_capacity >= ceiling) { return -1; }
     int want = (world -> hull_face_capacity > 0) ? world -> hull_face_capacity * 2 : (MIG_HULL_ICOSA_FACES * 3);
     if (want > ceiling) { want = ceiling; }
@@ -1874,10 +1877,12 @@ int physics_world_add_hull (physics_world *world, mpe_hull_shape_kind kind,
                             double s, double h, float mass, vector3 position) {
     if ((!world) || (!world -> bodies)) { return -1; }
     /* Build the canonical mesh in scratch: the largest catalog mesh is
-     * the icosahedron (12 verts / 20 faces). */
-    mig_hull_point v [MIG_HULL_ICOSA_VERTS];
+     * the 2.6.3 ellipsoid (86 verts / 168 faces); every scratch buffer
+     * in this file sizes to MIG_HULL_MAX_VERTS so a bigger catalog
+     * shape can never overflow one silently. */
+    mig_hull_point v [MIG_HULL_MAX_VERTS];
     mig_hull_point_set set;
-    if (mig_hull_point_set_init (&set, v, MIG_HULL_ICOSA_VERTS) != mig_hull_ok) { return -1; }
+    if (mig_hull_point_set_init (&set, v, MIG_HULL_MAX_VERTS) != mig_hull_ok) { return -1; }
     const int *faces = NULL;
     int nf = 0;
     switch (kind) {
@@ -1905,6 +1910,15 @@ int physics_world_add_hull (physics_world *world, mpe_hull_shape_kind kind,
         faces = mig_hull_icosahedron_faces;
         nf = MIG_HULL_ICOSA_FACES;
         break;
+    case mpe_hull_shape_ellipsoid:
+        /* 2.6.3: (s, h) are the equatorial and polar diameters — the
+         * spheroid a = b = s/2, c = h/2 through the tri-axial builder
+         * (a general (a, b, c) spawn API is a later brick). */
+        if (!(s > 0.0) || !(h > 0.0)) { return -1; }
+        if (mig_hull_build_ellipsoid (s / 2.0, s / 2.0, h / 2.0, &set) != mig_hull_ok) { return -1; }
+        faces = mig_hull_ell_faces;
+        nf = MIG_HULL_ELL_FACES;
+        break;
     default:
         return -1;
     }
@@ -1931,7 +1945,7 @@ int physics_world_add_hull (physics_world *world, mpe_hull_shape_kind kind,
         fabs (unit.inertia [1][2]) > 1e-9 * max_diag) { return -1; }
     /* Rebase the vertices to the COM frame (engine invariant: position
      * IS the COM) and measure the bounding circumradius. */
-    mig_hull_point local [MIG_HULL_ICOSA_VERTS];
+    mig_hull_point local [MIG_HULL_MAX_VERTS];
     double bound2 = 0.0;
     for (int i = 0; i < set.count; i++) {
         local [i].x = set.points [i].x - unit.com [0];
@@ -2017,8 +2031,8 @@ bool physics_world_hull_floor_detect (physics_world *world, rigidbody *hull,
     if (!mpe_hull_slice_ok (world, hull)) { return false; }
     const mpe_config_t *cfg = mpe_world_cfg (world);
     const vector4 q = hull -> orientation;
-    vector3 candidate_positions [MIG_HULL_ICOSA_VERTS];
-    float candidate_penetrations [MIG_HULL_ICOSA_VERTS];
+    vector3 candidate_positions [MIG_HULL_MAX_VERTS];
+    float candidate_penetrations [MIG_HULL_MAX_VERTS];
     int candidate_count = 0;
     for (int i = 0; i < hull -> hull_vert_count; i++) {
         const mig_hull_point *v = &world -> hull_verts [hull -> hull_vert_base + i];
@@ -2114,7 +2128,7 @@ bool mpe_hull_collide_cube (rigidbody *hull, rigidbody *cube, void *out_p, mpe_w
     const vector4 qc = cube -> orientation;
     const vector4 qc_conj = {qc.w, -qc.x, -qc.y, -qc.z};
     const vector4 qh = hull -> orientation;
-    mig_hull_point local [MIG_HULL_ICOSA_VERTS];
+    mig_hull_point local [MIG_HULL_MAX_VERTS];
     for (int i = 0; i < hull -> hull_vert_count; i++) {
         const mig_hull_point *v = &world -> hull_verts [hull -> hull_vert_base + i];
         vector3 p = vector4_rotate_to_vector3 (qh, (vector3) {(float) v -> x, (float) v -> y, (float) v -> z});
@@ -2167,7 +2181,7 @@ bool mpe_hull_collide_hull (rigidbody *a, rigidbody *b, void *out_p, mpe_world_t
     const vector4 qa = a -> orientation;
     const vector4 qa_conj = {qa.w, -qa.x, -qa.y, -qa.z};
     const vector4 qb = b -> orientation;
-    mig_hull_point localb [MIG_HULL_ICOSA_VERTS];
+    mig_hull_point localb [MIG_HULL_MAX_VERTS];
     for (int i = 0; i < b -> hull_vert_count; i++) {
         const mig_hull_point *v = &world -> hull_verts [b -> hull_vert_base + i];
         vector3 p = vector4_rotate_to_vector3 (qb, (vector3) {(float) v -> x, (float) v -> y, (float) v -> z});

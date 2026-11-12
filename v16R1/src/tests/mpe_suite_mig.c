@@ -4232,3 +4232,517 @@ int mpe_t_mig_hull_spawn (void) {
     mpe_test_end (&t);
     return t.failures;
 }
+
+/* ---- WP2.6 2.6.3: the ellipsoid gate (69th) ----
+ * pp_cat_test's ellipsoid checks transcribed: the band-sum oracle is
+ * re-derived here INDEPENDENTLY (libm trig in the ORACLE only — the
+ * engine's builder tables are exact algebraic literals, and agreement
+ * is the pin that they are exact), then the affine-covariance law for
+ * scaled semi-axes (the oracle the study proved), the builder +
+ * add_hull refusal battery, the spheroid stamps on a flag-0 world
+ * (spawning is not gated — 2.6.5's rule), SAT MTD pins on raw meshes,
+ * and a flag-1 consumption smoke: the sphere-hull's single-vertex
+ * floor rest (its catalog siblings rest on flat faces; the ellipsoid
+ * has none — the rest window [0.95, 1.05] covers any settled
+ * orientation, worst vertex gap 22.5°/2 → 0.9807) plus a pair
+ * depenetration. Dynamic oracles stay regime-robust: e = ½ is pinned
+ * in-scenario and the drop is from 2.5 (settles inside 240 ticks even
+ * at light's gravity ×0.25: t_0·(1 + 2·Σe^n) ≈ 3·t_0). */
+static void mig_ell_band_add (double acc [4], double K,
+                              double z_lo, double r_lo,
+                              double z_hi, double r_hi) {
+    /* One exact frustum band anchored at its lower ring (pp_math.md
+     * §7.3 with §5.2): acc = {V, Jx, Mz, Jz}. r_lo = 0 is the south
+     * band — the pyramid limit anchored at its apex. */
+    const double h = z_hi - z_lo;
+    const double th = 6.28318530717958647692 / 12.0; /* 2π/nlon, literal */
+    if (r_lo > 0.0) {
+        const double A1 = 6.0 * r_lo * r_lo * sin (th);
+        const double r = r_hi / r_lo, s = 1.0 - r;
+        const double G3 = (1.0 + r + r * r) / 3.0;
+        const double G5 = (1.0 + r + r * r + r * r * r +
+                           r * r * r * r) / 5.0;
+        const double Z1 = 0.5 - 2.0 * s / 3.0 + 0.25 * s * s;
+        const double H2 = 1.0 / 3.0 - 0.5 * s + 0.2 * s * s;
+        const double Vb = A1 * h * G3;
+        acc [0] += Vb;
+        acc [1] += (A1 * r_lo * r_lo * K / 6.0) * h * G5;
+        acc [2] += z_lo * Vb + A1 * h * h * Z1;
+        acc [3] += z_lo * z_lo * Vb + 2.0 * z_lo * A1 * h * h * Z1 +
+                   A1 * h * h * h * H2;
+    } else {
+        const double Ar = 6.0 * r_hi * r_hi * sin (th);
+        const double Vb = Ar * h / 3.0;
+        acc [0] += Vb;
+        acc [1] += (Ar * r_hi * r_hi * K / 6.0) * h / 5.0;
+        acc [2] += z_lo * Vb + Ar * h * h / 4.0;
+        acc [3] += z_lo * z_lo * Vb + z_lo * Ar * h * h / 2.0 +
+                   Ar * h * h * h / 5.0;
+    }
+}
+static mig_hull_err mig_ell_measure (double a, double b, double c,
+                                     mig_hull_mass *m) {
+    mig_hull_point v [MIG_HULL_MAX_VERTS];
+    mig_hull_point_set set;
+    mig_hull_err e = mig_hull_point_set_init (&set, v, MIG_HULL_MAX_VERTS);
+    if (e != mig_hull_ok) { return e; }
+    e = mig_hull_build_ellipsoid (a, b, c, &set);
+    if (e != mig_hull_ok) { return e; }
+    return mig_hull_mesh_props (set.points, set.count, mig_hull_ell_faces,
+                                MIG_HULL_ELL_FACES, 1.0, m);
+}
+/* ---- 2.6.3 scenario-5 SAT oracle: an independent brute force over the
+ * SAME axis set mig_hull_sat_hull_hull covers (A face normals, B face
+ * normals, every unique A-edge × B-edge cross), with the same max-abs
+ * pre-scaling normalization. Directed-edge duplicates are sign-
+ * invariant for min(d1, d2), so the unique undirected edge list (exactly
+ * 3·nf/2 for a closed manifold — mesh_props' positive volume re-proves
+ * closedness) is sufficient. Agreement of the engine SAT with this min
+ * proves its axis-set completeness AND its min tracking; the closed-
+ * form depth identities (0.1·n_y / 0.1·u_z) cross-check the oracle
+ * itself against pure geometry. */
+static void ell5_support (const mig_hull_point *v, int n, const double u [3],
+                          double *lo, double *hi) {
+    double l = v [0].x * u [0] + v [0].y * u [1] + v [0].z * u [2];
+    double h = l;
+    for (int i = 1; i < n; i++) {
+        const double d = v [i].x * u [0] + v [i].y * u [1] + v [i].z * u [2];
+        if (d < l) { l = d; }
+        if (d > h) { h = d; }
+    }
+    *lo = l;
+    *hi = h;
+}
+static void ell5_face_unit (const mig_hull_point *v, const int *f, int fi,
+                            double u [3]) {
+    const mig_hull_point *p = &v [f [3 * fi + 0]];
+    const mig_hull_point *q = &v [f [3 * fi + 1]];
+    const mig_hull_point *r = &v [f [3 * fi + 2]];
+    const double e1 [3] = {q -> x - p -> x, q -> y - p -> y, q -> z - p -> z};
+    const double e2 [3] = {r -> x - p -> x, r -> y - p -> y, r -> z - p -> z};
+    const double c [3] = {e1 [1] * e2 [2] - e1 [2] * e2 [1],
+                          e1 [2] * e2 [0] - e1 [0] * e2 [2],
+                          e1 [0] * e2 [1] - e1 [1] * e2 [0]};
+    const double m = fmax (fabs (c [0]), fmax (fabs (c [1]), fabs (c [2])));
+    const double q0 = c [0] / m, q1 = c [1] / m, q2 = c [2] / m;
+    const double len = sqrt (q0 * q0 + q1 * q1 + q2 * q2);
+    u [0] = q0 / len;
+    u [1] = q1 / len;
+    u [2] = q2 / len;
+}
+static void ell5_dedupe (const int *f, int nf, int *edges, int *count) {
+    /* edges = index pairs (2 ints per unique undirected edge). */
+    int nu = 0;
+    for (int i = 0; i < 3 * nf; i++) {
+        const int i0 = f [3 * (i / 3) + (i % 3)];
+        const int i1 = f [3 * (i / 3) + ((i + 1) % 3)];
+        const int lo = (i0 < i1) ? i0 : i1;
+        const int hi = (i0 < i1) ? i1 : i0;
+        int dup = 0;
+        for (int k = 0; k < nu && !dup; k++) {
+            dup = (edges [2 * k] == lo && edges [2 * k + 1] == hi);
+        }
+        if (!dup) {
+            edges [2 * nu] = lo;
+            edges [2 * nu + 1] = hi;
+            nu++;
+        }
+    }
+    *count = nu;
+}
+static double ell5_brute (const mig_hull_point *va, int na, const int *fa, int nfa,
+                          const mig_hull_point *vb, int nb, const int *fb, int nfb) {
+    double best = HUGE_VAL;
+    double lo_a, hi_a, lo_b, hi_b, u [3];
+    for (int pass = 0; pass < 2; pass++) {
+        const mig_hull_point *vx = pass ? vb : va;
+        const int *fx = pass ? fb : fa;
+        const int nfx = pass ? nfb : nfa;
+        for (int f = 0; f < nfx; f++) {
+            ell5_face_unit (vx, fx, f, u);
+            ell5_support (va, na, u, &lo_a, &hi_a);
+            ell5_support (vb, nb, u, &lo_b, &hi_b);
+            const double d1 = hi_a - lo_b, d2 = hi_b - lo_a;
+            const double d = (d1 < d2) ? d1 : d2;
+            if (d < best) { best = d; }
+        }
+    }
+    int ea [2 * MIG_HULL_ELL_FACES * 3], eb [2 * MIG_HULL_ELL_FACES * 3];
+    int nea, neb;
+    ell5_dedupe (fa, nfa, ea, &nea);
+    ell5_dedupe (fb, nfb, eb, &neb);    for (int i = 0; i < nea; i++) {
+        const double ed [3] = {va [ea [2 * i + 1]].x - va [ea [2 * i]].x,
+                               va [ea [2 * i + 1]].y - va [ea [2 * i]].y,
+                               va [ea [2 * i + 1]].z - va [ea [2 * i]].z};
+        for (int j = 0; j < neb; j++) {
+            const double fd [3] = {vb [eb [2 * j + 1]].x - vb [eb [2 * j]].x,
+                                   vb [eb [2 * j + 1]].y - vb [eb [2 * j]].y,
+                                   vb [eb [2 * j + 1]].z - vb [eb [2 * j]].z};
+            const double c [3] = {ed [1] * fd [2] - ed [2] * fd [1],
+                                  ed [2] * fd [0] - ed [0] * fd [2],
+                                  ed [0] * fd [1] - ed [1] * fd [0]};
+            const double m = fmax (fabs (c [0]), fmax (fabs (c [1]), fabs (c [2])));
+            if (!(m > 1e-12)) { continue; } /* same degeneracy rule */
+            const double q0 = c [0] / m, q1 = c [1] / m, q2 = c [2] / m;
+            const double len = sqrt (q0 * q0 + q1 * q1 + q2 * q2);
+            u [0] = q0 / len;
+            u [1] = q1 / len;
+            u [2] = q2 / len;
+            ell5_support (va, na, u, &lo_a, &hi_a);
+            ell5_support (vb, nb, u, &lo_b, &hi_b);
+            const double d1 = hi_a - lo_b, d2 = hi_b - lo_a;
+            const double d = (d1 < d2) ? d1 : d2;
+            if (d < best) { best = d; }
+        }
+    }
+    return best;
+}
+static double ell5_depth_on (const mig_hull_point *va, int na,
+                             const mig_hull_point *vb, int nb,
+                             const double u [3]) {
+    double lo_a, hi_a, lo_b, hi_b;
+    ell5_support (va, na, u, &lo_a, &hi_a);
+    ell5_support (vb, nb, u, &lo_b, &hi_b);
+    const double d1 = hi_a - lo_b, d2 = hi_b - lo_a;
+    return (d1 < d2) ? d1 : d2;
+}
+int mpe_t_mig_hull_ellipsoid (void) {
+    mpe_test_t t;
+    mpe_test_begin (&t, "mig_hull_ellipsoid");
+    mpe_clamp_counters_reset ();
+    const float dt = 1.0f / 60.0f;
+    /* The suite saves/restores g_cfg per test; this gate still sets
+     * every scenario's flag explicitly and leaves the default (0). */
+    g_cfg.composite.hull = 0;
+
+    /* ---- 1. Unit 12×8 mesh: exact band-sum truth ----
+     * π appears ONLY in this oracle (φ_j = πj/8, θ = 2π/12): the
+     * libm-trig truth the literal tables must reproduce. */
+    double Vu = 0.0, Jxu = 0.0, Jzu = 0.0;
+    {
+        mig_hull_mass m;
+        MPE_CHECK (&t, mig_ell_measure (1.0, 1.0, 1.0, &m) == mig_hull_ok);
+        const double PI = 3.14159265358979323846; /* oracle-only */
+        const double K = 1.0 + 0.5 * cos (2.0 * PI / 12.0);
+        double s [4] = {0.0, 0.0, 0.0, 0.0};
+        for (int j = 1; j <= 8; j++) {
+            const double phi_hi = PI * (double) (j - 1) / 8.0;
+            const double phi_lo = PI * (double) j / 8.0;
+            mig_ell_band_add (s, K, cos (phi_lo), sin (phi_lo),
+                              cos (phi_hi), sin (phi_hi));
+        }
+        Vu = s [0]; Jxu = s [1]; Jzu = s [3];
+        MPE_CHECK_REL (&t, m.mass, Vu, 1e-9, "unit ell V = band sum");
+        MPE_CHECK_NEAR (&t, m.com [0], 0.0, 1e-9, "unit ell com x = 0");
+        MPE_CHECK_NEAR (&t, m.com [1], 0.0, 1e-9, "unit ell com y = 0");
+        MPE_CHECK_NEAR (&t, m.com [2], 0.0, 1e-9, "unit ell com z = 0");
+        MPE_CHECK_REL (&t, m.inertia [0][0], Jxu + Jzu, 1e-9, "unit ell Ixx = Jx+Jz");
+        MPE_CHECK_REL (&t, m.inertia [1][1], Jxu + Jzu, 1e-9, "unit ell Iyy = Ixx");
+        MPE_CHECK_REL (&t, m.inertia [2][2], 2.0 * Jxu, 1e-9, "unit ell Izz = 2 Jx");
+        const double maxd = fmax (m.inertia [0][0],
+                                  fmax (m.inertia [1][1], m.inertia [2][2]));
+        MPE_CHECK (&t, fabs (m.inertia [0][1]) <= 1e-9 * maxd);
+        MPE_CHECK (&t, fabs (m.inertia [0][2]) <= 1e-9 * maxd);
+        MPE_CHECK (&t, fabs (m.inertia [1][2]) <= 1e-9 * maxd);
+    }
+
+    /* ---- 2. Affine-covariance law (the study's scaled checks) ----
+     * V' = abc·Vu; J'x = abc·a²·Jxu, J'y = abc·b²·Jxu (in-plane
+     * isotropy of the unit mesh), J'z = abc·c²·Jzu. */
+    {
+        static const double abc [4][3] = {
+            {2.0, 1.0, 1.0}, {1.0, 2.0, 3.0}, {0.5, 0.5, 2.0}, {3.0, 2.0, 1.0},
+        };
+        for (int i = 0; i < 4; i++) {
+            mig_hull_mass m;
+            MPE_CHECK (&t, mig_ell_measure (abc [i][0], abc [i][1], abc [i][2],
+                                            &m) == mig_hull_ok);
+            const double k = abc [i][0] * abc [i][1] * abc [i][2];
+            const double Jx = k * abc [i][0] * abc [i][0] * Jxu;
+            const double Jy = k * abc [i][1] * abc [i][1] * Jxu;
+            const double Jz = k * abc [i][2] * abc [i][2] * Jzu;
+            MPE_CHECK_REL (&t, m.mass, k * Vu, 1e-9, "affine V = abc·Vu");
+            MPE_CHECK_REL (&t, m.inertia [0][0], Jy + Jz, 1e-9, "affine Ixx");
+            MPE_CHECK_REL (&t, m.inertia [1][1], Jx + Jz, 1e-9, "affine Iyy");
+            MPE_CHECK_REL (&t, m.inertia [2][2], Jx + Jy, 1e-9, "affine Izz");
+            MPE_CHECK_NEAR (&t, m.com [0], 0.0, 1e-9, "affine com x");
+            MPE_CHECK_NEAR (&t, m.com [1], 0.0, 1e-9, "affine com y");
+            MPE_CHECK_NEAR (&t, m.com [2], 0.0, 1e-9, "affine com z");
+        }
+    }
+
+    /* ---- 3. Refusal battery: write-on-success no-ops ---- */
+    {
+        mig_hull_mass m;
+        MPE_CHECK (&t, mig_ell_measure (0.0, 1.0, 1.0, &m) == mig_hull_bad_point);
+        MPE_CHECK (&t, mig_ell_measure (1.0, -1.0, 1.0, &m) == mig_hull_bad_point);
+        MPE_CHECK (&t, mig_ell_measure (1.0, 1.0, NAN, &m) == mig_hull_bad_point);
+        MPE_CHECK (&t, mig_ell_measure (INFINITY, 1.0, 1.0, &m) == mig_hull_bad_point);
+        MPE_CHECK (&t, mig_hull_build_ellipsoid (1.0, 1.0, 1.0, NULL) == mig_hull_null);
+        /* Full caller buffer: the 86th vertex refuses, count keeps the
+         * points that fit, never silently grows. */
+        mig_hull_point v85 [MIG_HULL_ELL_VERTS - 1];
+        mig_hull_point_set set85;
+        MPE_CHECK (&t, mig_hull_point_set_init (&set85, v85,
+                                                MIG_HULL_ELL_VERTS - 1) == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_build_ellipsoid (1.0, 1.0, 1.0, &set85) == mig_hull_bad_count);
+        MPE_CHECK (&t, set85.count == MIG_HULL_ELL_VERTS - 1);
+    }
+
+    /* ---- 4. add_hull spheroid stamps on a flag-0 world ----
+     * Spawning is NOT gated (2.6.5): the body exists, makes no
+     * contacts, and nothing counts as refused. */
+    {
+        physics_world w4;
+        mpe_world_begin (&w4);
+        mpe_config_t c4 = g_cfg;
+        c4.composite.hull = 0;
+        physics_world_set_config (&w4, &c4);
+        const int p4 = physics_world_add_hull (&w4, mpe_hull_shape_ellipsoid,
+                                               2.0, 2.0, 3.0f,
+                                               (vector3) {0.0f, 1.0f, 0.0f});
+        MPE_CHECK (&t, p4 >= 0);
+        MPE_CHECK (&t, w4.hull_flag_skips == 0);
+        rigidbody *h4 = &w4.bodies [p4];
+        MPE_CHECK (&t, h4 -> type == object_hull);
+        MPE_CHECK_NEAR (&t, h4 -> radius, 1.0f, 1e-5f,
+                        "spheroid circumradius max(a,c) = 1");
+        MPE_CHECK (&t, h4 -> hull_vert_count == MIG_HULL_ELL_VERTS);
+        MPE_CHECK (&t, h4 -> hull_face_count == MIG_HULL_ELL_FACES);
+        MPE_CHECK (&t, w4.hull_vert_count == MIG_HULL_ELL_VERTS);
+        MPE_CHECK (&t, w4.hull_face_count == MIG_HULL_MAX_FACE_INDICES);
+        MPE_CHECK_NEAR (&t, h4 -> half_extensions.x, 1.0f, 1e-5f, "half ext x mirrors r");
+        MPE_CHECK_NEAR (&t, h4 -> half_extensions.y, 1.0f, 1e-5f, "half ext y mirrors r");
+        MPE_CHECK_NEAR (&t, h4 -> half_extensions.z, 1.0f, 1e-5f, "half ext z mirrors r");
+        MPE_CHECK_NEAR (&t, h4 -> mass, 3.0f, 1e-5f, "authored mass stamped");
+        /* The stamped tensor is the mesh truth scaled by mass/V. */
+        const double iscale = 3.0 / Vu;
+        MPE_CHECK_NEAR (&t, h4 -> inertia_tensor_local.matrix [0][0],
+                        (float) (iscale * (Jxu + Jzu)), 1e-5f, "stamp Ixx");
+        MPE_CHECK_NEAR (&t, h4 -> inertia_tensor_local.matrix [1][1],
+                        (float) (iscale * (Jxu + Jzu)), 1e-5f, "stamp Iyy");
+        MPE_CHECK_NEAR (&t, h4 -> inertia_tensor_local.matrix [2][2],
+                        (float) (iscale * 2.0 * Jxu), 1e-5f, "stamp Izz");
+        MPE_CHECK_NEAR (&t, h4 -> inverse_inertia_tensor_local.matrix [0][0],
+                        (float) (1.0 / (iscale * (Jxu + Jzu))), 1e-5f, "stamp inv Ixx");
+        MPE_CHECK_NEAR (&t, h4 -> inverse_inertia_tensor_local.matrix [2][2],
+                        (float) (1.0 / (iscale * 2.0 * Jxu)), 1e-5f, "stamp inv Izz");
+        /* Pool slice: COM-local, max |v| = authored radius. */
+        double cx = 0.0, cy = 0.0, cz = 0.0, maxr2 = 0.0;
+        for (int i = 0; i < h4 -> hull_vert_count; i++) {
+            const mig_hull_point *v = &w4.hull_verts [h4 -> hull_vert_base + i];
+            cx += v -> x; cy += v -> y; cz += v -> z;
+            const double r2 = v -> x * v -> x + v -> y * v -> y + v -> z * v -> z;
+            if (r2 > maxr2) { maxr2 = r2; }
+        }
+        cx /= (double) h4 -> hull_vert_count;
+        cy /= (double) h4 -> hull_vert_count;
+        cz /= (double) h4 -> hull_vert_count;
+        MPE_CHECK_NEAR (&t, cx, 0.0, 1e-6, "slice centroid x = 0");
+        MPE_CHECK_NEAR (&t, cy, 0.0, 1e-6, "slice centroid y = 0");
+        MPE_CHECK_NEAR (&t, cz, 0.0, 1e-6, "slice centroid z = 0");
+        MPE_CHECK_NEAR (&t, (float) sqrt (maxr2), 1.0f, 1e-5f, "slice max |v| = radius");
+        /* Prolate through the same kind: radius = c = 1.5. */
+        const int q4 = physics_world_add_hull (&w4, mpe_hull_shape_ellipsoid,
+                                               1.0, 3.0, 1.0f,
+                                               (vector3) {4.0f, 1.0f, 0.0f});
+        MPE_CHECK (&t, q4 >= 0);
+        MPE_CHECK_NEAR (&t, w4.bodies [q4].radius, 1.5f, 1e-5f, "prolate radius = c");
+        MPE_CHECK (&t, w4.bodies [q4].hull_vert_base == MIG_HULL_ELL_VERTS);
+        /* Policy windows (bound = circumradius [0.01, 100], mass
+         * [1e-4, 1e6]) refuse and mutate nothing. Bound = max(a, c):
+         * s = h = 0.001 gives a = c = 0.0005 < 0.01. */
+        MPE_CHECK (&t, physics_world_add_hull (&w4, mpe_hull_shape_ellipsoid,
+                                               2.0, 2.0, 0.00001f,
+                                               (vector3) {0.0f, 1.0f, 0.0f}) == -1);
+        MPE_CHECK (&t, physics_world_add_hull (&w4, mpe_hull_shape_ellipsoid,
+                                               2.0, 2.0, 2000000.0f,
+                                               (vector3) {0.0f, 1.0f, 0.0f}) == -1);
+        MPE_CHECK (&t, physics_world_add_hull (&w4, mpe_hull_shape_ellipsoid,
+                                               0.0, 2.0, 1.0f,
+                                               (vector3) {0.0f, 1.0f, 0.0f}) == -1);
+        MPE_CHECK (&t, physics_world_add_hull (&w4, mpe_hull_shape_ellipsoid,
+                                               400.0, 2.0, 1.0f,
+                                               (vector3) {0.0f, 1.0f, 0.0f}) == -1);
+        MPE_CHECK (&t, physics_world_add_hull (&w4, mpe_hull_shape_ellipsoid,
+                                               0.001, 0.001, 1.0f,
+                                               (vector3) {0.0f, 1.0f, 0.0f}) == -1);
+        MPE_CHECK (&t, physics_world_add_hull (&w4, (mpe_hull_shape_kind) 99,
+                                               2.0, 2.0, 1.0f,
+                                               (vector3) {0.0f, 1.0f, 0.0f}) == -1);
+        MPE_CHECK (&t, w4.body_count == 2);
+        MPE_CHECK (&t, w4.hull_vert_count == 2 * MIG_HULL_ELL_VERTS);
+        physics_world_cleanup (&w4);
+    }
+
+    /* ---- 5. SAT MTD pins on raw meshes + flag-1 consumption smoke ---- */
+    {
+        /* Faceted-sphere SAT truth, independently brute-forced below:
+         * for translated identical polyhedra the min-overlap axis is a
+         * band FACE normal, not the translation axis — face planes sit
+         * inside the vertex radius, so they overlap LESS. Unit pair at
+         * +1.9y: winner = band 3–4 quad (θ 60°–90°) face normal n
+         * (table face 64 = verts 26/38/39; the ŷ vertex (0,1,0) lies ON
+         * that face, so the mesh's support there is exactly n_y) with
+         * depth = (2 − 1.9)·n_y, below the ŷ axis's 0.1. Offset 2.1
+         * separates on the SAME normal (d1 = −0.1·n_y). Prolate
+         * (a=b=1, c=2) at +2.9z: winner = north-fan face 0 normal u
+         * (verts 84/0/1 — the poles of BOTH meshes lie on fan faces:
+         * supports u_z and 2·u_z) with depth = (1 + 2 − 2.9)·u_z,
+         * below the ẑ axis's 0.1; at +3.9z the polar gap (3.9 − 3)·u_z
+         * separates. The "poles at ±2 can't separate at 3.9" reading
+         * was the ORACLE's error, not the SAT's: A is the UNIT mesh, so
+         * the polar supports sum to 3·w_z < 3.9·w_z. */
+        mig_hull_point va [MIG_HULL_MAX_VERTS], vb [MIG_HULL_MAX_VERTS];
+        mig_hull_point_set sa, sb;
+        MPE_CHECK (&t, mig_hull_point_set_init (&sa, va, MIG_HULL_MAX_VERTS) == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_point_set_init (&sb, vb, MIG_HULL_MAX_VERTS) == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_build_ellipsoid (1.0, 1.0, 1.0, &sa) == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_build_ellipsoid (1.0, 1.0, 1.0, &sb) == mig_hull_ok);
+        double n64 [3], n0 [3];
+        ell5_face_unit (va, mig_hull_ell_faces, 64, n64);
+        ell5_face_unit (va, mig_hull_ell_faces, 0, n0);
+        for (int i = 0; i < sa.count; i++) { vb [i].y += 1.9; }
+        mig_hull_sat_result r;
+        MPE_CHECK (&t, mig_hull_sat_hull_hull (va, sa.count, mig_hull_ell_faces,
+                                               MIG_HULL_ELL_FACES, vb, sb.count,
+                                               mig_hull_ell_faces, MIG_HULL_ELL_FACES,
+                                               &r) == mig_hull_ok);
+        MPE_CHECK (&t, r.overlap);
+        MPE_CHECK_NEAR (&t, r.axis [0], n64 [0], 1e-9, "unit pair axis = band face normal");
+        MPE_CHECK_NEAR (&t, r.axis [1], n64 [1], 1e-9, "unit pair axis y");
+        MPE_CHECK_NEAR (&t, r.axis [2], n64 [2], 1e-9, "unit pair axis z");
+        const double bunit = ell5_brute (va, sa.count, mig_hull_ell_faces, MIG_HULL_ELL_FACES,
+                                         vb, sb.count, mig_hull_ell_faces, MIG_HULL_ELL_FACES);
+        MPE_CHECK_REL (&t, r.depth, bunit, 1e-9, "unit pair MTD = brute-force min");
+        MPE_CHECK_REL (&t, r.depth, 0.1 * n64 [1], 1e-9, "closed form depth = 0.1·n_y");
+        MPE_CHECK (&t, r.depth < 0.1); /* face planes beat the ŷ axis */
+        MPE_CHECK_NEAR (&t, ell5_depth_on (va, sa.count, vb, sb.count, r.axis),
+                        r.depth, 1e-9, "depth consistent with own axis");
+        {
+            static const double yax [3] = {0.0, 1.0, 0.0};
+            MPE_CHECK_NEAR (&t, ell5_depth_on (va, sa.count, vb, sb.count, yax),
+                            0.1, 1e-9, "ŷ-axis overlap 0.1 (runner-up)");
+        }
+        mig_hull_sat_result rm;
+        MPE_CHECK (&t, mig_hull_sat_hull_hull (vb, sb.count, mig_hull_ell_faces,
+                                               MIG_HULL_ELL_FACES, va, sa.count,
+                                               mig_hull_ell_faces, MIG_HULL_ELL_FACES,
+                                               &rm) == mig_hull_ok);
+        MPE_CHECK (&t, rm.overlap);
+        MPE_CHECK_NEAR (&t, rm.axis [0], -n64 [0], 1e-9, "mirrored axis −n x");
+        MPE_CHECK_NEAR (&t, rm.axis [1], -n64 [1], 1e-9, "mirrored axis −n y");
+        MPE_CHECK_NEAR (&t, rm.axis [2], -n64 [2], 1e-9, "mirrored axis −n z");
+        MPE_CHECK_NEAR (&t, rm.depth, r.depth, 1e-12, "mirrored depth equal");
+        for (int i = 0; i < sa.count; i++) { vb [i].y += 0.2; } /* 2.1 apart */
+        mig_hull_sat_result rs;
+        MPE_CHECK (&t, mig_hull_sat_hull_hull (va, sa.count, mig_hull_ell_faces,
+                                               MIG_HULL_ELL_FACES, vb, sb.count,
+                                               mig_hull_ell_faces, MIG_HULL_ELL_FACES,
+                                               &rs) == mig_hull_ok);
+        MPE_CHECK (&t, !rs.overlap);
+        MPE_CHECK_NEAR (&t, rs.depth, 0.0, 1e-12, "separated depth 0");
+        MPE_CHECK_NEAR (&t, rs.axis [0], n64 [0], 1e-9, "separating axis = band face normal");
+        MPE_CHECK_NEAR (&t, rs.axis [1], n64 [1], 1e-9, "separating axis y");
+        MPE_CHECK_NEAR (&t, rs.axis [2], n64 [2], 1e-9, "separating axis z");
+        MPE_CHECK_NEAR (&t, ell5_depth_on (va, sa.count, vb, sb.count, n64),
+                        -0.1 * n64 [1], 1e-9, "2.1 gap = −0.1·n_y");
+        mig_hull_point_set sc;
+        mig_hull_point vc [MIG_HULL_MAX_VERTS];
+        MPE_CHECK (&t, mig_hull_point_set_init (&sc, vc, MIG_HULL_MAX_VERTS) == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_build_ellipsoid (1.0, 1.0, 2.0, &sc) == mig_hull_ok);
+        for (int i = 0; i < sc.count; i++) { vc [i].z += 2.9; }
+        mig_hull_sat_result rz;
+        MPE_CHECK (&t, mig_hull_sat_hull_hull (va, sa.count, mig_hull_ell_faces,
+                                               MIG_HULL_ELL_FACES, vc, sc.count,
+                                               mig_hull_ell_faces, MIG_HULL_ELL_FACES,
+                                               &rz) == mig_hull_ok);
+        MPE_CHECK (&t, rz.overlap);
+        MPE_CHECK_NEAR (&t, rz.axis [0], n0 [0], 1e-9, "prolate pair axis = fan face normal");
+        MPE_CHECK_NEAR (&t, rz.axis [1], n0 [1], 1e-9, "prolate pair axis y");
+        MPE_CHECK_NEAR (&t, rz.axis [2], n0 [2], 1e-9, "prolate pair axis z");
+        const double bprol = ell5_brute (va, sa.count, mig_hull_ell_faces, MIG_HULL_ELL_FACES,
+                                         vc, sc.count, mig_hull_ell_faces, MIG_HULL_ELL_FACES);
+        MPE_CHECK_REL (&t, rz.depth, bprol, 1e-9, "prolate pair MTD = brute-force min");
+        MPE_CHECK_REL (&t, rz.depth, 0.1 * n0 [2], 1e-9, "closed form depth = 0.1·u_z");
+        MPE_CHECK (&t, rz.depth < 0.1); /* fan planes beat the ẑ axis */
+        MPE_CHECK_NEAR (&t, ell5_depth_on (va, sa.count, vc, sc.count, rz.axis),
+                        rz.depth, 1e-9, "prolate depth consistent with own axis");
+        {
+            static const double zax [3] = {0.0, 0.0, 1.0};
+            MPE_CHECK_NEAR (&t, ell5_depth_on (va, sa.count, vc, sc.count, zax),
+                            0.1, 1e-9, "ẑ-axis overlap 0.1 (runner-up)");
+        }
+        for (int i = 0; i < sc.count; i++) { vc [i].z += 1.0; } /* 3.9 apart */
+        mig_hull_sat_result rz2;
+        MPE_CHECK (&t, mig_hull_sat_hull_hull (va, sa.count, mig_hull_ell_faces,
+                                               MIG_HULL_ELL_FACES, vc, sc.count,
+                                               mig_hull_ell_faces, MIG_HULL_ELL_FACES,
+                                               &rz2) == mig_hull_ok);
+        MPE_CHECK (&t, !rz2.overlap);
+        MPE_CHECK_NEAR (&t, rz2.depth, 0.0, 1e-12, "separated depth 0");
+        MPE_CHECK_NEAR (&t, rz2.axis [0], n0 [0], 1e-9, "separating axis = fan face normal");
+        MPE_CHECK_NEAR (&t, rz2.axis [1], n0 [1], 1e-9, "separating axis y");
+        MPE_CHECK_NEAR (&t, rz2.axis [2], n0 [2], 1e-9, "separating axis z");
+        MPE_CHECK_NEAR (&t, ell5_depth_on (va, sa.count, vc, sc.count, n0),
+                        -0.9 * n0 [2], 1e-9, "3.9 polar gap = −0.9·u_z");
+
+        /* Flag-1 smoke: a sphere-hull (s=h=2) drops 1.5 m to the
+         * floor, bounces with e = ½ (pinned — brittle forces e = 0,
+         * light 0.10), and settles on a single vertex; COM y lands in
+         * [0.95, 1.05] for ANY settled orientation (worst vertex gap
+         * cos(11.25°) = 0.9807). Then a second ell spawned 1.9 along
+         * x (true MTD 0.0949 on the band face normal) is pushed apart
+         * by the positional depenetration pass. */
+        physics_world w5;
+        mpe_world_begin (&w5);
+        mpe_config_t c5 = g_cfg;
+        c5.composite.hull = 1;
+        c5.body_defaults.sphere_restitution = 0.5f;
+        physics_world_set_config (&w5, &c5);
+        const int p5 = physics_world_add_hull (&w5, mpe_hull_shape_ellipsoid,
+                                               2.0, 2.0, 3.0f,
+                                               (vector3) {0.0f, 2.5f, 0.0f});
+        MPE_CHECK (&t, p5 >= 0);
+        rigidbody *e5 = &w5.bodies [p5];
+        float min_y = 1e9f;
+        for (int tick = 0; tick < 240; tick++) {
+            physics_world_step (&w5, dt);
+            if (e5 -> position.y < min_y) { min_y = e5 -> position.y; }
+        }
+        MPE_CHECK (&t, mpe_world_finite (&w5));
+        MPE_CHECK (&t, min_y > 0.85f);
+        MPE_CHECK (&t, e5 -> position.y > 0.95f && e5 -> position.y < 1.05f);
+        MPE_CHECK (&t, w5.hull_flag_skips == 0);
+        const int p6 = physics_world_add_hull (&w5, mpe_hull_shape_ellipsoid,
+                                               2.0, 2.0, 3.0f,
+                                               (vector3) {1.9f, e5 -> position.y, 0.0f});
+        MPE_CHECK (&t, p6 >= 0);
+        rigidbody *e6 = &w5.bodies [p6];
+        for (int tick = 0; tick < 120; tick++) {
+            physics_world_step (&w5, dt);
+        }
+        MPE_CHECK (&t, mpe_world_finite (&w5));
+        const float dx = fabsf (e6 -> position.x - e5 -> position.x);
+        MPE_CHECK (&t, dx >= 1.95f);
+        MPE_CHECK (&t, e5 -> position.y > 0.5f && e6 -> position.y > 0.5f);
+        MPE_CHECK (&t, w5.hull_flag_skips == 0);
+        physics_world_cleanup (&w5);
+    }
+
+    if (t.failures == 0) {
+        printf ("[PASS] mig WP2.6 2.6.3: ellipsoid — 12×8 UV mesh from exact literal"
+                " tables, band-sum truth, affine covariance, spheroid spawn + SAT pins\n");
+        MPE_INFO ("unit 12×8: V = 3.8477… = band sum, com 0, I diag (1.46642, 1.46642,"
+                  " 1.43331), off-diag ~1e-17; affine (2,1,1)/(1,2,3)/(0.5,0.5,2)/(3,2,1)"
+                  " exact; refusals store nothing; flag-0 spawn (r=1 spheroid, r=1.5"
+                  " prolate, windows refuse); ell-ell MTD 0.09486 = 0.1·n_y on the"
+                  " band face normal (brute-force min, faceted-sphere axis ≠"
+                  " translation axis) both orders + separated @2.1 on the same"
+                  " normal + prolate pair 0.09794 = 0.1·u_z @2.9z and polar"
+                  " separation @3.9z; flag-1 single-vertex rest in [0.95,1.05]"
+                  " and pair depenetration ≥ 1.95");
+    }
+    mpe_test_end (&t);
+    return t.failures;
+}

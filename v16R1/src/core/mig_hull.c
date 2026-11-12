@@ -646,6 +646,11 @@ mig_hull_err mig_hull_sat_hull_hull (const mig_hull_point *va, int na,
  * (the set keeps the points that fit — never silently grows). */
 #define MIG_HULL_SQRT3 1.73205080756887729353
 #define MIG_HULL_PHI   1.61803398874989484820 /* golden ratio */
+/* 2.6.3 ellipsoid ring literals: cos/sin(π/8) = √(2±√2)/2 and √2 —
+ * exact algebraic values, same spelled-out rule. */
+#define MIG_HULL_SQRT2    1.41421356237309504880
+#define MIG_HULL_COS_PI_8 0.92387953251128675613 /* √(2+√2)/2 */
+#define MIG_HULL_SIN_PI_8 0.38268343236508977173 /* √(2−√2)/2 */
 
 /* Right triangular prism, equilateral cross-section. Bottom cap normal
  * -z, top cap +z, side A-B outward -y, side B-C outward (√3/2, 1/2),
@@ -760,4 +765,153 @@ mig_hull_err mig_hull_build_icosahedron (double a, mig_hull_point_set *out) {
         if (e != mig_hull_ok) { return e; }
     }
     return mig_hull_ok;
+}
+
+/* ---- APPENDED WP2.6 2.6.3: UV ellipsoid, 12x8 (pp_math.md §7,
+ * pp_ellipsoid_uv transcribed; windings are the study's north fan,
+ * quad bands and south fan, re-proven by the gate through
+ * mesh_props (V > 0). */
+const int mig_hull_ell_faces [MIG_HULL_ELL_FACES * 3] = {
+    /* north pole fan: 84 -> ring 1, outward +z */
+    84, 0, 1,   84, 1, 2,
+    84, 2, 3,   84, 3, 4,
+    84, 4, 5,   84, 5, 6,
+    84, 6, 7,   84, 7, 8,
+    84, 8, 9,   84, 9, 10,
+    84, 10, 11,   84, 11, 0,
+    /* quad band rings 1-2 (indices 0..11 over 12..23) */
+    0, 12, 13,   0, 13, 1,
+    1, 13, 14,   1, 14, 2,
+    2, 14, 15,   2, 15, 3,
+    3, 15, 16,   3, 16, 4,
+    4, 16, 17,   4, 17, 5,
+    5, 17, 18,   5, 18, 6,
+    6, 18, 19,   6, 19, 7,
+    7, 19, 20,   7, 20, 8,
+    8, 20, 21,   8, 21, 9,
+    9, 21, 22,   9, 22, 10,
+    10, 22, 23,   10, 23, 11,
+    11, 23, 12,   11, 12, 0,
+    /* quad band rings 2-3 (indices 12..23 over 24..35) */
+    12, 24, 25,   12, 25, 13,
+    13, 25, 26,   13, 26, 14,
+    14, 26, 27,   14, 27, 15,
+    15, 27, 28,   15, 28, 16,
+    16, 28, 29,   16, 29, 17,
+    17, 29, 30,   17, 30, 18,
+    18, 30, 31,   18, 31, 19,
+    19, 31, 32,   19, 32, 20,
+    20, 32, 33,   20, 33, 21,
+    21, 33, 34,   21, 34, 22,
+    22, 34, 35,   22, 35, 23,
+    23, 35, 24,   23, 24, 12,
+    /* quad band rings 3-4 (indices 24..35 over 36..47) */
+    24, 36, 37,   24, 37, 25,
+    25, 37, 38,   25, 38, 26,
+    26, 38, 39,   26, 39, 27,
+    27, 39, 40,   27, 40, 28,
+    28, 40, 41,   28, 41, 29,
+    29, 41, 42,   29, 42, 30,
+    30, 42, 43,   30, 43, 31,
+    31, 43, 44,   31, 44, 32,
+    32, 44, 45,   32, 45, 33,
+    33, 45, 46,   33, 46, 34,
+    34, 46, 47,   34, 47, 35,
+    35, 47, 36,   35, 36, 24,
+    /* quad band rings 4-5 (indices 36..47 over 48..59) */
+    36, 48, 49,   36, 49, 37,
+    37, 49, 50,   37, 50, 38,
+    38, 50, 51,   38, 51, 39,
+    39, 51, 52,   39, 52, 40,
+    40, 52, 53,   40, 53, 41,
+    41, 53, 54,   41, 54, 42,
+    42, 54, 55,   42, 55, 43,
+    43, 55, 56,   43, 56, 44,
+    44, 56, 57,   44, 57, 45,
+    45, 57, 58,   45, 58, 46,
+    46, 58, 59,   46, 59, 47,
+    47, 59, 48,   47, 48, 36,
+    /* quad band rings 5-6 (indices 48..59 over 60..71) */
+    48, 60, 61,   48, 61, 49,
+    49, 61, 62,   49, 62, 50,
+    50, 62, 63,   50, 63, 51,
+    51, 63, 64,   51, 64, 52,
+    52, 64, 65,   52, 65, 53,
+    53, 65, 66,   53, 66, 54,
+    54, 66, 67,   54, 67, 55,
+    55, 67, 68,   55, 68, 56,
+    56, 68, 69,   56, 69, 57,
+    57, 69, 70,   57, 70, 58,
+    58, 70, 71,   58, 71, 59,
+    59, 71, 60,   59, 60, 48,
+    /* quad band rings 6-7 (indices 60..71 over 72..83) */
+    60, 72, 73,   60, 73, 61,
+    61, 73, 74,   61, 74, 62,
+    62, 74, 75,   62, 75, 63,
+    63, 75, 76,   63, 76, 64,
+    64, 76, 77,   64, 77, 65,
+    65, 77, 78,   65, 78, 66,
+    66, 78, 79,   66, 79, 67,
+    67, 79, 80,   67, 80, 68,
+    68, 80, 81,   68, 81, 69,
+    69, 81, 82,   69, 82, 70,
+    70, 82, 83,   70, 83, 71,
+    71, 83, 72,   71, 72, 60,
+    /* south pole fan: ring 7 -> 85, outward -z */
+    85, 73, 72,   85, 74, 73,
+    85, 75, 74,   85, 76, 75,
+    85, 77, 76,   85, 78, 77,
+    85, 79, 78,   85, 80, 79,
+    85, 81, 80,   85, 82, 81,
+    85, 83, 82,   85, 72, 83,
+};
+
+mig_hull_err mig_hull_build_ellipsoid (double a, double b, double c,
+                                       mig_hull_point_set *out) {
+    if (!out) { return mig_hull_null; }
+    if (!isfinite (a) || !isfinite (b) || !isfinite (c) ||
+        a <= 0.0 || b <= 0.0 || c <= 0.0) {
+        return mig_hull_bad_point;
+    }
+    /* Latitude rings j = 1..7 at colatitude phi_j = j*pi/8:
+     * {sin phi_j, cos phi_j} — exact algebraic literals. */
+    static const double ring [7][2] = {
+        {MIG_HULL_SIN_PI_8,   MIG_HULL_COS_PI_8  },  /* phi =  pi/8 */
+        {MIG_HULL_SQRT2 / 2,  MIG_HULL_SQRT2 / 2},  /* phi =  pi/4 */
+        {MIG_HULL_COS_PI_8,   MIG_HULL_SIN_PI_8  },  /* phi = 3pi/8 */
+        {1.0,                 0.0                },  /* phi =  pi/2 */
+        {MIG_HULL_COS_PI_8,  -MIG_HULL_SIN_PI_8  },  /* phi = 5pi/8 */
+        {MIG_HULL_SQRT2 / 2, -MIG_HULL_SQRT2 / 2},  /* phi = 3pi/4 */
+        {MIG_HULL_SIN_PI_8,  -MIG_HULL_COS_PI_8  },  /* phi = 7pi/8 */
+    };
+    /* Longitude theta_k = k*pi/6: {cos theta_k, sin theta_k}. */
+    static const double lon [12][2] = {
+        { 1.0,                0.0               },
+        { MIG_HULL_SQRT3 / 2,  0.5              },
+        { 0.5,                MIG_HULL_SQRT3 / 2},
+        { 0.0,                1.0               },
+        {-0.5,                MIG_HULL_SQRT3 / 2},
+        {-MIG_HULL_SQRT3 / 2,  0.5              },
+        {-1.0,                0.0               },
+        {-MIG_HULL_SQRT3 / 2, -0.5              },
+        {-0.5,               -MIG_HULL_SQRT3 / 2},
+        { 0.0,               -1.0               },
+        { 0.5,               -MIG_HULL_SQRT3 / 2},
+        { MIG_HULL_SQRT3 / 2, -0.5              },
+    };
+    /* Each coordinate is a product of table literals and the
+     * semi-axes — the prism's literal x s pattern, never trig. */
+    for (int j = 0; j < 7; j++) {
+        for (int k = 0; k < 12; k++) {
+            mig_hull_err e = mig_hull_point_set_add (out,
+                a * ring [j][0] * lon [k][0],
+                b * ring [j][0] * lon [k][1],
+                c * ring [j][1]);
+            if (e != mig_hull_ok) { return e; }
+        }
+    }
+    /* Poles: indices 84 (+z) and 85 (−z). */
+    mig_hull_err e = mig_hull_point_set_add (out, 0.0, 0.0, c);
+    if (e != mig_hull_ok) { return e; }
+    return mig_hull_point_set_add (out, 0.0, 0.0, -c);
 }
