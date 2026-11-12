@@ -4,7 +4,7 @@
 # The Makefile builds thin MFS-only .so files and needs no engine objects.
 MFS_ENGINE_SRCS = core/physics_world.c core/rigidbody.c \
     core/mpe_registry.c core/mpe_loader.c \
-    core/det_math.c core/mpe_primary.c core/mig_mass.c \
+    core/det_math.c core/mpe_primary.c core/mig_mass.c core/mig_hull.c \
     physics/collision_narrowphase.c physics/collision_cache.c \
     physics/collision_solver.c physics/collision_ccd.c \
     physics/collision_cylinder.c physics/broadphase.c \

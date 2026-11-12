@@ -286,6 +286,13 @@ truth in this order and do not write a new line of code until green:
 cd 475-MPE/v16R1/src
 make build_suite            # zero complaints expected (-Werror is default)
 ./test_mpe_suite --all      # expect: Total: 68 | Blocking failures: 0
+make -C ecosystem/mgb && make mfs_ecosystem
+bash ecosystem/mfs/build_tests.sh   # modules embed engine sources — every new
+                                    # core/*.c must join all three parallel lists
+                                    # (mgb/makefile CORE, mfs/mfs_sources.mk,
+                                    # mfs/build_tests.sh CORE) or the module
+                                    # links fail on undefined symbols;
+                                    # expect: FTC RESULT: gated pass=5 fail=0 info-diags=12
 cd ../..
 python3 tools/test_runner.py --profile quick   # expect Checks: 82 | passed: 82
 git status --short          # manifest must match §1 exactly — no half-written files
@@ -1734,6 +1741,22 @@ Ledger (new entries get a line, never an edit of a past line):
   Suite floor 67 → 68; suite 67/67 → 68/68, quick 81/81 → 82/82 at
   the landing; ASan spot-checks of the new gate, the boundary gate
   and the sibling hull gates clean.
+
+- 2026-11-12 — WP2.6 2.6.5 follow-up (this commit): mgb/mfs module
+  source lists gain `core/mig_hull.c`. The module makefiles embed
+  engine sources and predate the hull brick, so `make -C
+  ecosystem/mgb` failed with 14 undefined `mig_hull_*` references
+  (every one from `physics_world.c`'s new hull paths) and the MFS FTC
+  gate failed for the same reason (gated pass=4 fail=1) — the 2.6.5
+  verify list covered the primary builds but missed the module
+  targets. Fixed the three PARALLEL lists together —
+  `ecosystem/mgb/makefile` CORE, `ecosystem/mfs/mfs_sources.mk`
+  MFS_ENGINE_SRCS, `ecosystem/mfs/build_tests.sh` embedded CORE (they
+  carry the "same proven list / update together" annotation;
+  `core/mig_spec.c` stays test-core only) — and §0's resume ritual now
+  runs the module builds so the next brick's verify list cannot miss
+  them again. Post-fix: mgb link green, `make mfs_ecosystem` green,
+  FTC gated pass=5 fail=0 info-diags=12.
 
 ## §10 Definition of done for v16S (the cut checklist)
 
