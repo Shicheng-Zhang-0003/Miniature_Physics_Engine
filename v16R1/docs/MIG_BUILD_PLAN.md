@@ -1103,6 +1103,36 @@ the editor is a window onto it; no editor-only truth exists.
   "editor and terminal create the same objects through the same parser."
   Per-part authored materials are a post-4.5 feature (mig_part has no
   material fields — body_defaults per part type, review 9.3).
+- [x] **4.6 The tiny CAD editor — design MODEL first (LANDED 2026-11-13,
+  `cad_editor_model`, suite floor 70 → 71):** the standalone headless
+  truth for a terminal-style miniature CAD editor. `cad/cad_editor.{h,c}`
+  compiles into ENGINE_SRCS but NOTHING calls it yet (dead code by
+  design, zero behavior change) — the terminal-style shell and its
+  1-key-terminal-style screen are the next brick, driving this model
+  exactly like WP4's headless-before-GTK discipline. A `cad_design` is
+  ONE composite body under construction in the assembly frame: an
+  ordered `mig_part` list (the WP0 record the composite path consumes)
+  whose poses may place parts with DELIBERATE GAPS — the "spaces" the
+  weld-flow composites cannot express. Verbs: typed adds
+  (sphere/cube/cylinder at water density), generic add, delete+shift,
+  duplicate-with-offset (the primary "spaces" verb), linear array
+  (n total, staged-validate before append), move/set_position/rotate
+  (assembly-axis premultiply, degrees; position snap and rotation snap
+  are MODES, not verbs), set_mass, select; named `cad_err` battery,
+  every verb write-on-success. Persistence IS the frozen spec grammar:
+  `cad_save` emits the canonical normalized form, `cad_load` re-parses —
+  a saved design is a legal spec file, compatible with the terminal
+  `mig` store, microvim, and the 4.4 panel forever (bitwise part
+  round-trip + byte-identical emissions, pinned by the gate). Build
+  seam: `cad_build` wraps `mig_make_bridge` (compose truth + COM-rebased
+  copy, inter-part gap preserved across the re-anchor) and returns the
+  bridge — the later hookup calls `physics_world_add_composite` with
+  exactly that; the TU deliberately does NOT include physics_world.h
+  (the model cannot mutate a world). Plus a deterministic ASCII plan
+  view (64×24, 1 cell = 0.25 m) with a stale-glyph regression pin.
+  Gate `cad_editor_model` (blocking) pins all of it; one real bug
+  found by the gate on landing day: cad_save's cap-0 size probe against
+  an emitter that has none (empty file + cad_ok — now emit-and-measure).
 
 ## §7 WP5 — MFS adoption (toggle default OFF, A/B or the gate doesn't flip)
 
@@ -1957,6 +1987,42 @@ Ledger (new entries get a line, never an edit of a past line):
   noted: composite.max_parts is likewise GUI-unreachable (TUI
   export reaches it) — a config-menu page 3 is the follow-up if
   wanted.
+
+- 2026-11-13 — docs sweep (commit `c58da4e`, docs-only, no gate
+  change): 17 files updated for the hull train's true counts — suite
+  70/68, quick 84/84, CONFIG.md rewritten (86 tunables/15 categories +
+  GUI-reachability section), how_to_use spawn/config/scene-v201
+  rewrite, KNOWN_LIMITATIONS hull-scope bullet, FTC.md 37/37 + the
+  `&w` segfault fix row, REMAINING_WORK dated entry, GLOSSARY hull
+  entry, plus ARCHITECTURE/DEV_GUIDE/API_REFERENCE/INDEX/LIMITATIONS/
+  readme count alignments. Recorded here so the ledger chain stays
+  unbroken (it shipped between 2.6.6b and 4.6).
+
+- 2026-11-13 — WP4 4.6 (this commit): the tiny CAD editor's DESIGN
+  MODEL, standalone. `cad/cad_editor.{h,c}` compiles into
+  ENGINE_SRCS and the suite but nothing calls it yet (dead code by
+  design, zero behavior change — the terminal-style shell is the
+  next brick and will drive this headless truth). A `cad_design` is
+  ONE composite body under construction in the assembly frame: an
+  ordered `mig_part` list whose poses may place parts with
+  DELIBERATE GAPS — the "spaces" weld-flow composites cannot
+  express; duplicate-with-offset and linear array are the primary
+  gap verbs. Persistence IS the frozen spec grammar (cad_save/cad_load
+  over mig_spec_emit_normalized/mig_spec_parse_file — a saved design
+  is a legal spec file, compatible with the terminal store, microvim
+  and the 4.4 panel); build seam `cad_build` wraps `mig_make_bridge`
+  and the TU deliberately never includes physics_world.h (the model
+  cannot mutate a world). Gate 71 `cad_editor_model` (blocking):
+  refusal battery with a whole-design memcmp witness, snap/rotate
+  left-composition pin, bridge ≡ direct mig_compose (1e-9) with the
+  gap preserved (1e-6), bitwise spec round trip + byte-identical
+  emissions, load refusals, caller cap, ASCII plan view + the
+  stale-glyph regression. The gate caught a real bug on landing
+  day: cad_save measured the canonical text with a cap-0 probe this
+  emitter does not implement (returns 0, not the size) — empty file
+  + cad_ok; now emit-and-measure with the overflow refusal. Suite
+  71/69, floor raised 70 -> 71 (loud edit in test_runner.py +
+  TESTING.md + RELEASE_GATES.md + RELEASE_POLICY.md + readme).
 
 ## §10 Definition of done for v16S (the cut checklist)
 

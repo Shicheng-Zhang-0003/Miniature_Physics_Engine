@@ -131,6 +131,7 @@ int mpe_t_mig_hull_sat_hulls (void);
 int mpe_t_mig_hull_spawn (void);
 int mpe_t_mig_hull_ellipsoid (void);
 int mpe_t_mig_hull_render_stamp (void);
+int mpe_t_cad_editor_model (void);
 typedef struct {
     const char *name;
     int (*fn) (void);
@@ -300,6 +301,16 @@ static const mpe_entry_t mpe_registry [] = {
      * builds scale onto the stored collision verts exactly, and add_hull
      * stamps (kind, s, h) for the renderer's per-kind unit mesh. */
     {"mig_hull_render_stamp", mpe_t_mig_hull_render_stamp, 0},
+    /* MIG WP4 4.6: the miniature CAD editor's DESIGN MODEL (cad/cad_editor.c)
+     * — typed adds + full refusal battery (write-on-success, memcmp
+     * witness), snap/rotate/dup/array transforms with the left-composition
+     * pin, cad_build ≡ direct mig_compose + gap-preserved re-anchor (the
+     * "spaces" property), frozen-spec-grammar persistence round trip
+     * (bitwise + byte-identical emissions) + load refusals, caller cap,
+     * and the deterministic ASCII plan view incl. the stale-glyph
+     * regression. Standalone: nothing in the shipped GUI calls the model
+     * yet — the terminal-style shell is the next brick. */
+    {"cad_editor_model", mpe_t_cad_editor_model, 0},
 };
 #define MPE_NTESTS ((int) (sizeof (mpe_registry) / sizeof (mpe_registry [0])))
 /* Returns 0 pass, 1 fail, 2 skipped.
