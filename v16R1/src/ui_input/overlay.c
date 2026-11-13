@@ -137,11 +137,9 @@ void overlay_update (void) {
         else {
             char buf [512];
             if (main_inputs.spawner_menu_level == 1) {
-                const char *t = main_inputs.current_spawn_type == 0 ? "Sphere"
-                : main_inputs.current_spawn_type == 1 ? "Cube"
-                : "Cylinder";
-                snprintf (buf, sizeof (buf), "-- Spawner Menu --\n1: Sphere\n2: Cube\n3: Current Type: %s\n4: Cylinder",
-                          t);
+                snprintf (buf, sizeof (buf),
+                          "-- Spawner Menu --\n1: Sphere\n2: Cube\n3: Current Type: %s\n4: Cylinder\n5: Hull Settings",
+                          term_spawn_type_name ());
             } else if (main_inputs.spawner_menu_level == 2)
                 snprintf (buf, sizeof (buf), "-- Sphere Settings --\n1: Mass\n2: Radius");
             else if (main_inputs.spawner_menu_level == 3)
@@ -161,13 +159,11 @@ void overlay_update (void) {
             else if (main_inputs.spawner_menu_level == 7)
                 snprintf (buf, sizeof (buf), "-- Cube Size --\nCurrent Size: %.2f m\n\nValue dialog active (step %.2f)",
                           g_cfg.spawner.cube_extent, adj);
-            else if (main_inputs.spawner_menu_level == 8) {
-                const char *t = main_inputs.current_spawn_type == 0 ? "Sphere"
-                : main_inputs.current_spawn_type == 1 ? "Cube"
-                : "Cylinder";
+            else if (main_inputs.spawner_menu_level == 8)
                 snprintf (buf, sizeof (buf),
-                          "-- Toggle Spawn Type --\nCurrent: %s\n\nUp/Down: Cycle\nEnter: Save and Close", t);
-            } else if (main_inputs.spawner_menu_level == 9)
+                          "-- Toggle Spawn Type --\nCurrent: %s\n\nUp/Down: Cycle\nEnter: Save and Close",
+                          term_spawn_type_name ());
+            else if (main_inputs.spawner_menu_level == 9)
                 snprintf (buf, sizeof (buf), "-- Cylinder Settings --\n1: Mass\n2: Radius\n3: Half-Length");
             else if (main_inputs.spawner_menu_level == 10)
                 snprintf (buf, sizeof (buf),
@@ -181,6 +177,22 @@ void overlay_update (void) {
                 snprintf (buf, sizeof (buf),
                           "-- Cylinder Half-Length --\nCurrent: %.2f m\n\nValue dialog active (step %.2f)",
                           g_cfg.spawner.cyl_half_length, adj);
+            /* MIG WP2.6 spawn-menu: the hull dial screens (shared by all
+             * five catalog kinds). */
+            else if (main_inputs.spawner_menu_level == 13)
+                snprintf (buf, sizeof (buf), "-- Hull Settings --\n1: Mass\n2: Size (s)\n3: Height (h)");
+            else if (main_inputs.spawner_menu_level == 14)
+                snprintf (buf, sizeof (buf),
+                          "-- Hull Mass --\nCurrent Mass: %.2f kg\n\nValue dialog active (step %.2f)",
+                          g_cfg.spawner.hull_mass, adj);
+            else if (main_inputs.spawner_menu_level == 15)
+                snprintf (buf, sizeof (buf),
+                          "-- Hull Size (s) --\nCurrent: %.2f m\n\nValue dialog active (step %.2f)",
+                          g_cfg.spawner.hull_size, adj);
+            else if (main_inputs.spawner_menu_level == 16)
+                snprintf (buf, sizeof (buf),
+                          "-- Hull Height (h) --\nCurrent: %.2f m\n\nValue dialog active (step %.2f)",
+                          g_cfg.spawner.hull_height, adj);
             else
             buf [0] = 0;
             gtk_label_set_text (GTK_LABEL (spawner_menu_label), buf);

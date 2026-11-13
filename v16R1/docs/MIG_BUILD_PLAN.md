@@ -1845,6 +1845,41 @@ Ledger (new entries get a line, never an edit of a past line):
   change. tui-smoke 9 scenes pass; suite 69/69, quick 83/83
   unchanged.
 
+- 2026-11-12 — WP2.6 GUI spawn-menu (this commit, GUI-only): the
+  spawner menu now offers all 8 kinds and edits them in place —
+  level 1 gains "5: Hull Settings" (→ level 13: 1 Mass, 2 Size (s),
+  3 Height (h) → dialogs 14/15/16) and the level-8 cycle is 8-way
+  (`% 8` / `+7`): sphere, cube, cylinder, prism, pyr4, pyr3, icosa,
+  ell. `current_spawn_type` 0..7 is the single state word. Three
+  SHARED dials serve all five hull kinds — `spawner.hull_mass`
+  (default 1, [1e-4, 1e6]), `spawner.hull_size` (s: prism/pyr4/pyr3
+  base width, icosa edge, ell equatorial diameter),
+  `spawner.hull_height` (h: prism/pyr heights, ell polar diameter,
+  ignored for icosa) — both size dials floored at 0.02, not the
+  generic 0.01: the ell spawn's circumradius is s/2, and add_hull's
+  window opens at 0.01, so s=0.01 would spawn a half-penny prolate
+  the gate never sees. The dialogs clamp at those real windows.
+  Spawn dispatch is deduplicated into `spawner_launch_current_type()`
+  (both the Enter-hold and the repeat-rate site call it); new
+  `spawner_launch_hull(kind, name, speed)` mirrors the TUI verb:
+  composite.hull=0 refuses loudly (event-log hint names the config
+  menu, not the print-only `env`), reach = max(s, h) + 1, the
+  add_hull-window refusal prints the real policy, velocity stamps
+  launch + viewpoint, spawner frictions, per-index colour.
+  `term_spawn_type_name()` (term_obj.c) is the single source of
+  truth for the 8-name label; its prototype moved from term_priv.h
+  (NOT public API) to debug_terminal.h so overlay.c's spawner texts
+  use it — the prior inline ternaries in overlay.c were a live
+  violation of that rule, now gone. Append-only throughout: the
+  config struct gained 3 floats (recompiles everything — the full
+  battery was rerun), the input_state comment lists all 8 values.
+  Known limits unchanged: hull spawns simulate but stay INVISIBLE
+  (the 2.6.5 renderer stopgap — skip + counter + one-time note) and
+  scene save still vetoes hulls (SVF06); a hull-mesh renderer brick
+  is the visible follow-up. Verified: engine build clean; suite
+  69/69; quick 83/83 (all 5 regimes); tui-smoke pass; make
+  everything green.
+
 ## §10 Definition of done for v16S (the cut checklist)
 
 All gates green at the final floor; policy amendment committed; release

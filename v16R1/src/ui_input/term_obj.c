@@ -20,12 +20,20 @@ const char *term_object_type_name (rigidbody *rigid_body) {
     if (rigid_body -> type == object_sphere) { return "sph"; }
     if (rigid_body -> type == object_cylinder) { return "cyl"; }
     return "cube";
-} /* Single source of truth for the spawn-gun type label (sphere/cube/cylinder).
- * All terminal + overlay-adjacent displays must use this, never inline. */
+} /* Single source of truth for the spawn-gun type label (sphere/cube/
+ * cylinder + the five catalog hulls — MIG WP2.6 spawn-menu). All
+ * terminal + overlay-adjacent displays must use this, never inline. */
 const char *term_spawn_type_name (void) {
-    if (main_inputs.current_spawn_type == 0) { return "sphere"; }
-    if (main_inputs.current_spawn_type == 1) { return "cube"; }
-    return "cylinder";
+    switch (main_inputs.current_spawn_type) {
+        case 0: { return "sphere"; }
+        case 1: { return "cube"; }
+        case 2: { return "cylinder"; }
+        case 3: { return "prism"; }
+        case 4: { return "pyr4"; }
+        case 5: { return "pyr3"; }
+        case 6: { return "icosa"; }
+        default: { return "ell"; }
+    }
 }
 const char *term_object_state_name (rigidbody *rigid_body) {
     if (rigid_body -> static_state) { return "static"; }

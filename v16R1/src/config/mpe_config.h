@@ -143,6 +143,15 @@ typedef struct {
         float friction_k;
         int overlap_max_attempts;
         float overlap_thresh;
+        /* MIG WP2.6 spawn-menu: hull spawner defaults — all five catalog
+         * kinds share the three dials. size = s (prism/pyr4/pyr3 base
+         * width, icosa edge, ell equatorial diameter); height = h
+         * (prism/pyramid heights, ell polar diameter, ignored for
+         * icosa). Floor 0.02: the ell spawn's circumradius is s/2 and
+         * add_hull's window opens at 0.01. */
+        float hull_mass;
+        float hull_size;
+        float hull_height;
     } spawner;
     struct {
         float sphere_restitution;

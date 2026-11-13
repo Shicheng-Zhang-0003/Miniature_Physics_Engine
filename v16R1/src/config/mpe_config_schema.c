@@ -200,6 +200,16 @@ static mpe_param s_registry [] = {
      &g_cfg.spawner.cyl_radius, 0.4, 0.01, 50.0, false},
     {"spawner.cyl_half_length", "Cylinder Half-Length", "Default axle half-length for spawned cylinders (m)", p_float,
      cat_spawner, &g_cfg.spawner.cyl_half_length, 0.4, 0.01, 50.0, false},
+    /* MIG WP2.6 spawn-menu: hull dials (all five catalog kinds). The
+     * min/max windows mirror add_hull's policy: mass [1e-4, 1e6];
+     * size/height [0.02, 200] — the ell spawn's circumradius is size/2,
+     * so 0.02 is the smallest spawnable s. */
+    {"spawner.hull_mass", "Hull Mass", "Default mass for spawned hull shapes (kg)", p_float, cat_spawner,
+     &g_cfg.spawner.hull_mass, 1.0, 0.0001, 1000000.0, false},
+    {"spawner.hull_size", "Hull Size (s)", "Base size s for spawned hulls (m): prism/pyr4/pyr3 base width, icosa edge, ell equatorial diameter", p_float,
+     cat_spawner, &g_cfg.spawner.hull_size, 1.0, 0.02, 200.0, false},
+    {"spawner.hull_height", "Hull Height (h)", "Height h for spawned hulls (m): prism/pyr4/pyr3 height, ell polar diameter (ignored for icosa)", p_float,
+     cat_spawner, &g_cfg.spawner.hull_height, 1.0, 0.02, 200.0, false},
     {"spawner.speed", "Launch Speed", "Launch velocity for spawned objects (m/s, uncapped — CCD owns fast bodies)",
      p_float, cat_spawner, &g_cfg.spawner.speed, 20.0, 0.0, 150.0, false},
     {"spawner.friction_s", "Spawn Friction (Static)", "Static friction applied to new objects", p_float, cat_spawner,

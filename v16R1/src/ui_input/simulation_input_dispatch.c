@@ -161,36 +161,16 @@ void simulation_input_dispatch (GtkWidget *parent_window) {
         (main_inputs.spawner_menu_level == 0) && (main_inputs.velocity_menu_level == 0) &&
         (main_inputs.object_menu_level == 0)) {
         if (!enter_previously_held) {
-            if (main_inputs.current_spawn_type == 0) { spawner_launch_sphere (g_cfg.spawner.radius, g_cfg.spawner.mass, g_cfg.spawner.speed); } else if (main_inputs.current_spawn_type == 1) {
-                vector3 cube_spawn_position =
-                    vector3_addition (main_camera_fov.position, vector3_scaling (main_camera_fov.forward_vector,
-                                                                                 g_cfg.spawner.cube_extent + 1.0f));
-                spawner_launch_cube (
-                    cube_spawn_position,
-                    (vector3) {g_cfg.spawner.cube_extent, g_cfg.spawner.cube_extent, g_cfg.spawner.cube_extent},
-                    g_cfg.spawner.cube_mass);
-            } else {
-                spawner_launch_cylinder (g_cfg.spawner.cyl_radius, g_cfg.spawner.cyl_half_length,
-                                         g_cfg.spawner.cyl_mass, g_cfg.spawner.speed);
-            } enter_hold_timer = 0.0f;
+            spawner_launch_current_type ();
+            enter_hold_timer = 0.0f;
             enter_spawn_interval_timer = 0.0f;
         } else {
             enter_hold_timer += main_timer.delta_time;
             if (enter_hold_timer > g_cfg.ui.enter_spawn_delay) {
                 enter_spawn_interval_timer += main_timer.delta_time;
                 if (enter_spawn_interval_timer >= g_cfg.ui.enter_spawn_interval) {
-                    if (main_inputs.current_spawn_type == 0) { spawner_launch_sphere (g_cfg.spawner.radius, g_cfg.spawner.mass, g_cfg.spawner.speed); } else if (main_inputs.current_spawn_type == 1) {
-                        vector3 cube_spawn_position = vector3_addition (
-                            main_camera_fov.position,
-                            vector3_scaling (main_camera_fov.forward_vector, g_cfg.spawner.cube_extent + 1.0f));
-                        spawner_launch_cube (
-                            cube_spawn_position,
-                            (vector3) {g_cfg.spawner.cube_extent, g_cfg.spawner.cube_extent, g_cfg.spawner.cube_extent},
-                            g_cfg.spawner.cube_mass);
-                    } else {
-                        spawner_launch_cylinder (g_cfg.spawner.cyl_radius, g_cfg.spawner.cyl_half_length,
-                                                 g_cfg.spawner.cyl_mass, g_cfg.spawner.speed);
-                    } enter_spawn_interval_timer = 0.0f;
+                    spawner_launch_current_type ();
+                    enter_spawn_interval_timer = 0.0f;
                 }
             }
         } enter_previously_held = true;

@@ -266,6 +266,9 @@ gboolean on_keypress (GtkEventControllerKey *w, guint keyval, guint keycode, Gdk
             st -> spawner_menu_level = 8;
         if (keyval == GDK_KEY_4)
             st -> spawner_menu_level = 9;
+        /* MIG WP2.6 spawn-menu: shared hull dial screen. */
+        if (keyval == GDK_KEY_5)
+            st -> spawner_menu_level = 13;
     } else if (st -> spawner_menu_level == 2) {
         if (keyval == GDK_KEY_1)
             st -> spawner_menu_level = 3;
@@ -276,6 +279,13 @@ gboolean on_keypress (GtkEventControllerKey *w, guint keyval, guint keycode, Gdk
             st -> spawner_menu_level = 6;
         if (keyval == GDK_KEY_2)
             st -> spawner_menu_level = 7;
+    } else if (st -> spawner_menu_level == 13) {
+        if (keyval == GDK_KEY_1)
+            st -> spawner_menu_level = 14;
+        if (keyval == GDK_KEY_2)
+            st -> spawner_menu_level = 15;
+        if (keyval == GDK_KEY_3)
+            st -> spawner_menu_level = 16;
     } else if (st -> spawner_menu_level == 9) {
         if (keyval == GDK_KEY_1)
             st -> spawner_menu_level = 10;

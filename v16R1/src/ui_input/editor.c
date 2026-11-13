@@ -65,14 +65,41 @@ void editor_update_menus (GtkWidget *parent_window) {
         if (g_cfg.spawner.cyl_half_length < 0.01f) { g_cfg.spawner.cyl_half_length = 0.01f; }
         main_inputs.spawner_menu_level = 0;
     }
+    /* MIG WP2.6 spawn-menu: hull dials (shared by all five catalog
+     * kinds). Clamps mirror add_hull's policy windows, NOT the generic
+     * 0.01 floor: mass 1e-4 is the real minimum, and size/height 0.02
+     * is the smallest spawnable s (the ell circumradius is s/2). */
+    else if (main_inputs.spawner_menu_level == 14) {
+        g_cfg.spawner.hull_mass =
+            open_numerical_input_dialog (parent_window, "Hull Mass (kg)", g_cfg.spawner.hull_mass);
+        editor_reacquire_mouse (parent_window);
+        if (g_cfg.spawner.hull_mass < 0.0001f) { g_cfg.spawner.hull_mass = 0.0001f; }
+        else if (g_cfg.spawner.hull_mass > 1000000.0f) { g_cfg.spawner.hull_mass = 1000000.0f; }
+        main_inputs.spawner_menu_level = 0;
+    } else if (main_inputs.spawner_menu_level == 15) {
+        g_cfg.spawner.hull_size =
+            open_numerical_input_dialog (parent_window, "Hull Size s (m)", g_cfg.spawner.hull_size);
+        editor_reacquire_mouse (parent_window);
+        if (g_cfg.spawner.hull_size < 0.02f) { g_cfg.spawner.hull_size = 0.02f; }
+        else if (g_cfg.spawner.hull_size > 200.0f) { g_cfg.spawner.hull_size = 200.0f; }
+        main_inputs.spawner_menu_level = 0;
+    } else if (main_inputs.spawner_menu_level == 16) {
+        g_cfg.spawner.hull_height =
+            open_numerical_input_dialog (parent_window, "Hull Height h (m)", g_cfg.spawner.hull_height);
+        editor_reacquire_mouse (parent_window);
+        if (g_cfg.spawner.hull_height < 0.02f) { g_cfg.spawner.hull_height = 0.02f; }
+        else if (g_cfg.spawner.hull_height > 200.0f) { g_cfg.spawner.hull_height = 200.0f; }
+        main_inputs.spawner_menu_level = 0;
+    }
     if (main_inputs.spawner_menu_level == 8) {
-        /* Three-way spawn-type cycle (was a two-way toggle). */
+        /* Eight-way spawn-type cycle (sphere, cube, cylinder, prism,
+         * pyr4, pyr3, icosa, ell — MIG WP2.6 spawn-menu). */
         if (main_inputs.up_arrow_pressed) {
-            main_inputs.current_spawn_type = (main_inputs.current_spawn_type + 1) % 3;
+            main_inputs.current_spawn_type = (main_inputs.current_spawn_type + 1) % 8;
             main_inputs.up_arrow_pressed = false;
             main_inputs.down_arrow_pressed = false;
         } else if (main_inputs.down_arrow_pressed) {
-            main_inputs.current_spawn_type = (main_inputs.current_spawn_type + 2) % 3;
+            main_inputs.current_spawn_type = (main_inputs.current_spawn_type + 7) % 8;
             main_inputs.up_arrow_pressed = false;
             main_inputs.down_arrow_pressed = false;
         }

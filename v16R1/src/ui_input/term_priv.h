@@ -72,9 +72,9 @@ int term_require_object (const char *token);
 int term_require_joint (const char *token);
 int term_parse_movement_destination (const char *token, float *x, float *y, float *z);
 void term_execute (char *command_line);
-/* object/joint model layer (defined in term_obj.c) */
+/* object/joint model layer (defined in term_obj.c); the spawn-gun
+ * label's prototype lives in debug_terminal.h (overlay shares it). */
 const char *term_object_type_name (rigidbody *rigid_body);
-const char *term_spawn_type_name (void);
 const char *term_object_state_name (rigidbody *rigid_body);
 const char *term_object_mode (rigidbody *rigid_body);
 void term_print_object_long (int object_index);

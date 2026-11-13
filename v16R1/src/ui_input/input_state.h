@@ -37,7 +37,7 @@ typedef struct {
     int spawner_menu_level;
     int velocity_menu_level;
     int object_menu_level;
-    int current_spawn_type;
+    int current_spawn_type; /* spawn gun: 0 sphere, 1 cube, 2 cylinder, 3 prism, 4 pyr4, 5 pyr3, 6 icosa, 7 ell */
     bool up_arrow_pressed, down_arrow_pressed, enter_key_pressed, e_key_pressed;
     bool stability_test_pressed;
     bool sleep_wake_test_pressed;
