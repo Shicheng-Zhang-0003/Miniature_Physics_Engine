@@ -150,6 +150,16 @@ int cad_rotate_degrees (cad_design *design, int index, int axis, float degrees);
 /* Rewrite either mass mode on a part (explicit kg or density kg/m^3). */
 int cad_set_mass (cad_design *design, int index, mig_mass_mode mode, float value);
 
+/* ---- dims resize (the window's scale verb) ----
+ * Resize ONE part through the verb matching its type; a mismatch refuses
+ * cad_bad_type (a sphere is not resized by the cube verb). Dims must be
+ * finite and strictly positive (the mig_compose rule). Write-on-success:
+ * a refused resize leaves the part untouched. */
+int cad_set_dims_sphere (cad_design *design, int index, float radius);
+int cad_set_dims_cube (cad_design *design, int index, vector3 half_extensions);
+int cad_set_dims_cylinder (cad_design *design, int index, float radius,
+                           float half_length);
+
 /* Snap every part position to snap_step multiples (axis-wise). A
  * no-op while snap_step is 0; refuses cad_bad_arg for step <= 0
  * through cad_set_snap (below). */

@@ -2024,6 +2024,19 @@ Ledger (new entries get a line, never an edit of a past line):
   71/69, floor raised 70 -> 71 (loud edit in test_runner.py +
   TESTING.md + RELEASE_GATES.md + RELEASE_POLICY.md + readme).
 
+- 2026-11-13 — WP4 4.6a (this commit, model round-out for the window):
+  dims-resize verbs `cad_set_dims_sphere/cube/cylinder` — the scale
+  half of actual CAD editing. The verb must match the part's type
+  (cad_bad_type otherwise), dims finite and strictly positive
+  (cad_bad_dims), write-on-success; pinned inside the existing
+  `cad_editor_model` gate (8b section): mismatched verbs + bad dims +
+  index/NULL refusals with memcmp witnesses, each type resizing
+  through its own verb, and a resize surviving the spec round trip.
+  No floor change (gate 71 extended in place). Toolset ruling for the
+  window recorded: dead code until the connect round; first-cut
+  toolset = add/select/move/rotate/delete/duplicate/array/resize/
+  snap/save/load/rename.
+
 ## §10 Definition of done for v16S (the cut checklist)
 
 All gates green at the final floor; policy amendment committed; release

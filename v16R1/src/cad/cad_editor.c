@@ -270,6 +270,45 @@ int cad_set_mass (cad_design *design, int index, mig_mass_mode mode, float value
     return cad_ok;
 }
 
+/* ---- dims resize: the verb must match the part's type (a sphere is
+ * not resized by the cube verb), dims finite and strictly positive —
+ * the mig_compose rule — and the write lands only on success. */
+
+int cad_set_dims_sphere (cad_design *design, int index, float radius) {
+    if (!design) { return cad_null; }
+    if ((index < 0) || (index >= design -> count)) { return cad_bad_index; }
+    if (design -> parts [index].type != mig_part_sphere) { return cad_bad_type; }
+    if (!isfinite (radius) || (radius <= 0.0f)) { return cad_bad_dims; }
+    design -> parts [index].radius = radius;
+    return cad_ok;
+}
+
+int cad_set_dims_cube (cad_design *design, int index, vector3 half_extensions) {
+    if (!design) { return cad_null; }
+    if ((index < 0) || (index >= design -> count)) { return cad_bad_index; }
+    if (design -> parts [index].type != mig_part_cube) { return cad_bad_type; }
+    if (!cad_finite3 (half_extensions) || (half_extensions.x <= 0.0f) ||
+        (half_extensions.y <= 0.0f) || (half_extensions.z <= 0.0f)) {
+        return cad_bad_dims;
+    }
+    design -> parts [index].half_extensions = half_extensions;
+    return cad_ok;
+}
+
+int cad_set_dims_cylinder (cad_design *design, int index, float radius,
+                           float half_length) {
+    if (!design) { return cad_null; }
+    if ((index < 0) || (index >= design -> count)) { return cad_bad_index; }
+    if (design -> parts [index].type != mig_part_cylinder) { return cad_bad_type; }
+    if (!isfinite (radius) || (radius <= 0.0f) || !isfinite (half_length) ||
+        (half_length <= 0.0f)) {
+        return cad_bad_dims;
+    }
+    design -> parts [index].radius = radius;
+    design -> parts [index].cylinder_half_length = half_length;
+    return cad_ok;
+}
+
 int cad_set_snap (cad_design *design, float snap_step) {
     if (!design) { return cad_null; }
     if (!isfinite (snap_step) || (snap_step < 0.0f)) { return cad_bad_arg; }

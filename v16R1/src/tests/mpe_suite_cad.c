@@ -448,6 +448,44 @@ int mpe_t_cad_editor_model (void) {
     MPE_CHECK (&t, mig_compose (l.parts, l.count, &ldirect) == mig_compose_ok);
     MPE_CHECK_NEAR (&t, lbr.totals.mass, ldirect.mass, 1e-9, "loaded bridge mass == compose");
 
+    /* ---- 8b. dims resize (the window's scale verb) ---------------------
+     * design r: parts [sphere, cube, cylinder]; design c2: two spheres. */
+    MPE_CHECK (&t, cad_set_dims_sphere (&c2, 0, 0.3f) == cad_ok);
+    MPE_CHECK (&t, c2.parts [0].radius == 0.3f);
+    /* a mismatched verb refuses and the design is untouched */
+    cad_design c2ref = c2;
+    MPE_CHECK (&t, cad_set_dims_cube (&c2, 0, (vector3) {0.1f, 0.1f, 0.1f}) == cad_bad_type);
+    MPE_CHECK (&t, cad_set_dims_cylinder (&c2, 0, 0.1f, 0.1f) == cad_bad_type);
+    MPE_CHECK (&t, memcmp (&c2, &c2ref, sizeof (c2)) == 0);
+    /* bad dims refuse write-on-success (sphere verb on c2's sphere;
+     * cube/cylinder verbs need their own types — design r has them) */
+    MPE_CHECK (&t, cad_set_dims_sphere (&c2, 0, 0.0f) == cad_bad_dims);
+    MPE_CHECK (&t, cad_set_dims_sphere (&c2, 0, -1.0f) == cad_bad_dims);
+    MPE_CHECK (&t, cad_set_dims_sphere (&c2, 0, (float) NAN) == cad_bad_dims);
+    cad_design rref = r;
+    MPE_CHECK (&t, cad_set_dims_cube (&r, 1, (vector3) {0.1f, 0.0f, 0.1f}) == cad_bad_dims);
+    MPE_CHECK (&t, cad_set_dims_cube (&r, 1, (vector3) {0.1f, 0.1f, INFINITY}) == cad_bad_dims);
+    MPE_CHECK (&t, cad_set_dims_cylinder (&r, 2, 0.1f, 0.0f) == cad_bad_dims);
+    MPE_CHECK (&t, cad_set_dims_cylinder (&r, 2, (float) NAN, 0.1f) == cad_bad_dims);
+    MPE_CHECK (&t, memcmp (&r, &rref, sizeof (r)) == 0);
+    /* index + NULL refusals */
+    MPE_CHECK (&t, cad_set_dims_sphere (&c2, 5, 0.1f) == cad_bad_index);
+    MPE_CHECK (&t, cad_set_dims_sphere (NULL, 0, 0.1f) == cad_null);
+    /* each type resizes through its own verb */
+    MPE_CHECK (&t, cad_set_dims_cube (&r, 1, (vector3) {0.4f, 0.25f, 0.2f}) == cad_ok);
+    MPE_CHECK (&t, r.parts [1].half_extensions.x == 0.4f && r.parts [1].half_extensions.y == 0.25f &&
+                   r.parts [1].half_extensions.z == 0.2f);
+    MPE_CHECK (&t, cad_set_dims_cylinder (&r, 2, 0.4f, 0.9f) == cad_ok);
+    MPE_CHECK (&t, r.parts [2].radius == 0.4f && r.parts [2].cylinder_half_length == 0.9f);
+    /* and a resize survives the spec round trip (the emit path carries
+     * the resized dims) */
+    MPE_CHECK (&t, cad_save (&r, path) == cad_ok);
+    cad_design l2;
+    int resize_err = -1;
+    MPE_CHECK (&t, cad_load (&l2, path, 16, &resize_err) == cad_ok);
+    MPE_CHECK (&t, l2.parts [1].half_extensions.x == 0.4f && l2.parts [2].radius == 0.4f &&
+                   l2.parts [2].cylinder_half_length == 0.9f);
+
     /* ---- 9. the ASCII plan view ---------------------------------------- */
     char pv [8192];
     char pv2 [8192];
