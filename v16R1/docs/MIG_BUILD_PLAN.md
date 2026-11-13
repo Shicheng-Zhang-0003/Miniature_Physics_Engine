@@ -1817,6 +1817,34 @@ Ledger (new entries get a line, never an edit of a past line):
   hull gate clean; module builds green (mgb, mfs all, FTC pass=5
   fail=0 info-diags=12).
 
+- 2026-11-12 — WP2.6 spawn-verb follow-up (this commit, TUI-only):
+  `touch <hull> [x y z] [s h mass]` — the hull tail is parameterized
+  (omitted = the 2.6.5 defaults s=h=1 m=1, so old invocations spawn
+  the same bodies; icosa takes the edge and ignores h; ell takes
+  equatorial/polar diameters; prism/pyr4/pyr3 base+height). s/h
+  parse-checked in the verb (positive, finite); mass passes through
+  to add_hull whose policy windows print the REAL refusal reason
+  instead of "pool full" (pool-fullness is differentiated first).
+  While smoking the verbs, a shell-world config gap surfaced: the
+  shell bound its world to a SNAPSHOT of g_cfg, so `export
+  composite.hull=1` flipped the registry but never reached the
+  running world — the flag-1 hull path was unreachable from the
+  shell, and the touch refusal's hint named `env composite.hull 1`
+  which only PRINTS. Fixed: the shell world binds `&g_cfg` directly
+  (the shell loads no scene, so there is nothing to isolate — the
+  snapshot/stream and live-inspector paths keep their per-run copies
+  for scenes that tune physics) and the hint now says `export
+  composite.hull=1`. The same smoke produced a false alarm worth
+  recording: an ell (s=4, h=1) spawned at y=2 appeared FROZEN. It was
+  RESTING — the catalog convention places every shape's
+  height/extrusion axis along Z (the 2.6.5 gate pins the lying
+  prism's inradius rest), so the ell's equatorial radius is vertical
+  and COM 2.0 IS the equator-ring rest height for s=4; the SAT and
+  the pair handler were verified clean against an independent brute
+  force first (all offsets separated, agreement exact). No engine
+  change. tui-smoke 9 scenes pass; suite 69/69, quick 83/83
+  unchanged.
+
 ## §10 Definition of done for v16S (the cut checklist)
 
 All gates green at the final floor; policy amendment committed; release

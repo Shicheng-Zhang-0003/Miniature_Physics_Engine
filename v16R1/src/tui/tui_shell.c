@@ -244,26 +244,49 @@ static void cmd_touch (physics_world *w, int argc, char **argv) {
     if (strcmp(kind,"sphere")==0) idx = physics_world_add_sphere(w, 0.5f, 1.0f, pos);
     else if (strcmp(kind,"cube")==0)  idx = physics_world_add_cube(w, (vector3){0.5f,0.5f,0.5f}, pos, 1.0f);
     else if (strcmp(kind,"cyl")==0 || strcmp(kind,"cylinder")==0) idx = physics_world_add_cylinder(w, 0.5f, 0.5f, 1.0f, pos);
-    /* MIG WP2.6 2.6.5: catalog hull shapes. Spawning itself is not
-     * flag-gated, but a flag-0 world makes NO hull contacts (the body
-     * falls through the floor forever), so the verb refuses LOUDLY
-     * instead of quietly spawning a ghost. Fixed exact sizes: prism
-     * s=h=1, pyr4/pyr3 s=h=1, icosa edge a=1, ell equatorial/polar
-     * diameters s=h=1 (spheroid a=c=0.5); mass 1 kg. */
+    /* MIG WP2.6 2.6.5 + 2.6.3: catalog hull shapes. Spawning itself is
+     * not flag-gated, but a flag-0 world makes NO hull contacts (the
+     * body falls through the floor forever), so the verb refuses
+     * LOUDLY instead of quietly spawning a ghost. Parameterized:
+     * touch <kind> [x y z] [s h mass]; omitted tail keeps the 2.6.5
+     * defaults (s=h=1, mass 1 kg) so older invocations spawn the
+     * same bodies. icosa takes s = edge (h unused); ell takes
+     * (s, h) = equatorial/polar diameters (a = b = s/2, c = h/2);
+     * prism/pyr4/pyr3 take the base size s and height h. Policy
+     * windows live in add_hull (mass [1e-4, 1e6], circumradius
+     * [0.01, 100]) — a refusal prints the real reason, not "pool
+     * full". */
     else if (strcmp(kind,"prism")==0 || strcmp(kind,"pyr4")==0 ||
              strcmp(kind,"pyr3")==0 || strcmp(kind,"icosa")==0 ||
              strcmp(kind,"ell")==0 || strcmp(kind,"ellipsoid")==0) {
         if (!w->cfg->composite.hull) {
-            printf ("touch: %s needs composite.hull=1 (contacts are flag-gated; set it: env composite.hull 1)\n", kind);
+            printf ("touch: %s needs composite.hull=1 (contacts are flag-gated; set it: export composite.hull=1)\n", kind);
             return;
         }
         mpe_hull_shape_kind hk = mpe_hull_shape_prism;
-        double s = 1.0, h = 1.0;
+        int icosa = 0;
+        double s = (argc > 5) ? atof(argv[5]) : 1.0;
+        double h = (argc > 6) ? atof(argv[6]) : 1.0;
+        float mass = (argc > 7) ? (float) atof(argv[7]) : 1.0f;
         if (strcmp(kind,"pyr4")==0) { hk = mpe_hull_shape_pyr4; }
         else if (strcmp(kind,"pyr3")==0) { hk = mpe_hull_shape_pyr3; }
-        else if (strcmp(kind,"icosa")==0) { hk = mpe_hull_shape_icosa; s = 1.0; h = 0.0; }
+        else if (strcmp(kind,"icosa")==0) { hk = mpe_hull_shape_icosa; icosa = 1; if (argc <= 6) { h = 0.0; } }
         else if (strcmp(kind,"ell")==0 || strcmp(kind,"ellipsoid")==0) { hk = mpe_hull_shape_ellipsoid; }
-        idx = physics_world_add_hull(w, hk, s, h, 1.0f, pos);
+        if (!(s > 0.0) || (!icosa && !(h > 0.0))) {
+            printf ("touch: %s needs positive s%s (got s=%g h=%g)\n", kind,
+                    icosa ? "" : " and h", s, h);
+            return;
+        }
+        idx = physics_world_add_hull(w, hk, s, h, mass, pos);
+        if (idx < 0) {
+            if (w->body_count >= mpe_max_bodies) {
+                printf ("touch: cannot create object (pool full)\n");
+            } else {
+                printf ("touch: add_hull refused (s=%g h=%g mass=%g; needs s,h>0, mass in [1e-4,1e6], circumradius in [0.01,100])\n",
+                        s, h, (double) mass);
+            }
+            return;
+        }
     }
     else { printf ("touch: unknown kind '%s' (sphere|cube|cyl|prism|pyr4|pyr3|icosa|ell)\n", kind); return; }
     if (idx < 0) { printf ("touch: cannot create object (pool full)\n"); return; }
@@ -990,7 +1013,7 @@ static shell_cmd g_cmds[] = {
     {"ls","ls [path]","list /obj /joint /world /camera /spawner",cmd_ls},
     {"ll","ll [path]","long listing",cmd_ll},
     {"cat","cat <path>","inspect object/world/camera/spawner",cmd_cat},
-    {"touch","touch <sphere|cube|cyl|prism|pyr4|pyr3|icosa|ell> [x y z]","spawn an object (hulls need composite.hull=1)",cmd_touch},
+    {"touch","touch <sphere|cube|cyl|prism|pyr4|pyr3|icosa|ell> [x y z] [s h mass]","spawn an object (hulls need composite.hull=1; size/mass tail is hull-only, omitted = s=h=1 m=1)",cmd_touch},
     {"ps","ps","object table",cmd_ps},
     {"stat","stat <obj>","detailed object info",cmd_stat},
     {"w","w","camera state",cmd_w},
@@ -1070,8 +1093,13 @@ int tui_shell_run (int argc, char **argv) {
     mpe_config_init();
     physics_world world;
     physics_world_init (&world);
-    mpe_config_t sc = g_cfg;
-    physics_world_set_config(&world, &sc);
+    /* Bound to the GLOBAL config (no snapshot copy): the shell loads no
+     * scene, so there is nothing to isolate — and 'export' must reach
+     * the running world, because 'export composite.hull=1' before
+     * `touch <hull>` is the documented flag path (the snapshot/stream
+     * and live-inspector paths keep their per-run copies for scenes
+     * that tune physics). */
+    physics_world_set_config(&world, &g_cfg);
     mpe_register_builtins();
     mpe_register_ecosystems();
     printf ("MPE headless shell (engine without a display). Type 'help'.\n");
