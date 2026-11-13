@@ -1,5 +1,9 @@
 #include "../mpe_engine.h"
 #include "object_spawner.h"
+/* MIG WP2.6 2.6.6a: hull-spawn refusals (flag-0 + window/pool). The
+ * event log is terminal-only, so the GUI HUD carries this count —
+ * non-zero means Enter fired a hull type and nothing spawned. */
+unsigned long spawner_hull_refusal_count = 0;
 static vector3 get_viewpoint_velocity (void) {
     vector3 player_velocity = vector3_zero ();
     if (!main_inputs.is_debug_mode_active) {
@@ -60,6 +64,16 @@ void spawner_launch_hull (mpe_hull_shape_kind kind, const char *name, float laun
     if (!g_cfg.composite.hull) {
         event_log_push (2, "spawn refused: %s needs composite.hull=1 (contacts are flag-gated; set it in the config menu)",
                         name);
+        /* MIG WP2.6 2.6.6a: the event log is terminal-only — a GUI user
+         * would see nothing. One-time stderr note (the renderer's
+         * hull-skip note precedent) + the always-on HUD counter. */
+        spawner_hull_refusal_count++;
+        static bool flag_note_shown = false;
+        if (!flag_note_shown) {
+            flag_note_shown = true;
+            fprintf (stderr, "[spawner] hull spawn refused: composite.hull=0 — set it in the config menu "
+                             "(the HUD HullRef count is running)\n");
+        }
         return;
     }
     physics_world *world = physics_world_get_primary ();
@@ -72,6 +86,13 @@ void spawner_launch_hull (mpe_hull_shape_kind kind, const char *name, float laun
     if (newly_spawned_object_index < 0) {
         event_log_push (2, "spawn refused: %s outside add_hull windows (mass [1e-4,1e6], circumradius [0.01,100]) or pool full",
                         name);
+        spawner_hull_refusal_count++;
+        static bool window_note_shown = false;
+        if (!window_note_shown) {
+            window_note_shown = true;
+            fprintf (stderr, "[spawner] hull spawn refused: outside add_hull windows or pool full "
+                             "(the HUD HullRef count is running)\n");
+        }
         return;
     }
     rigidbody *rigid_body = &world -> bodies [newly_spawned_object_index];

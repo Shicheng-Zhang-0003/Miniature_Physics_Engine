@@ -39,6 +39,13 @@ static void overlay_append_overflow_text (char *buffer, size_t buffer_size) {
         if (l < buffer_size)
             snprintf (buffer + l, buffer_size - l, " | Manifold overflow:%d", debug_last_manifold_overflow_count);
     }
+    /* MIG WP2.6 2.6.6a: hull-spawn refusals are invisible to a GUI user
+     * (the event log is terminal-only), so the HUD carries the count. */
+    if (spawner_hull_refusal_count > 0) {
+        size_t l = strlen (buffer);
+        if (l < buffer_size)
+            snprintf (buffer + l, buffer_size - l, " | HullRef:%lu", spawner_hull_refusal_count);
+    }
     if ((node_overflow_count > 0) || (pair_overflow_count > 0)) {
         size_t l = strlen (buffer);
         if (l < buffer_size)

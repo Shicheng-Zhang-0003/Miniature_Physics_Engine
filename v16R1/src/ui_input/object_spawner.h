@@ -17,4 +17,8 @@ void spawner_launch_hull (mpe_hull_shape_kind kind, const char *name, float laun
  * cylinder, prism, pyr4, pyr3, icosa, ell) — the one call both the hold
  * and repeat sites make. */
 void spawner_launch_current_type (void);
+/* MIG WP2.6 2.6.6a: hull-spawn refusal counter (flag-0 + window/pool
+ * refusals). The event log is terminal-only, so the GUI HUD surfaces
+ * this count. Lifetime counter, never reset. */
+extern unsigned long spawner_hull_refusal_count;
 #endif
