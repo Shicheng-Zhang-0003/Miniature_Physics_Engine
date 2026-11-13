@@ -12,6 +12,7 @@
 #include "sphere_meshing.h"
 #include "cube_meshing.h"
 #include "cylinder_meshing.h"
+#include "hull_meshing.h" /* MIG WP2.6 2.6.6: catalog unit meshes */
 #include "grid.h"
 #include "traj_line.h"
 #include "trail.h"
@@ -63,10 +64,13 @@ static traj_line_mesh main_traj;
 static float *sphere_instances = NULL;
 static float *cube_instances = NULL;
 static float *cylinder_instances = NULL;
-/* MIG WP2.6 2.6.5: hull bodies are skipped in the draw loop (no instanced
- * hull mesh yet); the skip is counted, not silent. */
-static unsigned long g_render_hull_skip_count = 0;
-static bool g_render_hull_skip_reported = false;
+/* MIG WP2.6 2.6.6: hull instance buffers (one per catalog kind — the
+ * draw loop packs per-kind, then each mesh draws its own count). */
+static float *prism_instances = NULL;
+static float *pyr4_instances = NULL;
+static float *pyr3_instances = NULL;
+static float *icosa_instances = NULL;
+static float *ell_instances = NULL;
 /* MIG WP4 4.4: COM marker cross (cyan, 3 axis-aligned lines at the edited
  * spec's COM). Static VAO/VBO initialized on first use. */
 static GLuint com_cross_vao = 0;
@@ -119,6 +123,31 @@ static int render_pack_composite_part (float *target_array, int *target_count, c
     target_array [idx + 18] = body_colour -> z;
     (*target_count)++;
     return 1;
+}
+/* MIG WP2.6 2.6.6: pack ONE hull instance — same T*R*S composition and
+ * 19-float layout as every instanced path; the caller picks the
+ * per-kind target array and the catalog (s, s, h) scale (icosa uses
+ * (s, s, s): its edge is s and h is unused). */
+static void render_pack_hull (float *target_array, int *target_count, const rigidbody *rigid_body,
+                              vector3 scale) {
+    if ((*target_count) >= mpe_max_bodies) { return; }
+    math4 rotation_matrix = vector4_to_math4 (rigid_body -> orientation);
+    float scale_comp [3] = {scale.x, scale.y, scale.z};
+    math4 model_matrix = {{{0}}};
+    for (int mc = 0; mc < 3; mc++) {
+        for (int mr = 0; mr < 3; mr++) {
+            model_matrix.matrix [mc][mr] = rotation_matrix.matrix [mc][mr] * scale_comp [mc];
+        } model_matrix.matrix [mc][3] = 0.0f;
+        model_matrix.matrix [3][mc] = (mc == 0) ? rigid_body -> position.x
+        : (mc == 1) ? rigid_body -> position.y
+        : rigid_body -> position.z;
+    } model_matrix.matrix [3][3] = 1.0f;
+    int idx = (*target_count) * 19;
+    math4_to_flat_array (model_matrix, &target_array [idx]);
+    target_array [idx + 16] = rigid_body -> colour.x;
+    target_array [idx + 17] = rigid_body -> colour.y;
+    target_array [idx + 18] = rigid_body -> colour.z;
+    (*target_count)++;
 }
 static void render_delete_gl_objects (void);
 void render_cleanup (void);
@@ -204,10 +233,18 @@ void render_init () {
     init_sm_system (&sphere_mesh, 32, 32);
     cube_meshing_init ();
     init_cylinder_system (&cylinder_mesh, 24);
+    hull_meshing_init (); /* MIG WP2.6 2.6.6: five catalog unit meshes. */
     sphere_instances = malloc (mpe_max_bodies * 19 * sizeof (float));
     cube_instances = malloc (mpe_max_bodies * 19 * sizeof (float));
     cylinder_instances = malloc (mpe_max_bodies * 19 * sizeof (float));
-    if (!sphere_instances || !cube_instances || !cylinder_instances) {
+    prism_instances = malloc (mpe_max_bodies * 19 * sizeof (float));
+    pyr4_instances = malloc (mpe_max_bodies * 19 * sizeof (float));
+    pyr3_instances = malloc (mpe_max_bodies * 19 * sizeof (float));
+    icosa_instances = malloc (mpe_max_bodies * 19 * sizeof (float));
+    ell_instances = malloc (mpe_max_bodies * 19 * sizeof (float));
+    if (!sphere_instances || !cube_instances || !cylinder_instances ||
+        !prism_instances || !pyr4_instances || !pyr3_instances || !icosa_instances ||
+        !ell_instances) {
         fprintf (stderr, "RENDER INIT FAILED: instance buffer OOM\n");
         free (sphere_instances);
         sphere_instances = NULL;
@@ -215,6 +252,16 @@ void render_init () {
         cube_instances = NULL;
         free (cylinder_instances);
         cylinder_instances = NULL;
+        free (prism_instances);
+        prism_instances = NULL;
+        free (pyr4_instances);
+        pyr4_instances = NULL;
+        free (pyr3_instances);
+        pyr3_instances = NULL;
+        free (icosa_instances);
+        icosa_instances = NULL;
+        free (ell_instances);
+        ell_instances = NULL;
         render_delete_gl_objects ();
         render_init_status = render_failed;
         return;
@@ -260,6 +307,11 @@ static void render_delete_gl_objects (void) {
     } render_delete_mesh (&sphere_mesh);
     render_delete_mesh (&cube_mesh);
     render_delete_mesh (&cylinder_mesh);
+    render_delete_mesh (&prism_mesh); /* MIG WP2.6 2.6.6 */
+    render_delete_mesh (&pyr4_mesh);
+    render_delete_mesh (&pyr3_mesh);
+    render_delete_mesh (&icosa_mesh);
+    render_delete_mesh (&ell_mesh);
     if (main_grid.vertex_array_object) {
         glDeleteVertexArrays (1, &main_grid.vertex_array_object);
         main_grid.vertex_array_object = 0;
@@ -293,6 +345,26 @@ void render_cleanup (void) {
     if (cylinder_instances) {
         free (cylinder_instances);
         cylinder_instances = NULL;
+    }
+    if (prism_instances) {
+        free (prism_instances);
+        prism_instances = NULL;
+    }
+    if (pyr4_instances) {
+        free (pyr4_instances);
+        pyr4_instances = NULL;
+    }
+    if (pyr3_instances) {
+        free (pyr3_instances);
+        pyr3_instances = NULL;
+    }
+    if (icosa_instances) {
+        free (icosa_instances);
+        icosa_instances = NULL;
+    }
+    if (ell_instances) {
+        free (ell_instances);
+        ell_instances = NULL;
     } render_init_status = render_uninitialized;
 } /* Primary-world-only renderer: draws physics_world_get_primary().
  * TODO(world-param): take an explicit physics_world* so headless/secondary
@@ -356,6 +428,11 @@ void render_scene_current (int widget_width, int widget_height) {
     int sphere_inst_count = 0;
     int cube_inst_count = 0;
     int cylinder_inst_count = 0;
+    int prism_inst_count = 0; /* MIG WP2.6 2.6.6 */
+    int pyr4_inst_count = 0;
+    int pyr3_inst_count = 0;
+    int icosa_inst_count = 0;
+    int ell_inst_count = 0;
     int dropped_instances = 0; /* MIG WP2 2.7: per-frame part-drop count. */
     for (int object_index = 0; object_index < (physics_world_get_primary () -> body_count); object_index++) {
         rigidbody *rigid_body = &(physics_world_get_primary () -> bodies) [object_index];
@@ -370,20 +447,6 @@ void render_scene_current (int widget_width, int widget_height) {
             fprintf (stderr, "[render] WARNING: skipping non-finite body %d\n", object_index);
             continue;
         }
-        /* MIG WP2.6 2.6.5: a hull body has no instanced mesh yet — draw
-         * NOTHING rather than falling into the default-else cube branch
-         * (a hull's zero half_extensions would draw a garbage box at the
-         * body origin). Counted loudly; the solid/wireframe mesh brick
-         * replaces this skip. */
-        if (rigid_body -> type == object_hull) {
-            g_render_hull_skip_count++;
-            if (!g_render_hull_skip_reported) {
-                g_render_hull_skip_reported = true;
-                fprintf (stderr, "[render] object_hull bodies are not drawn yet (counted; %d so far this frame)\n",
-                         object_index);
-            }
-            continue;
-        }
         /* Sphere-vs-frustum: culled only when fully outside one plane. */
         {
             float bound = broadphase_bounding_radius (rigid_body);
@@ -391,6 +454,28 @@ void render_scene_current (int widget_width, int widget_height) {
                                                rigid_body -> position.z, bound)) {
                 continue;
             }
+        }
+        /* MIG WP2.6 2.6.6: a hull body draws from its catalog unit mesh
+         * (hull_meshing.c — built from the same mig_hull builders the
+         * collision pools use, COM-frame at unit s=h=1). The stamped
+         * (kind, s, h) scale it: stored verts == unit verts · (s, s, h)
+         * exactly (the 2.6.6 gate pins the affine identity), so the
+         * drawn surface IS the collision surface. Per-kind instance
+         * arrays; the icosahedron's edge is s and h is unused. Kind 0
+         * IS the prism, so the default case is the prism too. */
+        if (rigid_body -> type == object_hull) {
+            float *target_array;
+            int *target_count;
+            float sx = rigid_body -> hull_size_s, sz = rigid_body -> hull_size_h;
+            switch (rigid_body -> hull_kind) {
+                case 1: target_array = pyr4_instances; target_count = &pyr4_inst_count; break;
+                case 2: target_array = pyr3_instances; target_count = &pyr3_inst_count; break;
+                case 3: target_array = icosa_instances; target_count = &icosa_inst_count; sz = sx; break;
+                case 4: target_array = ell_instances; target_count = &ell_inst_count; break;
+                default: target_array = prism_instances; target_count = &prism_inst_count; break;
+            }
+            render_pack_hull (target_array, target_count, rigid_body, (vector3) {sx, sx, sz});
+            continue;
         }
         /* MIG WP2 2.7: a composite draws per PART — the sphere-backed
          * covering body (radius = authored bound) is a physics envelope,
@@ -504,6 +589,38 @@ void render_scene_current (int widget_width, int widget_height) {
         glBufferSubData (GL_ARRAY_BUFFER, 0, cylinder_inst_count * 19 * sizeof (float), cylinder_instances);
         glBindVertexArray (cylinder_mesh.vertex_array_object);
         glDrawElementsInstanced (GL_TRIANGLES, cylinder_mesh.index_count, GL_UNSIGNED_INT, 0, cylinder_inst_count);
+    }
+    /* MIG WP2.6 2.6.6: the five catalog hull meshes, guarded on both the
+     * frame's instance count and the mesh actually building at init. */
+    if (prism_inst_count > 0 && prism_mesh.index_count > 0) {
+        glBindBuffer (GL_ARRAY_BUFFER, prism_mesh.instance_vbo);
+        glBufferSubData (GL_ARRAY_BUFFER, 0, prism_inst_count * 19 * sizeof (float), prism_instances);
+        glBindVertexArray (prism_mesh.vertex_array_object);
+        glDrawElementsInstanced (GL_TRIANGLES, prism_mesh.index_count, GL_UNSIGNED_INT, 0, prism_inst_count);
+    }
+    if (pyr4_inst_count > 0 && pyr4_mesh.index_count > 0) {
+        glBindBuffer (GL_ARRAY_BUFFER, pyr4_mesh.instance_vbo);
+        glBufferSubData (GL_ARRAY_BUFFER, 0, pyr4_inst_count * 19 * sizeof (float), pyr4_instances);
+        glBindVertexArray (pyr4_mesh.vertex_array_object);
+        glDrawElementsInstanced (GL_TRIANGLES, pyr4_mesh.index_count, GL_UNSIGNED_INT, 0, pyr4_inst_count);
+    }
+    if (pyr3_inst_count > 0 && pyr3_mesh.index_count > 0) {
+        glBindBuffer (GL_ARRAY_BUFFER, pyr3_mesh.instance_vbo);
+        glBufferSubData (GL_ARRAY_BUFFER, 0, pyr3_inst_count * 19 * sizeof (float), pyr3_instances);
+        glBindVertexArray (pyr3_mesh.vertex_array_object);
+        glDrawElementsInstanced (GL_TRIANGLES, pyr3_mesh.index_count, GL_UNSIGNED_INT, 0, pyr3_inst_count);
+    }
+    if (icosa_inst_count > 0 && icosa_mesh.index_count > 0) {
+        glBindBuffer (GL_ARRAY_BUFFER, icosa_mesh.instance_vbo);
+        glBufferSubData (GL_ARRAY_BUFFER, 0, icosa_inst_count * 19 * sizeof (float), icosa_instances);
+        glBindVertexArray (icosa_mesh.vertex_array_object);
+        glDrawElementsInstanced (GL_TRIANGLES, icosa_mesh.index_count, GL_UNSIGNED_INT, 0, icosa_inst_count);
+    }
+    if (ell_inst_count > 0 && ell_mesh.index_count > 0) {
+        glBindBuffer (GL_ARRAY_BUFFER, ell_mesh.instance_vbo);
+        glBufferSubData (GL_ARRAY_BUFFER, 0, ell_inst_count * 19 * sizeof (float), ell_instances);
+        glBindVertexArray (ell_mesh.vertex_array_object);
+        glDrawElementsInstanced (GL_TRIANGLES, ell_mesh.index_count, GL_UNSIGNED_INT, 0, ell_inst_count);
     } glBindVertexArray (0);
     spring_joint_render (utility_shader_program, view_matrix, projection_matrix);
     /* SANDBOX S3: the selected object's motion trail — cyan polyline of

@@ -1994,6 +1994,11 @@ int physics_world_add_hull (physics_world *world, mpe_hull_shape_kind kind,
     rb -> hull_vert_count = set.count;
     rb -> hull_face_base = fbase;
     rb -> hull_face_count = nf;
+    /* MIG WP2.6 2.6.6: renderer unit-mesh stamps — display-only, the
+     * collision truth stays in the pool slices. */
+    rb -> hull_kind = (int) kind;
+    rb -> hull_size_s = (float) s;
+    rb -> hull_size_h = (float) h;
     if (world -> next_object_id == 0 || world -> next_object_id == 0xFFFFFFFFu) { world -> next_object_id = 1; }
     rb -> object_id = world -> next_object_id++;
     if (world -> next_object_id == 0 || world -> next_object_id == 0xFFFFFFFFu) { world -> next_object_id = 1; }

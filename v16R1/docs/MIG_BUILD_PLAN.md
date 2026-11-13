@@ -1880,6 +1880,65 @@ Ledger (new entries get a line, never an edit of a past line):
   69/69; quick 83/83 (all 5 regimes); tui-smoke pass; make
   everything green.
 
+- 2026-11-12 — WP2.6 2.6.6a (this commit, GUI-only): hull-spawn
+  refusals made VISIBLE to GUI users. The event log is terminal-only
+  (only term_admin's dmesg reads it), so a flag-0 or window-refused
+  hull spawn was completely silent on screen — Enter fired, nothing
+  happened, no hint anywhere (the exact "I can't spawn them" report).
+  Both refusal paths in spawner_launch_hull now bump a lifetime
+  counter (spawner_hull_refusal_count) that the HUD stats line shows
+  as ` | HullRef:N`, plus a one-time stderr note per reason (the
+  renderer's one-time note precedent) for terminal-launched sessions.
+
+- 2026-11-12 — WP2.6 FTC-fix (this commit, one line, MFS test
+  harness): mfs_drive_and_measure called physics_world_step (&w, DT)
+  — the address of the POINTER PARAMETER, not the world (the
+  settle_ticks helper below always had it right; every other &x call
+  site in the tree addresses a world OBJECT). The step then read
+  stack garbage as a physics_world: the guards sometimes passed,
+  mpe_parallel_sanitize walked wild memory (the INPUT CLAMPED spam
+  with denormal garbage masses — 3.3e-41 is uninitialised float), and
+  the stack stomp segfaulted layout-dependently — `mfs_suite --all`
+  crashed 3/3 bare runs (exit 139) while gdb ran 37/37 clean, and
+  composite_ab was VACUOUSLY passing: its world never stepped, both
+  robots "moved" 0 m, and equal zeros sit inside any band. Found by
+  rebuilding the battery with ASan: stack-use-after-return at
+  physics_world.c:2497 (the bodies guard) from mfs_t_composite_ab.
+  One-character fix. composite_ab now measures REAL motion and still
+  passes its bands — the A/B gate finally tests the thing it says it
+  tests. FTC battery pass=5 fail=0; ASan clean (0 reports).
+
+- 2026-11-12 — WP2.6 2.6.6 (this commit, GUI + one core append): hull
+  bodies RENDER. The 2.6.5 stopgap (draw-loop skip + counter + one-time
+  stderr note) is replaced by five per-kind instanced unit meshes:
+  render/hull_meshing.c builds prism/pyr4/pyr3 at s=h=1, the
+  icosahedron at edge 1, and the ell at semi-axes 0.5 (unit diameters)
+  from the SAME mig_hull builders the collision pools use, rebased to
+  the COM frame exactly like add_hull's rebase — affine covariance
+  does the rest: stored verts == unit verts · (s, s, h), so a body's
+  T*R*S with its stamped sizes lands the drawn surface on the
+  collision surface (the ell draws its exact 12×8 collision
+  polyhedron, NOT a fine sphere that would poke through the hull's
+  facets). Enabler: rigidbody gained hull_kind/hull_size_s/hull_size_h
+  (append-only, zeroed at all three initializer sites — the
+  determinism lesson), stamped by add_hull; collision never reads
+  them, the pool slices stay the truth. The draw loop packs hulls
+  per-kind (icosa scales (s, s, s) — its edge is s and h is unused)
+  into five new instance buffers with the standard 19-float layout;
+  hulls now flow through the same frustum cull (radius IS the
+  circumradius). Wireframe mode draws each catalog mesh's unique
+  undirected edge set (the polyhedra are all-crease shapes so that is
+  the natural edge wire; the coarse 12×8 ell draws its geodesic wire)
+  instead of collapsing into the zero-half-extensions cube default.
+  Gate 70 `mig_hull_render_stamp` (blocking) pins BOTH halves of the
+  contract engine-side, no GL needed: (1) the affine identity — unit
+  COM-frame verts · (s, s, h) == stored COM-frame verts exactly, 5
+  kinds × s∈{1, 2, 3.5} × h∈{1, 0.5, 4}; (2) add_hull stamps kind +
+  (s, h) on all five kinds with the slices untouched. Suite 70/70,
+  quick 84/84 (5 regimes), tui-smoke pass, mgb/mfs green, FTC 5/5
+  (post-FTC-fix), ASan clean on the FTC battery, make everything
+  green. Scene save still vetoes hulls (SVF06 — unchanged).
+
 ## §10 Definition of done for v16S (the cut checklist)
 
 All gates green at the final floor; policy amendment committed; release

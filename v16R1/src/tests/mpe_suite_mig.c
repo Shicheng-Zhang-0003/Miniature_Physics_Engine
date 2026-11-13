@@ -4746,3 +4746,126 @@ int mpe_t_mig_hull_ellipsoid (void) {
     mpe_test_end (&t);
     return t.failures;
 }
+
+/* ---- MIG WP2.6 2.6.6: the renderer unit-mesh contract (70th) ----
+ * The GUI renderer draws hull bodies from per-kind UNIT meshes built
+ * from the same mig_hull builders (COM-frame at s=h=1; the ell at
+ * semi-axes 0.5 = unit diameters), scaled by the body's stamped
+ * (hull_kind, hull_size_s, hull_size_h). This gate pins BOTH halves of
+ * that contract, engine-side, no GL needed:
+ *   1. the affine identity the scale relies on — stored COM-frame
+ *      verts == unit COM-frame verts · (s, s, h) exactly (double
+ *      math end to end, so ~1e-15; tolerance is contract-grade); and
+ *   2. add_hull stamps the three renderer fields (kind + (s, h)
+ *      roundtrip) without touching the pool-slice truth. */
+int mpe_t_mig_hull_render_stamp (void) {
+    mpe_test_t t;
+    mpe_test_begin (&t, "mig_hull_render_stamp");
+    mpe_clamp_counters_reset ();
+    /* ---- 1. Affine covariance of the COM-frame unit build ---- */
+    {
+        mig_hull_point ub [MIG_HULL_MAX_VERTS], sb [MIG_HULL_MAX_VERTS];
+        mig_hull_point_set us, ss;
+        mig_hull_mass up, sp;
+        struct {
+            mpe_hull_shape_kind kind;
+            mig_hull_err (*build2) (double, double, mig_hull_point_set *); /* (s, h) builders */
+            mig_hull_err (*build1) (double, mig_hull_point_set *);         /* icosa */
+            mig_hull_err (*build3) (double, double, double, mig_hull_point_set *); /* ell */
+            const int *faces;
+            int nf;
+        } shapes [5] = {
+            { mpe_hull_shape_prism, mig_hull_build_prism_equilateral, NULL, NULL,
+              mig_hull_prism_faces, MIG_HULL_PRISM_FACES },
+            { mpe_hull_shape_pyr4, mig_hull_build_pyr4_square, NULL, NULL,
+              mig_hull_pyr4_faces, MIG_HULL_PYR4_FACES },
+            { mpe_hull_shape_pyr3, mig_hull_build_pyr3_equilateral, NULL, NULL,
+              mig_hull_pyr3_faces, MIG_HULL_PYR3_FACES },
+            { mpe_hull_shape_icosa, NULL, mig_hull_build_icosahedron, NULL,
+              mig_hull_icosahedron_faces, MIG_HULL_ICOSA_FACES },
+            { mpe_hull_shape_ellipsoid, NULL, NULL, mig_hull_build_ellipsoid,
+              mig_hull_ell_faces, MIG_HULL_ELL_FACES },
+        };
+        const double s_list [3] = {1.0, 2.0, 3.5};
+        const double h_list [3] = {1.0, 0.5, 4.0};
+        for (int k = 0; k < 5; k++) {
+            /* Unit build: s=h=1 (ell: semi-axes 0.5 = unit diameters). */
+            MPE_CHECK (&t, mig_hull_point_set_init (&us, ub, MIG_HULL_MAX_VERTS) == mig_hull_ok);
+            if (shapes [k].build2) {
+                MPE_CHECK (&t, shapes [k].build2 (1.0, 1.0, &us) == mig_hull_ok);
+            } else if (shapes [k].build1) {
+                MPE_CHECK (&t, shapes [k].build1 (1.0, &us) == mig_hull_ok);
+            } else {
+                MPE_CHECK (&t, shapes [k].build3 (0.5, 0.5, 0.5, &us) == mig_hull_ok);
+            }
+            MPE_CHECK (&t, mig_hull_mesh_props (us.points, us.count, shapes [k].faces, shapes [k].nf,
+                                                1.0, &up) == mig_hull_ok);
+            for (int c = 0; c < 3; c++) {
+                const double s = s_list [c], h = h_list [c];
+                MPE_CHECK (&t, mig_hull_point_set_init (&ss, sb, MIG_HULL_MAX_VERTS) == mig_hull_ok);
+                if (shapes [k].build2) {
+                    MPE_CHECK (&t, shapes [k].build2 (s, h, &ss) == mig_hull_ok);
+                } else if (shapes [k].build1) {
+                    MPE_CHECK (&t, shapes [k].build1 (s, &ss) == mig_hull_ok);
+                } else {
+                    /* add_hull's exact call: semi-axes = diameters/2. */
+                    MPE_CHECK (&t, shapes [k].build3 (s / 2.0, s / 2.0, h / 2.0, &ss) == mig_hull_ok);
+                }
+                MPE_CHECK (&t, mig_hull_mesh_props (ss.points, ss.count, shapes [k].faces,
+                                                    shapes [k].nf, 1.0, &sp) == mig_hull_ok);
+                MPE_CHECK (&t, us.count == ss.count); /* same catalog shape */
+                /* The renderer's scale: (s, s, h); icosa's edge is s and
+                 * h is unused, so its effective z-scale is s. */
+                const double eff [3] = {s, s, shapes [k].build1 ? s : h};
+                for (int i = 0; i < us.count; i++) {
+                    const double uxyz [3] = {us.points [i].x - up.com [0],
+                                             us.points [i].y - up.com [1],
+                                             us.points [i].z - up.com [2]};
+                    const double sxyz [3] = {ss.points [i].x - sp.com [0],
+                                             ss.points [i].y - sp.com [1],
+                                             ss.points [i].z - sp.com [2]};
+                    for (int ax = 0; ax < 3; ax++) {
+                        MPE_CHECK_NEAR (&t, sxyz [ax], uxyz [ax] * eff [ax],
+                                        1e-9 * (1.0 + eff [ax]), "stored == unit · scale");
+                    }
+                }
+            }
+        }
+    }
+    /* ---- 2. add_hull stamps the renderer fields ---- */
+    {
+        physics_world w7;
+        mpe_world_begin (&w7);
+        mpe_config_t c7 = g_cfg;
+        c7.composite.hull = 0; /* spawning is NOT flag-gated */
+        physics_world_set_config (&w7, &c7);
+        const struct { mpe_hull_shape_kind kind; double s, h; } spawns [5] = {
+            { mpe_hull_shape_prism, 2.0, 3.0 },
+            { mpe_hull_shape_pyr4, 2.0, 3.0 },
+            { mpe_hull_shape_pyr3, 2.0, 3.0 },
+            { mpe_hull_shape_icosa, 2.0, 3.0 },
+            { mpe_hull_shape_ellipsoid, 2.0, 3.0 },
+        };
+        for (int k = 0; k < 5; k++) {
+            const int idx = physics_world_add_hull (&w7, spawns [k].kind, spawns [k].s, spawns [k].h,
+                                                    1.0f, (vector3) {(float) k, 2.0f, 0.0f});
+            MPE_CHECK (&t, idx >= 0);
+            MPE_CHECK (&t, w7.bodies [idx].type == object_hull);
+            MPE_CHECK (&t, w7.bodies [idx].hull_kind == (int) spawns [k].kind);
+            MPE_CHECK_NEAR (&t, w7.bodies [idx].hull_size_s, (float) spawns [k].s, 1e-5f,
+                            "hull_size_s stamp");
+            MPE_CHECK_NEAR (&t, w7.bodies [idx].hull_size_h, (float) spawns [k].h, 1e-5f,
+                            "hull_size_h stamp");
+            MPE_CHECK (&t, w7.bodies [idx].hull_vert_count > 0); /* slices untouched */
+        }
+        physics_world_cleanup (&w7);
+    }
+    if (t.failures == 0) {
+        printf ("[PASS] mig WP2.6 2.6.6: render stamp — unit COM-frame covariance + add_hull kind/size stamps\n");
+        MPE_INFO ("unit (s=h=1; ell a=b=c=0.5) COM-frame verts · (s, s, h) == stored COM-frame verts"
+                  " exactly (5 kinds × s∈{1, 2, 3.5} × h∈{1, 0.5, 4}); add_hull stamps hull_kind/"
+                  "hull_size_s/hull_size_h on all five kinds (slices untouched, spawn ungated)");
+    }
+    mpe_test_end (&t);
+    return t.failures;
+}

@@ -609,6 +609,12 @@ void rigidbody_initialisation_sphere (rigidbody *rigid_body, float radius, float
     rigid_body -> hull_vert_count = 0;
     rigid_body -> hull_face_base = 0;
     rigid_body -> hull_face_count = 0;
+    /* WP2.6 2.6.6: renderer unit-mesh stamps zeroed with the slices
+     * (the determinism lesson: heap garbage in foreign fields made
+     * twin worlds diverge). */
+    rigid_body -> hull_kind = 0;
+    rigid_body -> hull_size_s = 0.0f;
+    rigid_body -> hull_size_h = 0.0f;
     rigid_body -> ext_force_this_tick = 0;
     rigid_body -> no_collide = false;
     /* DETERMINISM: the body pool is malloc'd, so this _Bool would otherwise
@@ -1200,6 +1206,12 @@ void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_inpu
     rigid_body -> hull_vert_count = 0;
     rigid_body -> hull_face_base = 0;
     rigid_body -> hull_face_count = 0;
+    /* WP2.6 2.6.6: renderer unit-mesh stamps zeroed with the slices
+     * (the determinism lesson: heap garbage in foreign fields made
+     * twin worlds diverge). */
+    rigid_body -> hull_kind = 0;
+    rigid_body -> hull_size_s = 0.0f;
+    rigid_body -> hull_size_h = 0.0f;
     rigid_body -> ext_force_this_tick = 0;
     rigid_body -> no_collide = false;
     /* DETERMINISM: the body pool is malloc'd, so this _Bool would otherwise
@@ -1446,6 +1458,12 @@ void rigidbody_initialisation_cylinder (rigidbody *rigid_body, float radius, flo
     rigid_body -> hull_vert_count = 0;
     rigid_body -> hull_face_base = 0;
     rigid_body -> hull_face_count = 0;
+    /* WP2.6 2.6.6: renderer unit-mesh stamps zeroed with the slices
+     * (the determinism lesson: heap garbage in foreign fields made
+     * twin worlds diverge). */
+    rigid_body -> hull_kind = 0;
+    rigid_body -> hull_size_s = 0.0f;
+    rigid_body -> hull_size_h = 0.0f;
     rigid_body -> ext_force_this_tick = 0;
     rigid_body -> no_collide = false;
     /* DETERMINISM: the body pool is malloc'd, so this _Bool would otherwise

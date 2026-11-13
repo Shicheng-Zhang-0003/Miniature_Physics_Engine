@@ -130,6 +130,7 @@ int mpe_t_mig_hull_shape_catalog (void);
 int mpe_t_mig_hull_sat_hulls (void);
 int mpe_t_mig_hull_spawn (void);
 int mpe_t_mig_hull_ellipsoid (void);
+int mpe_t_mig_hull_render_stamp (void);
 typedef struct {
     const char *name;
     int (*fn) (void);
@@ -295,6 +296,10 @@ static const mpe_entry_t mpe_registry [] = {
      * rest/bounce and hull-hull oracles. */
     {"mig_hull_spawn", mpe_t_mig_hull_spawn, 0},
     {"mig_hull_ellipsoid", mpe_t_mig_hull_ellipsoid, 0},
+    /* MIG WP2.6 2.6.6: the renderer unit-mesh contract — unit COM-frame
+     * builds scale onto the stored collision verts exactly, and add_hull
+     * stamps (kind, s, h) for the renderer's per-kind unit mesh. */
+    {"mig_hull_render_stamp", mpe_t_mig_hull_render_stamp, 0},
 };
 #define MPE_NTESTS ((int) (sizeof (mpe_registry) / sizeof (mpe_registry [0])))
 /* Returns 0 pass, 1 fail, 2 skipped.

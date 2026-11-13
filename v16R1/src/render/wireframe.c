@@ -8,6 +8,7 @@
 #include "sphere_meshing.h"
 #include "cube_meshing.h"
 #include "cylinder_meshing.h"
+#include "hull_meshing.h" /* MIG WP2.6 2.6.6: catalog unit meshes */
 #include <epoxy/gl.h>
 #include <math.h>
 extern camera main_camera_fov;
@@ -15,6 +16,22 @@ extern int selected_object;
 extern mesh sphere_mesh;
 extern mesh cube_mesh;
 extern mesh cylinder_mesh;
+/* MIG WP2.6 2.6.6: the hull kind's catalog unit mesh (NULL when the
+ * mesh failed to build at init); *scale_out = the catalog (s, s, h) —
+ * the icosahedron's edge is s and h is unused. */
+static mesh *wireframe_hull_mesh (const rigidbody *rigid_body, vector3 *scale_out) {
+    float sx = rigid_body -> hull_size_s, sz = rigid_body -> hull_size_h;
+    mesh *m = &prism_mesh;
+    switch (rigid_body -> hull_kind) {
+        case 1: m = &pyr4_mesh; break;
+        case 2: m = &pyr3_mesh; break;
+        case 3: m = &icosa_mesh; sz = sx; break;
+        case 4: m = &ell_mesh; break;
+        default: break;
+    }
+    if (scale_out) { *scale_out = (vector3) {sx, sx, sz}; }
+    return (m -> index_count > 0) ? m : NULL;
+}
 static GLuint a3_wire_cached_program = 0;
 static GLint a3_wire_uniform_viewframe = -1;
 static GLint a3_wire_uniform_projection = -1;
@@ -79,6 +96,14 @@ void wireframe_render_object (GLuint shader_program, math4 view_matrix, math4 pr
         /* Unit cylinder mesh: axle X half-length 1, radius 1. */
         scale_matrix = math4_scaling ((vector3) {rigid_body -> cylinder_half_length * 1.01f, rigid_body -> radius * 1.01f,
                                                 rigid_body -> radius * 1.01f});
+    } else if (rigid_body -> type == object_hull) {
+        /* MIG WP2.6 2.6.6: catalog unit mesh scaled by the stamped
+         * (s, s, h) — a hull's half_extensions are zero and must not
+         * fall into the cube default. */
+        vector3 hull_scale;
+        wireframe_hull_mesh (rigid_body, &hull_scale);
+        scale_matrix = math4_scaling ((vector3) {hull_scale.x * 1.01f, hull_scale.y * 1.01f,
+                                                hull_scale.z * 1.01f});
     } else {
         scale_matrix =
             math4_scaling ((vector3) {rigid_body -> half_extensions.x * 1.01f, rigid_body -> half_extensions.y * 1.01f,
@@ -104,6 +129,14 @@ void wireframe_render_object (GLuint shader_program, math4 view_matrix, math4 pr
         a3_wire_scale_xyz [0] = rigid_body -> cylinder_half_length * 1.01f;
         a3_wire_scale_xyz [1] = rigid_body -> radius * 1.01f;
         a3_wire_scale_xyz [2] = rigid_body -> radius * 1.01f;
+    } else if (rigid_body -> type == object_hull) {
+        /* MIG WP2.6 2.6.6: catalog (s, s, h) scale, matching the model
+         * matrix above. */
+        vector3 hull_scale;
+        wireframe_hull_mesh (rigid_body, &hull_scale);
+        a3_wire_scale_xyz [0] = hull_scale.x * 1.01f;
+        a3_wire_scale_xyz [1] = hull_scale.y * 1.01f;
+        a3_wire_scale_xyz [2] = hull_scale.z * 1.01f;
     } else {
         a3_wire_scale_xyz [0] = rigid_body -> half_extensions.x * 1.01f;
         a3_wire_scale_xyz [1] = rigid_body -> half_extensions.y * 1.01f;
@@ -133,6 +166,15 @@ void wireframe_render_object (GLuint shader_program, math4 view_matrix, math4 pr
         glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, cylinder_mesh.wireframe_element_buffer_object);
         glDrawElements (GL_LINES, cylinder_mesh.wireframe_index_count, GL_UNSIGNED_INT, 0);
         glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, cylinder_mesh.element_buffer_object);
+    } else if (rigid_body -> type == object_hull) {
+        /* MIG WP2.6 2.6.6: the catalog unit mesh's unique-edge wire. */
+        mesh *hull_m = wireframe_hull_mesh (rigid_body, NULL);
+        if (hull_m) {
+            glBindVertexArray (hull_m -> vertex_array_object);
+            glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, hull_m -> wireframe_element_buffer_object);
+            glDrawElements (GL_LINES, hull_m -> wireframe_index_count, GL_UNSIGNED_INT, 0);
+            glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, hull_m -> element_buffer_object);
+        }
     } else {
         glBindVertexArray (cube_mesh.vertex_array_object);
         glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, cube_mesh.wireframe_element_buffer_object);

@@ -189,6 +189,17 @@ typedef struct {
     int hull_vert_count;
     int hull_face_base;
     int hull_face_count;
+    /* MIG WP2.6 2.6.6 (renderer unit meshes): the spawn's catalog kind
+     * (a mpe_hull_shape_kind value) and (s, h) sizes, stamped by
+     * add_hull. Collision never reads these — the pool slices above
+     * are the truth — the renderer scales the per-kind unit mesh with
+     * them: the unit mesh is the COM-frame s=h=1 build from the same
+     * mig_hull builders, and stored verts == unit verts · (s, s, h)
+     * (icosa (s, s, s)), so the drawn surface IS the collision
+     * surface. Zeroed at every initializer like the slices. */
+    int hull_kind;
+    float hull_size_s;
+    float hull_size_h;
 } rigidbody;
 void rigidbody_update_axes (rigidbody *rigid_body);
 void rigidbody_initialisation_sphere (rigidbody *rigid_body, float radius, float mass, vector3 position_input);
