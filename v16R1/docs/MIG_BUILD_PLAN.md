@@ -1939,6 +1939,25 @@ Ledger (new entries get a line, never an edit of a past line):
   (post-FTC-fix), ASan clean on the FTC battery, make everything
   green. Scene save still vetoes hulls (SVF06 — unchanged).
 
+- 2026-11-12 — WP2.6 2.6.6b (this commit, GUI-only): composite.hull
+  made reachable from the GUI. The refusal hint said "set it in the
+  config menu", but the GUI config menu (key 6) exposes two pages of
+  categories whose digit keys are ALL routed (6 is the close toggle)
+  — cat_composite was unreachable, so the hint pointed at a screen
+  that could not set the flag (the user's exact report: "nothing in
+  the 6 menu"). Fix: the Spawner Menu > 5: Hull Settings screen
+  carries the toggle itself — key 4 flips composite.hull in place
+  (the config_menu direct-action save/reset precedent; the world
+  reads &g_cfg live, so the flip lands on the next pair check) and
+  the overlay shows the state live ("4: Hull Contacts: ON/OFF").
+  The settings screens (cylinder 9 + hull 13) also close on Enter
+  now, matching the spawn-type screen — without that the toggle
+  flow trapped the user on the dial screen (the spawn gun needs
+  level 0). Refusal hints renamed to the real path. Known gap
+  noted: composite.max_parts is likewise GUI-unreachable (TUI
+  export reaches it) — a config-menu page 3 is the follow-up if
+  wanted.
+
 ## §10 Definition of done for v16S (the cut checklist)
 
 All gates green at the final floor; policy amendment committed; release
