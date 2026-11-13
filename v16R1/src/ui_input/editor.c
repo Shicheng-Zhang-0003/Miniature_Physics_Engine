@@ -108,6 +108,14 @@ void editor_update_menus (GtkWidget *parent_window) {
             main_inputs.enter_key_pressed = false;
         }
     }
+    /* MIG WP2.6 2.6.6b: the settings screens (cylinder + hull) close on
+     * Enter, matching the spawn-type screen — without this the hull
+     * toggle flow traps the user (the spawn gun needs level 0). */
+    if ((main_inputs.spawner_menu_level == 9 || main_inputs.spawner_menu_level == 13) &&
+        main_inputs.enter_key_pressed) {
+        main_inputs.spawner_menu_level = 0;
+        main_inputs.enter_key_pressed = false;
+    }
     // User Mechanics Menu Logic
     if (main_inputs.velocity_menu_level == 3) {
         g_cfg.spawner.speed = open_numerical_input_dialog (parent_window, "Spawn Speed (m/s)", g_cfg.spawner.speed);

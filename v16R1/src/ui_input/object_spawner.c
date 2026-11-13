@@ -62,17 +62,17 @@ void spawner_launch_hull (mpe_hull_shape_kind kind, const char *name, float laun
      * hulls are skipped by the draw loop (the 2.6.5 stopgap) — the body
      * simulates and the renderer's one-time skip note fires. */
     if (!g_cfg.composite.hull) {
-        event_log_push (2, "spawn refused: %s needs composite.hull=1 (contacts are flag-gated; set it in the config menu)",
+        event_log_push (2, "spawn refused: %s needs composite.hull=1 — Spawner Menu > 5: Hull Settings > 4: Hull Contacts",
                         name);
         /* MIG WP2.6 2.6.6a: the event log is terminal-only — a GUI user
          * would see nothing. One-time stderr note (the renderer's
-         * hull-skip note precedent) + the always-on HUD counter. */
+         * one-time note precedent) + the always-on HUD counter. */
         spawner_hull_refusal_count++;
         static bool flag_note_shown = false;
         if (!flag_note_shown) {
             flag_note_shown = true;
-            fprintf (stderr, "[spawner] hull spawn refused: composite.hull=0 — set it in the config menu "
-                             "(the HUD HullRef count is running)\n");
+            fprintf (stderr, "[spawner] hull spawn refused: composite.hull=0 — Spawner Menu > 5: Hull "
+                             "Settings > 4: Hull Contacts (the HUD HullRef count is running)\n");
         }
         return;
     }

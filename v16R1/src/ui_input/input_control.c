@@ -286,6 +286,18 @@ gboolean on_keypress (GtkEventControllerKey *w, guint keyval, guint keycode, Gdk
             st -> spawner_menu_level = 15;
         if (keyval == GDK_KEY_3)
             st -> spawner_menu_level = 16;
+        /* MIG WP2.6 2.6.6b: composite.hull is UNREACHABLE from the GUI
+         * config menu (both pages' digit keys are routed; 6 is the
+         * close toggle), so the hull dial screen carries the toggle
+         * itself — the config_menu save/reset direct-action precedent.
+         * The world reads &g_cfg live (no foreign config), so the flip
+         * takes effect on the next pair check. Stays on this level so
+         * the overlay shows the new state. */
+        if (keyval == GDK_KEY_4) {
+            g_cfg.composite.hull = g_cfg.composite.hull ? 0 : 1;
+            fprintf (stderr, "[spawner] composite.hull = %d (%s)\n", g_cfg.composite.hull,
+                     g_cfg.composite.hull ? "hull contacts ON" : "hull contacts OFF");
+        }
     } else if (st -> spawner_menu_level == 9) {
         if (keyval == GDK_KEY_1)
             st -> spawner_menu_level = 10;

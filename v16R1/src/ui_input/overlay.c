@@ -171,7 +171,7 @@ void overlay_update (void) {
                           "-- Toggle Spawn Type --\nCurrent: %s\n\nUp/Down: Cycle\nEnter: Save and Close",
                           term_spawn_type_name ());
             else if (main_inputs.spawner_menu_level == 9)
-                snprintf (buf, sizeof (buf), "-- Cylinder Settings --\n1: Mass\n2: Radius\n3: Half-Length");
+                snprintf (buf, sizeof (buf), "-- Cylinder Settings --\n1: Mass\n2: Radius\n3: Half-Length\nEnter: Close");
             else if (main_inputs.spawner_menu_level == 10)
                 snprintf (buf, sizeof (buf),
                           "-- Cylinder Mass --\nCurrent Mass: %.2f kg\n\nValue dialog active (step %.2f)",
@@ -185,9 +185,13 @@ void overlay_update (void) {
                           "-- Cylinder Half-Length --\nCurrent: %.2f m\n\nValue dialog active (step %.2f)",
                           g_cfg.spawner.cyl_half_length, adj);
             /* MIG WP2.6 spawn-menu: the hull dial screens (shared by all
-             * five catalog kinds). */
+             * five catalog kinds). 4 toggles composite.hull in place —
+             * the GUI config menu has no Composite page to reach it
+             * through. */
             else if (main_inputs.spawner_menu_level == 13)
-                snprintf (buf, sizeof (buf), "-- Hull Settings --\n1: Mass\n2: Size (s)\n3: Height (h)");
+                snprintf (buf, sizeof (buf),
+                          "-- Hull Settings --\n1: Mass\n2: Size (s)\n3: Height (h)\n4: Hull Contacts: %s\nEnter: Close",
+                          g_cfg.composite.hull ? "ON" : "OFF");
             else if (main_inputs.spawner_menu_level == 14)
                 snprintf (buf, sizeof (buf),
                           "-- Hull Mass --\nCurrent Mass: %.2f kg\n\nValue dialog active (step %.2f)",
