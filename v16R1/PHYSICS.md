@@ -494,7 +494,9 @@ byte-identical normalized output -- gate 4.2 pins it.
 Frozen OUT of v1 (decisions, not omissions): joints between objects;
 per-part `no_collide` (stays body-level); velocity/sleep/static/kinematic
 authoring (WP3 scene persistence owns dynamic state); convex hulls and
-mesh import (next train); principal-axis display (plan 4.4 named TODO);
+mesh import (hull BODIES exist in-engine since WP2.6 — mesh pools, spawn,
+render — but scene/spec files still do not carry them: `SVF06` refuses
+hulls at scene save); principal-axis display (plan 4.4 named TODO);
 units other than metres/kilograms/seconds; multiple objects per file (one
 file, one object -- share by copying files, not by growing a container
 format).

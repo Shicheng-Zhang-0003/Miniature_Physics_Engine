@@ -24,7 +24,7 @@ referenced), and the MFS sub-document section.
 | [`docs/API_REFERENCE.md`](API_REFERENCE.md) | Public C surface: world lifecycle, config, module ABI, registry, loader, joints, det_math, ownership rules |
 | [`docs/MODULE_TUTORIAL.md`](MODULE_TUTORIAL.md) | Worked example: write, build, hot-load, attach, verify, unload a module (+ the pitfalls audit history) |
 | [`v16R1/MODULES.md`](../v16R1/MODULES.md) | MPI contract (hot-plug physics), loader jail, rejection codes |
-| [`v16R1/CONFIG.md`](../v16R1/CONFIG.md) | 80 tunables, live menu, terminal env/export, round-trip save |
+| [`v16R1/CONFIG.md`](../v16R1/CONFIG.md) | 86 tunables in 15 categories, live menu, terminal env/export, round-trip save |
 | [`v16R1/DEV_GUIDE.md`](../v16R1/DEV_GUIDE.md) | Contributing, commit style, audit method, definition of done |
 | [`v16R1/ARCHITECTURE.md`](../v16R1/ARCHITECTURE.md) | Kernel internals, per-world object, data structures |
 

@@ -15,8 +15,8 @@ Header paths are relative to `v16R1/src/`. Layout notes:
 |---|---|
 | Kernel: world, bodies, math, determinism, diagnostics, module ABI, loader, registry | `core/` |
 | Physics stages: broadphase, narrowphase, solver, joints, CCD, depenetration, islands | `physics/` |
-| Scene I/O (v200 format, CRC32, ID remap), boundary walls | `scene/` |
-| Config system (80 tunables) | `config/` |
+| Scene I/O (v201 format, CRC32, ID remap), boundary walls | `scene/` |
+| Config system (86 tunables) | `config/` |
 | Ecosystem members (hot-plug modules) | `ecosystem/` |
 
 ---
@@ -94,7 +94,7 @@ bool mpe_config_save (const char *path);
 bool mpe_config_save_guarded (const char *path);
 ```
 
-- 80 tunables in 13 categories; the authoritative list is
+- 86 tunables in 15 categories; the authoritative list is
   [`v16R1/CONFIG.md`](../v16R1/CONFIG.md).
 - Module authors: read tunables through `world->cfg` **by struct field**
   (e.g. `cfg->solver.penetration_slop`), never through the key-string API

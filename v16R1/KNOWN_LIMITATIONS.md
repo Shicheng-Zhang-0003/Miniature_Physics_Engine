@@ -116,10 +116,22 @@ parallelism remains future work.
   towers; driven robots differ ~2.7% via motor-observer feedback (expected,
   not a path bug). The former duplicate GUI stage sequence was removed
   2026-10-23.
-- **Scene format:** v200 saves bodies (stable IDs, sleep state, damping)
-  plus springs + revolute/fixed/distance/prismatic/rope joints, with CRC32
-  integrity footer. Files v130/v140/v150/v151/v152/v153 load via the legacy
-  reader.
+- **Scene format:** v201 saves bodies (stable IDs, sleep state, damping)
+  plus springs + revolute/fixed/distance/prismatic/rope joints and a
+  dedicated composite-part-slice section (MIG WP3), with CRC32 integrity
+  footer. Hull bodies are refused outright by scene save (`SVF06` — see the
+  hull-scope bullet below). Files v130/v140/v150/v151/v152/v153 load via the
+  legacy reader.
+- **Hull-body scope (WP2.6):** hulls are the five exact-coordinate catalog
+  polyhedra only (prism, pyr4, pyr3, icosahedron, ellipsoid) — mesh import
+  and arbitrary point clouds do not exist. Collision consumption is gated on
+  `composite.hull` (default 0): with the flag off, hull bodies simulate as
+  no-contact ghosts. In the GUI the flag is togglable only from the Spawner
+  Menu → `5: Hull Settings` → `4: Hull Contacts` screen (the 6 config menu
+  has no Composite page — both pages' digit keys are routed);
+  `composite.max_parts` is likewise GUI-unreachable (TUI `export` or
+  `engine.cfg` reach it). Scene save refuses hulls (`SVF06`); a hull-aware
+  scene format is future work.
 - **Joint UI/persistence scope:** solver supports spring/revolute/fixed/
   prismatic/distance/rope; menus create springs (+revolutes in TUI scenes);
   v200 persists springs + all five constraint types. In-engine creation UI

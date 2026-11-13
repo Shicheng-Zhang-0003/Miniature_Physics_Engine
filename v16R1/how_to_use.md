@@ -69,7 +69,9 @@ so no stuck-drive surprises.
 
 **Enter** spawns an object in front of the camera. Hold Enter for 0.3 seconds to begin rapid-fire spawning.
 
-The active spawn type (sphere, cube, or cylinder) is shown in the status bar. To configure spawning, press `8`:
+The active spawn type is shown in the status bar — eight kinds: **sphere,
+cube, cylinder, prism, pyr4, pyr3, icosa, ell** (the last five are the
+WP2.6 convex-hull catalog). To configure spawning, press `8`:
 
 ```
 8 → Spawner Menu
@@ -79,14 +81,34 @@ The active spawn type (sphere, cube, or cylinder) is shown in the status bar. To
   2 → Cube settings
     1 → Mass
     2 → Size (half-extent)
-  3 → Toggle spawn type (sphere / cube / cylinder, Up/Down cycle, Enter confirms)
+  3 → Current spawn type (8-way cycle: sphere → cube → cylinder → prism →
+      pyr4 → pyr3 → icosa → ell; Up/Down cycles, Enter confirms + closes)
   4 → Cylinder settings
     1 → Mass
     2 → Radius
     3 → Half-length (axle, local X)
+    (Enter closes the screen)
+  5 → Hull Settings (the three dials are SHARED by all five hull kinds)
+    1 → Mass
+    2 → Size (s)
+    3 → Height (h)
+    4 → Hull Contacts: ON/OFF  (toggles composite.hull in place — this is
+        the only GUI path to that flag; the 6 config menu has no Composite
+        page)
+    (Enter closes the screen)
 ```
 
 Each leaf option opens a text input dialog where you type the value directly and press OK.
+
+**Hull prerequisites:** hull shapes need Hull Contacts ON
+(`composite.hull = 1`) or every hull spawn is refused — the HUD stats line
+shows ` | HullRef:N` counting refused spawns, and the one-time terminal note
+names the fix path (Spawner Menu > 5: Hull Settings > 4). The same rule
+applies to the TUI's `touch` verb (it refuses loudly instead of placing a
+no-contact ghost; only the C API `physics_world_add_hull` accepts flag-0
+placement — the body simulates but makes no contacts). Hull bodies also
+simulate and render, but scene save refuses them (`Error SVF06` — hull
+persistence is not implemented; save the rest of the scene without hulls).
 
 ---
 
@@ -144,6 +166,12 @@ Common commands:
 | `touch new.sph` | Spawn a sphere |
 | `touch new.cube` | Spawn a cube |
 | `touch new.cyl` | Spawn a cylinder |
+
+The GUI terminal's `touch` knows the three primitives only (sph/cube/cyl).
+Hull kinds are spawned from the Spawner Menu (see *Spawning Objects*) or the
+TUI's `touch <sphere|cube|cyl|prism|pyr4|pyr3|icosa|ell> [x y z] [s h mass]`
+(hulls need `composite.hull=1`; the size/mass tail is hull-only, omitted =
+`s=h=1 m=1`).
 | `rm 3` | Delete object 3 |
 | `rm -rf /obj/all` | Delete all objects |
 | `mv 3 /pos/0/10/0` | Teleport object 3 |
@@ -216,17 +244,29 @@ time scale, `/` filter, `q` quit. Snapshot sections (`[engine]`, `[body i]`,
 (`bodies=n/cap`, `cacheCount=n/cap`). `make tui-smoke` checks
 every scene dumps finite state.
 
+The TUI shell (`--shell`) is a full terminal: `touch <sphere|cube|cyl|
+prism|pyr4|pyr3|icosa|ell> [x y z] [s h mass]` spawns (WP2.6 hull kinds
+included; hulls need `export composite.hull=1` first, and the optional
+size/mass tail is hull-only — omitted = `s=h=1 m=1`), `env`/`export
+KEY=value` reach the live config registry, and `config save|load|reset`
+round-trips `status/engine.cfg`.
+
 ---
 
 ## Configuration System (Key 6)
 
-Press `6` to open the **Configuration Menu**. This provides live access to all 79 tunable engine parameters.
+Press `6` to open the **Configuration Menu**. The full registry is **86
+tunables in 15 categories**; the menu's two pages expose the **13**
+GUI-reachable categories (both pages' digit keys are routed, `6` closes):
+`composite` and `mfs` are registry-only here — TUI `export` or
+`engine.cfg` reach them (see `CONFIG.md` §1), and `composite.hull` also has
+an in-GUI toggle on the Spawner Menu → `5: Hull Settings` screen.
 
 The menu is organised into 13 categories:
 
 | Category | Parameters |
 |---|---|
-| World | Gravity, drag, floor friction |
+| World | Gravity, drag, floor friction, rolling resistance |
 | Timestep | Solver iterations, max substeps, speed clamps |
 | Sleep | Sleep/wake thresholds, timer |
 | Solver | Penetration slop, bias, restitution, friction |
@@ -234,7 +274,7 @@ The menu is organised into 13 categories:
 | Broadphase | Cell size, multiplier, max span |
 | Joints | Max acceleration, spring k, damping |
 | Boundary | Floor slop values |
-| Spawner | Mass, radius, speed, friction |
+| Spawner | Per-type mass/size dials (sphere, cube, cylinder, and the shared hull Mass/Size s/Height h), speed, friction, overlap attempts |
 | Body Defaults | Restitution, friction per type |
 | Camera | Speed, sensitivity, jump height |
 | Render | Light position, ambient, specular |
@@ -275,7 +315,7 @@ In the debug terminal:
 
 ### F11 Config Torture Test
 
-Press `F11` to randomise all 80 tunables to extreme bounded values and run
+Press `F11` to randomise all 86 tunables to extreme bounded values and run
 a 60-second long-run validation. This stress-tests the engine under
 adversarial parameter combinations (each press uses the next seed, printed
 for bisection). F11 is a **robustness verdict only**: PASS means the run
@@ -556,7 +596,7 @@ Press `9` to open the scene menu:
   3 → Exit engine
 ```
 
-Scenes are saved to `status/scene.dat` (v200: LE fields, stable IDs, CRC32 footer, atomic tmp→rename). Saving overwrites any existing file. Loading clears the current scene and replaces it entirely. Bodies (sphere/cube/cylinder incl. position, velocity, orientation, colour, mass, friction, restitution, static/kinematic/sleep/nice_value/stable ID+generation) plus spring joints and revolute/fixed/distance/prismatic/rope joints (anchors, axes, motors, limits) are saved and restored. Files v130/v140/v150/v151/v152/v153 load via the legacy reader (IDs remapped, cylinders become spheres pre-R3-04).
+Scenes are saved to `status/scene.dat` (v201: LE fields, stable IDs, CRC32 footer, atomic tmp→rename). Saving overwrites any existing file. Loading clears the current scene and replaces it entirely. Bodies (sphere/cube/cylinder incl. position, velocity, orientation, colour, mass, friction, restitution, static/kinematic/sleep/nice_value/stable ID+generation) plus spring joints and revolute/fixed/distance/prismatic/rope joints (anchors, axes, motors, limits) are saved and restored. Composite and hull bodies split: composites persist in scene v201 as a dedicated part-slice section (MIG WP3), while hull bodies are refused outright by scene save (`Error SVF06` — hull persistence is not implemented; WP2.6 hulls simulate + render but stay out of scene files). Files v130/v140/v150/v151/v152/v153/v200 load via the legacy/sectioned readers (IDs remapped, cylinders become spheres pre-R3-04).
 
 **Joint truth:** the solver supports spring, revolute, fixed, prismatic, distance, and rope constraints (see them live in `mpe-tui --scene demo`). The in-engine menus create spring joints; scene v200 persists springs + revolute/fixed/distance/prismatic/rope. Fixed/distance/prismatic/rope currently have no in-engine creation UI — solver + persistence + TUI-demo only.
 
@@ -615,7 +655,7 @@ vibration — because staged bodies are static and bonds carry `k = 0`. See
 pointer warping); the mouse locks via cursor capture and works under both
 Wayland and X11 sessions.
 
-**Scene format:** v200 saves bodies (stable IDs, sleep, damping) plus spring and revolute/fixed/distance/prismatic/rope joints, with CRC32 footer and atomic write. Fixed/distance/prismatic/rope have no in-engine creation UI yet (solver + persistence + TUI only). Files v130/v140/v150/v151/v152/v153 load via the legacy reader. Truth labels: `world.drag` is linear-viscous (not quadratic aero); `nice_value`/`angular_damping_scale` are NON-PHYSICAL settle tools (0/1.0 = truth); `sleep.enable=0` runs sleepless truth validation; boundary walls are a plastic safety net, not material contact.
+**Scene format:** v201 saves bodies (stable IDs, sleep, damping) plus spring and revolute/fixed/distance/prismatic/rope joints and the WP3 composite part-slice section, with CRC32 footer and atomic write. Fixed/distance/prismatic/rope have no in-engine creation UI yet (solver + persistence + TUI only). Hull bodies are refused by scene save (SVF06). Files v130/v140/v150/v151/v152/v153/v200 load via the legacy/sectioned readers. Truth labels: `world.drag` is linear-viscous (not quadratic aero); `nice_value`/`angular_damping_scale` are NON-PHYSICAL settle tools (0/1.0 = truth); `sleep.enable=0` runs sleepless truth validation; boundary walls are a plastic safety net, not material contact.
 
 ---
 

@@ -208,18 +208,23 @@ Terminal: `ftc biobuzz [build|spawn]`, `ftc biobuzz enter red|blue`,
 
 | Issue | Status |
 |---|---|
-| `tank` red (14/17 MFS) | Pre-existing CCD obstacle margin; per-pair fix is the candidate |
-| `drive_directions`, `odometry_yaw` red | Same global margin root cause |
+| `tank` red (14/17 MFS) | **Resolved** — green in the 2026-11-13 suite run (37/37 gated) |
+| `drive_directions`, `odometry_yaw` red | **Resolved** — green in the 2026-11-13 suite run |
 | Jointed air-spin limit cycle | Contained by bearing damping + diode+slew; documented frontier |
 | MOTOR-III observer limit cycle | Documented; driven path is a limit cycle at −61.3% |
 | Encoder odometry over-reports under slip | No slip term in model; land motor-chain step 2 together with slip term |
+| `mfs_drive_and_measure` stepped a wild stack world | **Fixed 2026-11-12**: the helper called `physics_world_step (&w, DT)` — the address of the pointer parameter, not the world. Stack garbage read as a `physics_world` segfaulted `mfs_suite --all` layout-dependently (gdb hid it) while `composite_ab` passed vacuously on zero displacement. Found by an ASan rebuild (stack-use-after-return at `physics_world.c:2497`); one-character fix; `composite_ab` now measures real motion |
 
 ---
 
 ## 7. Verification
 
-`build_tests.sh` — `mfs_suite --all` (30 gated) + build gates + ungated
-diagnostics. **Status 2026-10-14: 29/30 green** (sole red `tank`,
-pre-existing).
+`build_tests.sh` — `mfs_suite --all` (**37 gated**) + build gates + ungated
+diagnostics. **Status 2026-11-13: 37/37 green.** FTC module battery
+(hot-plug plugin): **gated pass=5 fail=0**, 12 ungated info-diags; an ASan
+build of the same battery runs clean (the plugin's single
+`mpe_module_desc_t` ODR complaint is benign/by design — set
+`detect_odr_violation=0`).
 
-Run: `cd v16R1/src/ecosystem/mfs && ./build_tests.sh`
+Run: `cd v16R1/src/ecosystem/mfs && ./build_tests.sh` (from `v16R1/src`
+this resolves the embedded engine source automatically).

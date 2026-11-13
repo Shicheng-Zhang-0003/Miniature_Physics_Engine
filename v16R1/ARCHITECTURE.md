@@ -244,9 +244,10 @@ plugin's address once more than one is loaded. Use a `static` symbol as the
 
 ## 6. Configuration System
 
-`config/mpe_config.h` + `config/mpe_config_schema.h`. 80 tunables in 13
+`config/mpe_config.h` + `config/mpe_config_schema.h`. 86 tunables in 15
 categories (world, timestep, sleep, solver, depenetration, broadphase,
-joints, boundary, spawner, body_defaults, camera, render, ui). Hot-path code
+joints, boundary, spawner, body_defaults, camera, render, ui, composite,
+mfs). Hot-path code
 reads `g_cfg.<group>.<field>` directly; cold-path code (menu, terminal,
 save/load) iterates the registry.
 

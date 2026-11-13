@@ -1,7 +1,8 @@
-# MPE Configuration System — v15S
+# MPE Configuration System — v16R1
 
-> 80 tunables in 13 categories, live menu (key `6`), terminal `env`/`export`,
-> round-trip save/load to `status/engine.cfg`, corrupt-safe load.
+> 86 tunables in 15 categories, live menu (key `6`, two pages, 13 categories
+> reachable), terminal `env`/`export`, round-trip save/load to
+> `status/engine.cfg`, corrupt-safe load.
 
 ---
 
@@ -25,11 +26,40 @@ Categories:
 | `broadphase` | cell_size_default/min/max/multiplier, max_cell_span_per_axis |
 | `joints` | max_acceleration, default_spring_k/damping, soft_spring_k/damping, revolute_beta/max_bias/motor_gain |
 | `boundary` | floor_emergency_slop, safety_net_enabled |
-| `spawner` | mass, radius, cube_mass/extent, cyl_mass/radius/half_length, speed, friction_s/k, overlap_max_attempts/thresh |
+| `spawner` | mass, radius, cube_mass/extent, cyl_mass/radius/half_length, hull_mass/size/height (WP2.6: the three shared hull dials, all five catalog kinds), speed, friction_s/k, overlap_max_attempts/thresh |
 | `body_defaults` | sphere/cube/cylinder restitution, friction_s/k |
 | `camera` | move_speed, mouse/steer_sensitivity, horizontal_friction, jump_height, ijkl_speed |
 | `render` | light_x/y/z, ambient_strength, specular_coeff/exponent |
 | `ui` | change_rate_game/debug, long_run_ticks, enter_spawn_delay/interval |
+| `composite` | max_parts (per-composite part ceiling, 1..16), hull (WP2.6 hull-consumption master flag, 0/1) |
+| `mfs` | robot.composite (WP5: build the FTC robot as one composite body, 0/1) |
+
+Counts per category (registry truth, `grep -o cat_ config/mpe_config_schema.c`):
+world 6, timestep 4, sleep 6, solver 7, depenetration 4, broadphase 5,
+joints 8, boundary 2, spawner 15, body_defaults 9, camera 6, render 6,
+ui 5, composite 2, mfs 1 = **86**.
+
+### GUI menu reachability (honest note)
+
+The key-`6` menu exposes **13 of the 15 categories** across two pages (both
+pages' digit keys are routed; `6` is the close toggle):
+
+- Page 1: `1` World, `2` Timestep, `3` Sleep, `4` Solver, `5` Depenetration,
+  `7` Broadphase, `8` Joints, `9` Boundary, `0` More.
+- Page 2: `1` Spawner, `2` Body Defaults, `3` Camera, `4` Render, `5` UI,
+  `7` Save, `8` Reset Defaults, `9`/`0` Back.
+
+`composite` and `mfs` have no menu page. Set them from the TUI shell
+(`export composite.hull=1`, `export composite.max_parts=16` — the
+snapshot/stream shells keep per-run config copies, but `--shell` binds the
+global registry so `export` reaches the live world) or via
+`status/engine.cfg` + `config load`. The one exception shape:
+`mfs robot.composite`'s key contains a space, so neither terminal's
+`export KEY=value` can address it (both tokenize on whitespace) — set it in
+`engine.cfg` and `config load`, or from C (`mpe_config_set_int`). In the GUI,
+`composite.hull` is nevertheless reachable **without** the 6 menu: the
+Spawner Menu → `5: Hull Settings` screen carries a `4: Hull Contacts` toggle
+(WP2.6 2.6.6b) that flips `composite.hull` in place.
 
 ---
 

@@ -9,6 +9,36 @@
 > 6 blocking, 4 informational); 2026-10-07 (44/42; 232+2 xfail/234);
 > 2026-10-01 (41/42).
 >
+## 2026-11-13 — WP2.6 hull train: what landed, what stays open
+
+Landed (ledger detail in `docs/MIG_BUILD_PLAN.md` §9; suite now **70
+registered / 68 blocking**, quick 84/84):
+
+- Hull spawn menu (8 spawn types, shared hull dials), hull collision
+  consumption behind `composite.hull`, hull bodies RENDERING (five
+  per-kind unit meshes from the same `mig_hull` builders — gate 70
+  `mig_hull_render_stamp`), refusal visibility (HUD `HullRef:N`),
+  and the GUI `composite.hull` toggle on the Hull Settings screen.
+- Pre-existing FTC segfault found and fixed: `mfs_drive_and_measure`
+  stepped a wild stack world (`&w` on a pointer parameter);
+  `composite_ab` had been passing vacuously and now measures real
+  motion. FTC battery 5/5, ASan clean.
+
+Still open from this train:
+
+- **Scene-save hull veto (SVF06)** — hull bodies refuse to persist; a
+  hull-aware scene format (v202?) is the candidate brick.
+- **`composite.max_parts` GUI-unreachable** — both 6-menu pages are
+  full; a config-menu page 3 (or a Composite page swap) is needed for
+  GUI reach of the part ceiling. `composite.hull` is covered by the
+  Hull Settings toggle.
+- **N-gonal ring family (2.6.2)** — pending the trig-exception ruling:
+  (a) admit trig for ring generation with exact special cases gated
+  separately, or (b) exact-literal subset (n=3, 4) only.
+- **Standing-spawn orientation** — hulls/polyhedra rest per the catalog's
+  lying-flat convention; the pending user ruling touches 2.6.5's pinned
+  rest heights (√3/3, h/4).
+
 ## 2026-10-24 — F11 honesty fix
 
 - GUI F11 randomizer used `% range`, so binary int params (`sleep.enable`,

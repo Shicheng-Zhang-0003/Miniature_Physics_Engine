@@ -6,6 +6,11 @@ complete, honest list. Headlines:
 - **Warm start:** cold by default (stable across all regimes). Damped
   warm-start is experimental — faster convergence at low iteration counts
   but unstable under extreme gravity/friction/restitution.
+- **Hull bodies (WP2.6):** the five exact-coordinate catalog polyhedra
+  only — no mesh import. Consumption is gated on `composite.hull`
+  (default 0; in the GUI the toggle lives on the Spawner Menu's Hull
+  Settings screen). Hull bodies render but scene save refuses them
+  (SVF06).
 - **CCD:** translation-only for volume-object pairs; floor plane includes
   rotational lowest-point velocity. Rotation-only tunneling between
   arbitrary volumes is unsolved.
