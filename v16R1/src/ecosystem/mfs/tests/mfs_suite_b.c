@@ -1173,7 +1173,13 @@ static float mfs_drive_and_measure (physics_world *w, ftc_robot *robot,
     sx = ch -> position.x; sz = ch -> position.z;
     for (int k = 0; k < ticks; k++) {
         drivetrain_mecanum (robot, fwd, strafe, rotate);
-        physics_world_step (&w, DT);
+        /* DESPOT-2026-11-13 FIX: this was physics_world_step (&w, DT) —
+         * the address of the POINTER parameter, not the world. The step
+         * read stack garbage as a physics_world (sanitize walked wild
+         * memory = the INPUT CLAMPED spam; the stack stomp segfaulted
+         * layout-dependently, which is why gdb hid it). mfs_settle_ticks
+         * below always had it right. */
+        physics_world_step (w, DT);
         if (!mfs_test_finite (w)) { return -1.0f; }
     }
     float dx = ch -> position.x - sx;
