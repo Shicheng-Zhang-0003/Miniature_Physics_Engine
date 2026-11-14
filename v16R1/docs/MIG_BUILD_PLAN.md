@@ -2113,6 +2113,20 @@ Ledger (new entries get a line, never an edit of a past line):
   smoke battery green again: suite 72/70, quick 86/86, tui-smoke
   PASS, engine clean under -Werror.
 
+- 2026-11-14 — WP4 4.6d (this commit, the keybind): 2 toggles the CAD
+  window — the user's connect call, lifting the 4.6c dead-code ruling.
+  input_state.h grows `cad_window_pressed`; on_keypress arms it in the
+  FREE state only (no scene/config/module menu open, no
+  spawner/velocity/object menu) so every menu keeps its own 2 —
+  mutually exclusive with the menu blocks by the same guards;
+  simulation_input_dispatch consumes it and calls cad_window_toggle
+  (the resize-panel T pattern, consumed per frame). The window opens
+  transient for the main window, design persists across toggle. Spawn-
+  to-world hookup is the NEXT brick (this TU still never includes
+  physics_world.h — it is the only TU that will). Build + smoke
+  battery: suite 72/70, quick 86/86, tui-smoke PASS, engine clean
+  under -Werror.
+
 ## §10 Definition of done for v16S (the cut checklist)
 
 All gates green at the final floor; policy amendment committed; release

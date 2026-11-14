@@ -193,6 +193,14 @@ gboolean on_keypress (GtkEventControllerKey *w, guint keyval, guint keycode, Gdk
     if ((keyval == GDK_KEY_1) && !config_menu_is_open () && st -> is_debug_mode_active && !st -> is_menu_open &&
         st -> spawner_menu_level == 0 && st -> velocity_menu_level == 0 && st -> object_menu_level == 0)
         st -> debug_terminal_pressed = true;
+    /* MIG WP4 4.6d: 2 toggles the CAD window — free state only (no
+     * scene/config/module menu, no spawner/velocity/object menu), so
+     * every menu keeps its own 2. Mutually exclusive with the menu
+     * blocks below by these same guards. */
+    if ((keyval == GDK_KEY_2) && !config_menu_is_open () && !module_config_menu_is_open () &&
+        !st -> is_menu_open && st -> spawner_menu_level == 0 &&
+        st -> velocity_menu_level == 0 && st -> object_menu_level == 0)
+        st -> cad_window_pressed = true;
     if (st -> is_menu_open) {
         if (keyval == GDK_KEY_1)
             st -> menu_1_pressed = true;

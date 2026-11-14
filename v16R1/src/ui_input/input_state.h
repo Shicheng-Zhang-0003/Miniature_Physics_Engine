@@ -23,6 +23,10 @@ typedef struct {
     /* SANDBOX S4a: T toggles the resize panel (the tiny terminal-style
      * editor window for the selected body). Free by the same convention. */
     bool t_key_pressed;
+    /* MIG WP4 4.6d: 2 toggles the CAD window (the miniature GL editor).
+     * Armed in the FREE state only — the scene/config/spawner menus own
+     * 2 whenever any of them is open. */
+    bool cad_window_pressed;
     /* SANDBOX S2: the Situation screen's cursor (object menu level 5).
      * 0 = static, 1 = kinematic, 2 = no-collide; Up/Down move it, Enter
      * toggles the row. Lives in the input state so editor.c mutates and

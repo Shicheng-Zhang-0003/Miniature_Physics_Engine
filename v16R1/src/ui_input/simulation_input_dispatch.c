@@ -8,6 +8,7 @@
 #include "../core/long_run_validation.h"
 #include "resize_panel.h" /* SANDBOX S4a: T toggles the panel */
 #include "drag_weld.h" /* SANDBOX S4b: LMB grab/carry/drop */
+#include "cad_window.h" /* MIG WP4 4.6d: 2 toggles the CAD window */
 void simulation_input_dispatch (GtkWidget *parent_window) {
     /* SANDBOX S1: freeze (P) and frame-step (O). P toggles the physics
      * halt; O runs exactly one tick while frozen (no-op when running).
@@ -27,6 +28,12 @@ void simulation_input_dispatch (GtkWidget *parent_window) {
     if (main_inputs.t_key_pressed) {
         resize_panel_toggle (parent_window);
         main_inputs.t_key_pressed = false;
+    }
+    /* MIG WP4 4.6d: 2 toggles the CAD window (the miniature GL editor;
+     * the keybind is armed in the free state only). */
+    if (main_inputs.cad_window_pressed) {
+        cad_window_toggle ();
+        main_inputs.cad_window_pressed = false;
     }
     /* SANDBOX S4b: LMB drag. Press selects + grabs the aimed body; while
      * held the body rides the crosshair ray; release drops it. Dispatch

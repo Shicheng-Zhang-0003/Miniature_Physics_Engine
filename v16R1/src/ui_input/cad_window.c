@@ -36,12 +36,14 @@
  * temp file -> full parse round trip -> store add (write-on-success);
  * load = the selected store spec -> cad_design_from_spec.
  *
- * Standalone ruling (the user's): DEAD CODE until the connect round —
- * no keybind is wired, nothing calls cad_window_toggle; the design
- * model + view math are gated, this TU is compile-verified under
- * -Werror only (the 4.4 panel precedent). The spawn-to-world hookup
- * (cad_build -> physics_world_add_composite) is deliberately absent:
- * this TU never includes physics_world.h.
+ * Connection ruling history (the user's calls): WP4 4.6c shipped this
+ * window as DEAD CODE (no keybind, nothing called it). WP4 4.6d lifted
+ * that: key 2 in the FREE state toggles the window through
+ * simulation_input_dispatch (the resize-panel T pattern). The
+ * spawn-to-world hookup (cad_build -> physics_world_add_composite) is
+ * the NEXT brick — this TU never includes physics_world.h YET; when it
+ * does, it will be the only TU allowed to (the editor model cannot
+ * mutate a world BY DESIGN, which is what keeps it gateable).
  *
  * Determinism: this is authoring-path math (a human holds the mouse);
  * sinf/cosf here are the documented cold-path ruling, the per-tick

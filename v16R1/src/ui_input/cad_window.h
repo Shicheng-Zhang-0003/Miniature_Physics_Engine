@@ -4,12 +4,14 @@
  * click-pick/drag-move, the whole verb set driving cad_editor.c's
  * landed model, persistence staged through the shared mig_spec_store).
  *
- * "Standalone" is still the hard property of the whole 4.6 family:
- * NOTHING calls cad_window_toggle yet (dead code until the connect
- * round — the user's ruling), so this TU ships compiled but unreached,
- * exactly like the 4.4 panel before its keybind landed. The design
- * model (cad_editor.c) and the view math (cad_view_math.c) it drives
- * are already gated; the window itself is GUI-only and suite-unlinked.
+ * WP4 4.6d lifted the dead-code ruling (the user's connect call): key
+ * 2 in the FREE state opens/closes this window (simulation_input_dispatch
+ * -> cad_window_toggle, the resize-panel T pattern). The design model
+ * (cad_editor.c) and the view math (cad_view_math.c) it drives are
+ * already gated; the window itself is GUI-only and suite-unlinked.
+ * The spawn-to-world hookup (cad_build -> physics_world_add_composite)
+ * is the NEXT brick — this TU is where it will live, and it is the only
+ * place allowed to include physics_world.h.
  */
 #ifndef cad_window_h
 #define cad_window_h
