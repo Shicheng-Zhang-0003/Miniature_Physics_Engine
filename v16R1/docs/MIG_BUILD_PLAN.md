@@ -2064,6 +2064,44 @@ Ledger (new entries get a line, never an edit of a past line):
   RELEASE_GATES.md + RELEASE_POLICY.md + readme). Suite 72/70,
   quick 86/86.
 
+- 2026-11-14 — WP4 4.6c (this commit, THE WINDOW): the miniature CAD
+  window itself — `ui_input/cad_window.{h,c}`, a real GL viewport you
+  sit inside and edit with. Own self-contained GL setup (own
+  inline-shader program as string literals, own VAOs/VBOs from unit
+  meshes built in the TU — sphere lat/long, cube 12 tris, cylinder
+  axle LOCAL X with smooth sides + fanned caps, floor grid at y = 0;
+  own column-major mat4 helpers): never touches the main renderer's
+  globals, shaders or meshes. Window recipe cloned from the 4.4 panel
+  (plain GtkWindow, transient for the main window via the GL area's
+  root, CSS keyed on the widget name, Esc closes, destroy handler
+  nulls the globals + releases the GL objects, never modal); GL recipe
+  from root_gtk.c (depth buffer, allowed GL, realize -> make_current +
+  init, render -> viewport + draw). Everything on screen drives the
+  LANDED headless truth and the GATED view math: cad_design + the full
+  verb set, orbit camera (turntable drag on empty space, Shift-drag
+  pan, wheel zoom, pitch clamped +-85 by the caller per the contract),
+  LMB pick (ray vs sphere/box/cylinder, nearest t) + drag-move on the
+  part-height work plane with a frozen grab offset. Keys: 1/2/3 add
+  sphere/cube/cylinder at the spawn point (camera-target XZ at the
+  identity-orientation rest height — the standing-vs-lying spawn
+  ruling stays deferred), Delete, D duplicate (+0.5 m X first-cut), A
+  array (3 copies, 0.5 m X step first-cut), X/Y/Z rotate +-15 deg
+  about the assembly axis (Shift = -15), G snap 0 <-> 0.25 m,
+  R rot-snap 0 <-> 15 deg, S save, L load, Esc closes; CAD keys skip
+  the name entry so typing a name never spawns spheres. Persistence =
+  the frozen spec grammar staged through the SHARED mig_spec_store
+  (terminal, microvim and the 4.4 panel read the same store): save =
+  to_spec -> canonical emit -> temp file -> FULL parse round trip ->
+  store add (write-on-success); load = the dropdown's store spec ->
+  cad_design_from_spec (write-on-success). Ruling honored: DEAD CODE
+  until the connect round — no keybind wired, nothing calls
+  cad_window_toggle; GUI-only TU compile-verified under -Werror (the
+  4.4 panel precedent), suite-unlinked, no gate change. The
+  spawn-to-world hookup (cad_build -> physics_world_add_composite) is
+  deliberately absent — this TU never includes physics_world.h; that
+  is the separate "perfect and connect" round. Suite 72/70, quick
+  86/86 (build + smoke battery for a GUI-only brick).
+
 ## §10 Definition of done for v16S (the cut checklist)
 
 All gates green at the final floor; policy amendment committed; release
