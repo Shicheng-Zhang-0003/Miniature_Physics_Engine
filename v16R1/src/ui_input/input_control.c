@@ -655,5 +655,21 @@ gboolean on_focus_out (GtkEventControllerFocus *ctrl, gpointer user_data_stored)
     st -> lmb_pressed = false;
     st -> lmb_released = true; /* SANDBOX S4b: focus loss mid-drag = drop */
     st -> suppress_mouse_delta = false;
+    /* MIG WP4 4.6f: focus loss to ANOTHER TOPLEVEL (the CAD window, the
+     * 4.4 panel, the resize panel) also releases the POINTER. The
+     * relative-pointer lock is a GLOBAL grab: while it is live, mouse
+     * motion over any window — the CAD window included — kept feeding
+     * the main camera, and on X11 the re-centre warp fought the
+     * cursor (the user's 2-window report: "the main engine was still
+     * reacting to any input"). The gl_area-leave case (focus moved to
+     * a child INSIDE the main window — terminal, menus) keeps the
+     * pre-4.6f behavior: latches cleared above, lock retained. The
+     * lock re-engages on the next deliberate main-window click. */
+    GtkWidget *focus_widget = gtk_event_controller_get_widget (
+        GTK_EVENT_CONTROLLER (ctrl));
+    if (st -> is_mouse_locked && focus_widget != g_gl_area) {
+        st -> is_mouse_locked = false;
+        mouse_lock_disable (g_gl_area);
+    }
     return FALSE;
 }

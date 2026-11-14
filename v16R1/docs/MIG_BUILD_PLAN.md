@@ -2154,6 +2154,27 @@ Ledger (new entries get a line, never an edit of a past line):
   everything clean under -Werror (one tui-smoke 126 was a concurrent-
   make race with the everything run, re-run sequentially green).
 
+- 2026-11-14 — WP4 4.6f (this commit, the isolation ruling): while the
+  user is inside the CAD window, the MAIN engine window must not react
+  to any input (the user's report: "I was inside the 2 window and the
+  main engine was still reacting to any input"). Root cause found: the
+  main window's focus-out ALREADY clears every input latch (the house
+  mechanism), but NOTHING released the mouse lock — and the relative-
+  pointer lock is a GLOBAL grab, so with it live, mouse motion over
+  ANY window (the CAD window included) kept feeding the main camera,
+  and on X11 the re-centre warp fought the cursor. Fix is two-pronged:
+  (1) on_focus_out now releases the lock when the focus loss is to
+  ANOTHER TOPLEVEL (the controller's widget != the gl area — the
+  gl_area-leave case, focus moving to a child inside the main window,
+  keeps the pre-4.6f latch-only behavior); (2) the CAD window's open
+  path releases the lock explicitly before presenting (the guarantee
+  if focus transfer never fires focus-out; mouse_lock_disable is
+  idempotent). The lock re-engages on the next deliberate main-window
+  click — main becomes active again only when the user returns to it.
+  No new gate (input plumbing; the gated surfaces are untouched).
+  Suite 72/70, quick 86/86, tui-smoke PASS, engine clean under
+  -Werror.
+
 ## §10 Definition of done for v16S (the cut checklist)
 
 All gates green at the final floor; policy amendment committed; release

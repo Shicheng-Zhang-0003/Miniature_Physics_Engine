@@ -51,6 +51,16 @@
  * what keeps it gateable (mpe_engine.h already carries
  * core/physics_world.h transitively — no new include).
  *
+ * Input isolation (WP4 4.6f, the user's ruling): while the user is
+ * inside this window, the MAIN engine window must not react to any
+ * input. The mechanism: opening (or focusing) this window releases the
+ * main window's pointer lock (the relative-pointer grab is GLOBAL —
+ * while live, mouse motion over THIS window fed the main camera) and
+ * the main window's focus-out clears every input latch; keys route to
+ * whichever toplevel has focus, so the main engine sees none. The lock
+ * re-engages on the next deliberate main-window click — main becomes
+ * active again only when the user deliberately returns to it.
+ *
  * Determinism: this is authoring-path math (a human holds the mouse);
  * sinf/cosf here are the documented cold-path ruling, the per-tick
  * solver ban is untouched. MATH_PI (math3d.h), never M_PI.
@@ -60,6 +70,7 @@
 #include "../cad/cad_editor.h"
 #include "../cad/cad_view_math.h"
 #include "term_priv.h"
+#include "mouse_lock.h"
 #include <gtk/gtk.h>
 #include <stdio.h>
 #include <string.h>
@@ -1170,6 +1181,20 @@ void cad_window_toggle (void) {
     if (cw_window) {
         gtk_window_destroy (GTK_WINDOW (cw_window));
         return;
+    }
+    /* MIG WP4 4.6f: taking over the pointer means the engine's pointer
+     * grab must die FIRST. With the relative-pointer lock live, mouse
+     * motion over any window — this one included — fed the main camera
+     * (the 2-window report), and on X11 the re-centre warp fought the
+     * cursor. mouse_lock_disable is idempotent; the main window's
+     * focus-out releases it too (the generic fix), this explicit
+     * release is the guarantee if focus transfer never happens. The
+     * lock re-engages on the next deliberate main-window click. */
+    if (main_inputs.is_mouse_locked) {
+        main_inputs.is_mouse_locked = false;
+        if (g_gl_area && GTK_IS_WIDGET (g_gl_area)) {
+            mouse_lock_disable (g_gl_area);
+        }
     }
     cw_window = gtk_window_new ();
     gtk_widget_set_name (cw_window, "mpe-cad-window");
