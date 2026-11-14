@@ -2230,6 +2230,49 @@ Ledger (new entries get a line, never an edit of a past line):
   contracts it drives are the gated view-math + model). Suite 72/70,
   quick 86/86, tui-smoke PASS, engine clean under -Werror.
 
+- 2026-11-14 — WP4 4.6i (this commit, THE ENGINE FEEL — the user's
+  revisit: "revisit the entire profile — except for the magnet stuff
+  it is still not behaving like the true engine, like everything
+  static nothing to move the objects around"). The interaction profile
+  is now PORTED from the engine's own mouse map (drag_weld.c /
+  object_selector.c / simulation_input_dispatch), not invented:
+  (1) THE DROP RULE — LMB release runs the S4c port: covering bounds
+  touching/overlapping another part = the pose JOINS the composite
+  (the engine welds a dropped body on covering-sphere overlap AT THAT
+  POSE; here the design is already one composite, so joined = stays
+  exactly where placed; touch counts because the magnet places at the
+  exact touch, and magnet targets are now written EXACTLY —
+  cw_write_exact bypasses the grid snap for that one write so the
+  touch survives the model's rounding); free space = the part FALLS:
+  the engine zeroes the carried body's velocity every frame while
+  held, so its release is a pure vertical fall — the SETTLE reproduces
+  exactly that (CW_MODE_SETTLING: straight down from the release
+  height, integrated in the 16 ms tick at the WORLD'S OWN gravity
+  config world.gravity, landed at cw_rest_y_for — the highest
+  supporter below whose oriented top is at/below the part's bottom and
+  whose oriented XZ footprint overlaps (per-axis row-0/row-2 extents,
+  tangent counts), floor otherwise — written EXACTLY, because a drop
+  that hovers one snap step over the floor reads broken while a drag
+  that quantizes reads as the grid: snap is a placement aid, gravity
+  is a surface truth). (2) EVERY-FRAME CARRY: the carry target is
+  recomputed in the tick every frame from the stored cursor (the
+  drag_weld_tick analog — the engine's carry runs from the frame
+  dispatch too), so zoom mid-carry keeps the part glued. (3) THE
+  ENGINE'S MMB: delete the selected part (scene_remove_object_by_
+  index on the selection) — the 4.6h MMB-pan is gone; pan lives on
+  Shift+LMB empty only. RMB keeps the selector contract
+  (select_object_by_index's miss = deselect). (4) F upgraded to
+  drop-to-rest (the settle's support seek, exact — a part above a
+  stack now drops ONTO the stack). Any press snaps an active settle
+  instantly (no part frozen mid-fall); verbs stay frozen in all three
+  motion modes (CARRY/PLANE_DRAG/SETTLING — index shifts would
+  retarget a fall); the settle slot resets on destroy. Support/weld
+  math is oriented-exact (rows 0/1/2 abs dotted with the local dims —
+  cylinder axle local X), all window-local statics, zero engine
+  changes. No new gate (GUI-only orchestration of the gated
+  view-math/model contracts). Suite 72/70, quick 86/86, tui-smoke
+  PASS, engine clean under -Werror.
+
 ## §10 Definition of done for v16S (the cut checklist)
 
 All gates green at the final floor; policy amendment committed; release
