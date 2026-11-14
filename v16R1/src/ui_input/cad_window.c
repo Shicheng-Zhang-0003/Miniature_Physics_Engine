@@ -17,17 +17,30 @@
  *   - cad_view_camera / ray-from-screen / pick_* / ray_plane
  *     (cad/cad_view_math.c) — the clicking and dragging.
  *
- * Interaction (first-cut toolset, the user's confirmed set):
- *   - LMB on a part: select + drag-move on the part-height work plane
- *     (y-up; the plane follows the part's current height). LMB on
- *     empty space: orbit (drag), Shift+drag: pan, wheel: zoom.
+ * Interaction (WP4 4.6h, the user's ruling: click objects and interact
+ * "just like the original engine", plus keybinds that place stuff
+ * better — grids, next to other objects):
+ *   - LMB on a part: the ENGINE grab (drag_weld's semantics) — grab at
+ *     the hit point, the part rides the cursor ray at the grabbed
+ *     depth for the whole drag (full 3D), never dipping under the
+ *     floor (oriented down-extent clamp). LMB on empty space: orbit.
+ *   - Shift+LMB on a part: the old y-locked work-plane carry (flat
+ *     layout work); Shift+LMB on empty space: pan. MMB: pan. Wheel:
+ *     zoom.
+ *   - RMB: the engine's RMB selector — pick and select only, never a
+ *     drag; empty space deselects.
  *   - Keys: 1/2/3 add sphere/cube/cylinder at the spawn point (the
  *     camera target's XZ at the part's identity-orientation rest
  *     height), Delete removes the selection, D duplicates it (+0.5 m
  *     X, first-cut offset), A arrays it (3 copies, 0.5 m X step —
  *     first-cut), X/Y/Z rotate the selection +-15 degrees about the
- *     ASSEMBLY axis (Shift = -15), G toggles snap 0 <-> 0.25 m,
- *     R toggles rot-snap 0 <-> 15 degrees, S saves, L loads the spec
+ *     ASSEMBLY axis (Shift = -15), G toggles snap (new designs start
+ *     ON at 0.25 m — grids by default), R toggles rot-snap 0 <-> 15
+ *     degrees, M toggles the MAGNET (a carried part snaps to TOUCH
+ *     the nearest other part along the line of centers at covering-
+ *     sphere distance — the physics_world_add_composite bound math —
+ *     within 0.25 m), F FLOORS the selection (exact oriented rest
+ *     height; grid snap may round it), S saves, L loads the spec
  *     selected in the dropdown, P spawns the design into the shared
  *     world (the 4.6e hookup; there is also a Spawn button), Esc
  *     closes. Typing-block ruling (WP4 4.6g): while the name entry
@@ -97,19 +110,32 @@ static cad_design cw_design;
 static cad_view_camera cw_camera;
 static int cw_design_ready = 0;
 
-/* Interaction modes: one drag at a time. */
+/* Interaction modes: one drag at a time. WP4 4.6h split the old
+ * CW_MODE_DRAG: CW_MODE_CARRY is the ENGINE grab (the drag_weld
+ * precedent — grab at the hit point, the part rides the cursor ray at
+ * the grabbed depth, full 3D); CW_MODE_PLANE_DRAG keeps the old
+ * y-locked work-plane slide for flat layout work (Shift+LMB). */
 enum {
     CW_MODE_IDLE = 0,
-    CW_MODE_ORBIT, /* LMB on empty space */
-    CW_MODE_PAN,   /* Shift+LMB */
-    CW_MODE_DRAG   /* LMB on a part: work-plane move */
+    CW_MODE_ORBIT,      /* LMB on empty space */
+    CW_MODE_PAN,        /* MMB, or Shift+LMB on empty space */
+    CW_MODE_CARRY,      /* LMB on a part: engine-style 3D ray carry */
+    CW_MODE_PLANE_DRAG  /* Shift+LMB on a part: y-locked plane move */
 };
 static int cw_mode = CW_MODE_IDLE;
 static double cw_last_x = 0.0;
 static double cw_last_y = 0.0;
-static int cw_drag_part = -1;     /* index while CW_MODE_DRAG */
-static float cw_drag_plane_y = 0.0f;  /* the work plane's height */
-static vector3 cw_drag_offset = {0.0f, 0.0f, 0.0f}; /* part - plane hit */
+static int cw_drag_part = -1;     /* index while CARRY / PLANE_DRAG */
+static float cw_drag_plane_y = 0.0f;  /* PLANE_DRAG: the work plane's height */
+static vector3 cw_drag_offset = {0.0f, 0.0f, 0.0f}; /* part - grab point */
+/* WP4 4.6h carry + placement state (window-local, like the camera —
+ * the design struct stays pure model data). cw_drag_t = the grabbed
+ * depth along the pick ray (drag_weld's grab-distance semantics);
+ * cw_drag_floor_y = the part's oriented down-extent at grab time (the
+ * carry never dips it under the floor); cw_magnet_on = the M toggle. */
+static float cw_drag_t = 0.0f;
+static float cw_drag_floor_y = 0.0f;
+static int cw_magnet_on = 0;
 
 /* ---- GL state (this window's own context; rebuilt per open) ---- */
 
@@ -530,10 +556,10 @@ static void cw_status_refresh (void) {
     }
     char buf [256];
     snprintf (buf, sizeof (buf),
-              "parts %d/%d | sel %s | snap %.3g m | rotsnap %.3g deg | %s",
+              "parts %d/%d | sel %s | snap %.3g m | rotsnap %.3g deg | magnet %s | %s",
               cw_design.count, cw_design.max_parts, sel,
               (double) cw_design.snap_step, (double) cw_design.rot_snap_deg,
-              cw_design.name);
+              cw_magnet_on ? "on" : "off", cw_design.name);
     gtk_label_set_text (GTK_LABEL (cw_status_label), buf);
 }
 
@@ -818,6 +844,139 @@ static void cw_toggle_rot_snap (void) {
     cw_status_refresh ();
 }
 
+/* ---- placement helpers (WP4 4.6h) -------------------------------------- */
+
+#define CW_MAGNET_ENGAGE 0.25f
+
+/* Covering-sphere radius of ONE part — the same bound math
+ * physics_world_add_composite enforces on whole assemblies: a sphere's
+ * radius, a cube's vertex distance sqrt(hx^2+hy^2+hz^2), a cylinder's
+ * sqrt(hl^2+r^2). Two parts whose centers sit exactly the sum of these
+ * apart along the line of centers have TOUCHING bounds (conservative:
+ * geometry may still sit a little inside for elongated shapes, but can
+ * never overlap). */
+static float cw_cover_radius (const mig_part *p) {
+    if (p -> type == mig_part_sphere) { return p -> radius; }
+    if (p -> type == mig_part_cube) {
+        return sqrtf (p -> half_extensions.x * p -> half_extensions.x +
+                      p -> half_extensions.y * p -> half_extensions.y +
+                      p -> half_extensions.z * p -> half_extensions.z);
+    }
+    return sqrtf (p -> cylinder_half_length * p -> cylinder_half_length +
+                  p -> radius * p -> radius);
+}
+
+/* World-Y half-extent at the CURRENT orientation: the absolute values
+ * of rotation-matrix row 1 (the local axes' world-Y components) dotted
+ * with the part's local half-dims. r10 = 2(xy+wz), r11 = 1-2(x^2+z^2),
+ * r12 = 2(yz-wx) for the engine's (w,x,y,z) quaternion. The cylinder's
+ * axle is local X (the engine's FTC convention), so its local dims are
+ * (hl, r, r). A part placed at y = this rests exactly ON the floor for
+ * any orientation. */
+static float cw_down_extent (const mig_part *p) {
+    const float x = (float) p -> orientation.x;
+    const float y = (float) p -> orientation.y;
+    const float z = (float) p -> orientation.z;
+    const float w = (float) p -> orientation.w;
+    const float r10 = 2.0f * (x * y + w * z);
+    const float r11 = 1.0f - 2.0f * (x * x + z * z);
+    const float r12 = 2.0f * (y * z - w * x);
+    float dx = 0.0f;
+    float dy = 0.0f;
+    float dz = 0.0f;
+    if (p -> type == mig_part_sphere) {
+        dx = p -> radius;
+        dy = p -> radius;
+        dz = p -> radius;
+    } else if (p -> type == mig_part_cube) {
+        dx = p -> half_extensions.x;
+        dy = p -> half_extensions.y;
+        dz = p -> half_extensions.z;
+    } else {
+        dx = p -> cylinder_half_length;
+        dy = p -> radius;
+        dz = p -> radius;
+    }
+    return fabsf (r10) * dx + fabsf (r11) * dy + fabsf (r12) * dz;
+}
+
+/* Magnet assist while carrying: snap the target to TOUCH the nearest
+ * other part along the line of centers — centers exactly the sum of
+ * the covering radii apart. Engages only within CW_MAGNET_ENGAGE of a
+ * valid touch position, so free placement away from parts stays free;
+ * ties break to the nearest part; coincident centers (no line of
+ * centers) skip. The result is written through cad_set_position like
+ * any move, so grid snap still rounds it — a snapped touch can sit up
+ * to half a step off the exact contact — and the floor clamp (applied
+ * after) can lift a would-be under-floor touch: floor wins, snap
+ * honors the grid. */
+static void cw_magnet_adjust (const mig_part *carried, vector3 *target) {
+    const float r_carry = cw_cover_radius (carried);
+    float best_err = 0.0f;
+    vector3 best = {0.0f, 0.0f, 0.0f};
+    int have = 0;
+    for (int i = 0; i < cw_design.count; i++) {
+        if (i == cw_drag_part) { continue; }
+        const mig_part *n = &cw_design.parts [i];
+        const vector3 delta = vector3_subtraction (*target, n -> position);
+        const float dist = vector3_length (delta);
+        if (dist <= 1e-6f) { continue; }
+        const float want = r_carry + cw_cover_radius (n);
+        const float err = fabsf (dist - want);
+        if (err > CW_MAGNET_ENGAGE) { continue; }
+        if ((!have) || (err < best_err)) {
+            have = 1;
+            best_err = err;
+            best = vector3_addition (n -> position,
+                                     vector3_scaling (delta, want / dist));
+        }
+    }
+    if (have) { *target = best; }
+}
+
+/* Carry floor clamp: the raw y, but never below the grabbed part's
+ * oriented down-extent. With grid snap on, the model rounds the
+ * written position — pass at least the first snap MULTIPLE at or
+ * above the floor rest (a multiple is snap-invariant) so the rounding
+ * can never dip the part under the floor. */
+static float cw_carry_clamp_y (float raw_y) {
+    float y = (raw_y < cw_drag_floor_y) ? cw_drag_floor_y : raw_y;
+    const float step = cw_design.snap_step;
+    if (step > 0.0f) {
+        const float y_min = ceilf (cw_drag_floor_y / step) * step;
+        if (y < y_min) { y = y_min; }
+    }
+    return y;
+}
+
+/* M: the magnet placement toggle (the status line shows the state). */
+static void cw_toggle_magnet (void) {
+    cw_magnet_on = !cw_magnet_on;
+    cw_status_refresh ();
+}
+
+/* F: floor the selection — exact oriented rest height via the
+ * down-extent (any orientation rests ON y = 0). Written through
+ * cad_set_position, so grid snap may round the rest height (turn G
+ * off for the exact float); the XZ snap stays honored either way. */
+static void cw_floor_selected (void) {
+    if ((cw_design.selected < 0) || (cw_design.selected >= cw_design.count)) {
+        cw_status_err ("floor: nothing selected");
+        return;
+    }
+    const mig_part *p = &cw_design.parts [cw_design.selected];
+    vector3 pos = p -> position;
+    pos.y = cw_down_extent (p);
+    const int rc = cad_set_position (&cw_design, cw_design.selected, pos);
+    if (rc != cad_ok) {
+        char buf [128];
+        snprintf (buf, sizeof (buf), "floor refused (%s)", cw_err_name (rc));
+        cw_status_err (buf);
+        return;
+    }
+    cw_status_refresh ();
+}
+
 /* ---- input handlers ---------------------------------------------------- */
 
 static void cw_on_press (GtkGestureClick *gesture, gint n_press, gdouble x,
@@ -831,32 +990,62 @@ static void cw_on_press (GtkGestureClick *gesture, gint n_press, gdouble x,
     gtk_widget_grab_focus (cw_gl_area);
     const guint button = gtk_gesture_single_get_current_button (
         GTK_GESTURE_SINGLE (gesture));
-    if (button != 1) { return; } /* LMB only */
     GdkModifierType state = 0;
     GdkEvent *event = gtk_event_controller_get_current_event (
         GTK_EVENT_CONTROLLER (gesture));
     if (event) { state = gdk_event_get_modifier_state (event); }
     cw_last_x = x;
     cw_last_y = y;
-    if (state & GDK_SHIFT_MASK) {
+    /* RMB (button 3): the engine's RMB selector — pick and select
+     * only, never a drag; empty space deselects (-1 is the model's
+     * documented deselect). */
+    if (button == 3) {
+        cad_select (&cw_design, cw_pick (x, y, NULL, NULL));
+        cw_status_refresh ();
+        return;
+    }
+    /* MMB (button 2): pan. */
+    if (button == 2) {
         cw_mode = CW_MODE_PAN;
         return;
     }
+    if (button != 1) { return; }
+    const int shift = (state & GDK_SHIFT_MASK) ? 1 : 0;
     float t = 0.0f;
     vector3 point = {0.0f, 0.0f, 0.0f};
     const int picked = cw_pick (x, y, &t, &point);
+    if (shift) {
+        /* Shift+LMB: the flat-layout pair — pan on empty space, the
+         * y-locked work-plane carry on a part (the pre-4.6h drag; the
+         * grab offset freezes the grip so the part doesn't jump). */
+        if (picked < 0) {
+            cw_mode = CW_MODE_PAN;
+            return;
+        }
+        cad_select (&cw_design, picked);
+        cw_drag_part = picked;
+        cw_drag_plane_y = cw_design.parts [picked].position.y;
+        cw_drag_offset = vector3_subtraction (cw_design.parts [picked].position, point);
+        cw_mode = CW_MODE_PLANE_DRAG;
+        cw_status_refresh ();
+        return;
+    }
     if (picked < 0) {
         cw_mode = CW_MODE_ORBIT;
         return;
     }
+    /* Plain LMB on a part: the ENGINE grab (drag_weld's semantics) —
+     * grab at the hit point and carry the part along the cursor ray at
+     * the grabbed depth (full 3D) until release. The grab offset
+     * freezes the grip point; the floor clamp freezes at the part's
+     * oriented down-extent so a carry can never dip it under the
+     * floor. */
     cad_select (&cw_design, picked);
-    /* Drag on the part-height work plane: y = the part's CURRENT
-     * height; the grab offset freezes the part's local grip point so
-     * the part doesn't jump to the cursor. */
     cw_drag_part = picked;
-    cw_drag_plane_y = cw_design.parts [picked].position.y;
+    cw_drag_t = t;
+    cw_drag_floor_y = cw_down_extent (&cw_design.parts [picked]);
     cw_drag_offset = vector3_subtraction (cw_design.parts [picked].position, point);
-    cw_mode = CW_MODE_DRAG;
+    cw_mode = CW_MODE_CARRY;
     cw_status_refresh ();
 }
 
@@ -905,7 +1094,29 @@ static void cw_on_motion (GtkEventControllerMotion *controller, gdouble x,
             vector3_scaling (up, dy * k));
         return;
     }
-    if (cw_mode == CW_MODE_DRAG) {
+    if (cw_mode == CW_MODE_CARRY) {
+        int w = 0;
+        int h = 0;
+        if (!cw_widget_pixels (&w, &h)) { return; }
+        cw_camera.aspect = (float) w / (float) h;
+        const float ndc_x = (float) (2.0 * x / (double) w - 1.0);
+        const float ndc_y = 1.0f - (float) (2.0 * y / (double) h);
+        const cad_view_ray ray = cad_view_ray_from_screen (&cw_camera, ndc_x, ndc_y);
+        /* The engine carry: the part rides the cursor ray at the
+         * grabbed depth (t along the UNIT direction) plus the frozen
+         * grip offset — no jump at grab, no plane lock, full 3D. */
+        vector3 target = vector3_addition (
+            vector3_scaling (ray.direction, cw_drag_t), cw_drag_offset);
+        target = vector3_addition (ray.origin, target);
+        if (cw_magnet_on) {
+            cw_magnet_adjust (&cw_design.parts [cw_drag_part], &target);
+        }
+        target.y = cw_carry_clamp_y (target.y);
+        cad_set_position (&cw_design, cw_drag_part, target);
+        cw_status_refresh ();
+        return;
+    }
+    if (cw_mode == CW_MODE_PLANE_DRAG) {
         int w = 0;
         int h = 0;
         if (!cw_widget_pixels (&w, &h)) { return; }
@@ -970,11 +1181,11 @@ static gboolean cw_on_key (GtkEventControllerKey *controller, guint keyval,
     if (cw_focus_in_name_entry ()) {
         return FALSE;
     }
-    /* Mid-drag the selection indices can shift under a Delete (the
-     * model shifts part indices down), which would retarget the drag
+    /* Mid-carry the selection indices can shift under a Delete (the
+     * model shifts part indices down), which would retarget the carry
      * at the wrong part — CAD verbs are frozen until the button
-     * releases. Esc still closes. */
-    if (cw_mode == CW_MODE_DRAG) {
+     * releases, in BOTH carry modes. Esc still closes. */
+    if ((cw_mode == CW_MODE_CARRY) || (cw_mode == CW_MODE_PLANE_DRAG)) {
         return FALSE;
     }
     const int shift = (state & GDK_SHIFT_MASK) ? 1 : 0;
@@ -997,6 +1208,10 @@ static gboolean cw_on_key (GtkEventControllerKey *controller, guint keyval,
         case GDK_KEY_G: cw_toggle_snap (); return TRUE;
         case GDK_KEY_r:
         case GDK_KEY_R: cw_toggle_rot_snap (); return TRUE;
+        case GDK_KEY_m:
+        case GDK_KEY_M: cw_toggle_magnet (); return TRUE;
+        case GDK_KEY_f:
+        case GDK_KEY_F: cw_floor_selected (); return TRUE;
         case GDK_KEY_s:
         case GDK_KEY_S: cw_save_design (); return TRUE;
         case GDK_KEY_l:
@@ -1211,6 +1426,11 @@ void cad_window_toggle (void) {
         cw_camera.distance = 9.0f;
         cw_camera.fov_y_deg = 50.0f;
         cw_camera.aspect = 1.5f;
+        /* WP4 4.6h: new designs start with grid snap ON at 0.25 m —
+         * placement-in-grids is the default; G frees the placement.
+         * (The gated model's own default stays 0; this is the window's
+         * GUI preference.) */
+        cw_design.snap_step = 0.25f;
         cw_design_ready = 1;
     }
     if (cw_window) {

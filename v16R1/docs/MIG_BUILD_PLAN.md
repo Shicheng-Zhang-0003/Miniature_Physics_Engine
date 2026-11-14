@@ -2194,6 +2194,42 @@ Ledger (new entries get a line, never an edit of a past line):
   including mid-typing. No new gate (GUI-only plumbing). Suite 72/70,
   quick 86/86, tui-smoke PASS, engine clean under -Werror.
 
+- 2026-11-14 — WP4 4.6h (this commit, the interaction ruling): click
+  objects and interact "just like the original engine", plus keybinds
+  that place stuff better (in grids, next to other objects). The old
+  CW_MODE_DRAG split in two: CW_MODE_CARRY is the ENGINE grab (the
+  drag_weld precedent) — plain LMB on a part grabs at the HIT POINT
+  and the part rides the cursor ray at the grabbed depth (cw_drag_t,
+  t along the UNIT direction) for the whole drag, full 3D, no plane
+  lock; the frozen grip offset (part_pos - hit point) means no jump at
+  grab; a floor clamp freezes cw_drag_floor_y at the part's ORIENTED
+  down-extent (|quat row 1| . local half-dims; r10 = 2(xy+wz),
+  r11 = 1-2(x^2+z^2), r12 = 2(yz-wx); the cylinder's axle is local X
+  so its dims are (hl, r, r)) and, with grid snap on, passes at least
+  the first snap multiple at/above the rest height so the model's
+  rounding can never dip the part under the floor. CW_MODE_PLANE_DRAG
+  keeps the old y-locked work-plane slide (Shift+LMB on a part — flat
+  layout). The mouse map is now the engine's: RMB = pick+select only
+  (empty = deselect, the RMB-selector analog), MMB = pan, Shift+LMB
+  empty = pan, plain LMB empty = orbit. Placement keys: M toggles the
+  MAGNET — a carried part snaps to TOUCH the nearest other part along
+  the line of centers at covering-sphere distance (the exact
+  physics_world_add_composite bound math: sphere r, cube
+  sqrt(hx^2+hy^2+hz^2), cylinder sqrt(hl^2+r^2)), engaging within
+  0.25 m, ties to the nearest, coincident centers skip; writes through
+  cad_set_position so grid snap stays honored (a snapped touch can sit
+  up to half a step off exact contact; the floor clamp applies after
+  — floor wins). F FLOORS the selection at the exact oriented rest
+  height via the same down-extent (grid snap may round it — G frees;
+  XZ snap stays honored). New designs start with grid snap ON at
+  0.25 m (the window's GUI preference; the gated model's default
+  stays 0) and the status line shows the magnet state. Mid-drag key
+  guard now covers BOTH carry modes. Window-local statics only
+  (cw_drag_t / cw_drag_floor_y / cw_magnet_on) — the design struct
+  stays pure model data. No new gate (GUI-only; the pick/ray/set
+  contracts it drives are the gated view-math + model). Suite 72/70,
+  quick 86/86, tui-smoke PASS, engine clean under -Werror.
+
 ## §10 Definition of done for v16S (the cut checklist)
 
 All gates green at the final floor; policy amendment committed; release
