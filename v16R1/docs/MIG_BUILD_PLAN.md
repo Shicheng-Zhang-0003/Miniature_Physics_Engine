@@ -2037,6 +2037,33 @@ Ledger (new entries get a line, never an edit of a past line):
   toolset = add/select/move/rotate/delete/duplicate/array/resize/
   snap/save/load/rename.
 
+- 2026-11-14 — WP4 4.6b (this commit, view math for the window):
+  `cad/cad_view_math.{h,c}` — the pure-float math the CAD window will
+  click and drag with: the orbit-camera basis (forward/right/up/eye,
+  y-up, yaw 0/pitch 0 = eye on +Z looking down -Z), perspective
+  unprojection (ndc -> UNIT ray, edge rays spread tan(fov/2)·aspect),
+  ray picking vs sphere/box/cylinder with part-local orientation
+  applied through a LOCAL quaternion conjugate (math3d has no
+  conjugate helper — local static; rotate via
+  vector4_rotate_to_vector3; the cylinder axle is LOCAL X per
+  MPE_FTC_090, sides then end caps, nearest surface wins), and the
+  work-plane drag projection (parallel/behind-the-ray refusals, out
+  untouched on 0). Picking contract: first surface crossed, t along
+  the UNIT direction, t = 0 for an origin inside. Oracle discipline:
+  every target a hand-derived closed form in the check comment
+  (basis from the angle definitions, slab/quadratic geometry,
+  the tan(fov/2)·aspect spread) — never computed with the function
+  under test. Cold-path trig ruling carried from 4.6: the click/
+  authoring path may sinf/cosf without touching the det-fallback
+  counters (a human already holds the mouse; the per-tick solver ban
+  is untouched). Standalone: compiled into ENGINE_SRCS by the
+  cad/*.c wildcard and the suite, nothing calls it yet — dead code
+  until the window TU (next brick, GUI-only and suite-unlinked, the
+  4.4 panel precedent). New blocking gate 72 `cad_view_math`;
+  floor raised 71 -> 72 (loud edit in test_runner.py + TESTING.md +
+  RELEASE_GATES.md + RELEASE_POLICY.md + readme). Suite 72/70,
+  quick 86/86.
+
 ## §10 Definition of done for v16S (the cut checklist)
 
 All gates green at the final floor; policy amendment committed; release

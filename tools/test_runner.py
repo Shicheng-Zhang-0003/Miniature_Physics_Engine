@@ -3,7 +3,7 @@
 
 Profiles:
   quick    Python runner-contract tests and the canonical C regression suite
-           (71 cases incl. 2 informational diags; full suite re-run under 5
+           (72 cases incl. 2 informational diags; full suite re-run under 5
            regimes default/light/heavy/brittle/sticky via MPE_TEST_REGIME).
   physics  quick + every isolated legacy case (30) and all paranoia cases (15).
   full     physics + ASan/UBSan suite, MFS robotics (37 gated), TUI snapshots
@@ -16,7 +16,7 @@ only the Python standard library.
 
 Strict contract: suite cases that print [SKIP] (self-skipped coverage) fail
 the run unless --allow-skip is given; [XFAIL] markers are surfaced in the
-summary counts but never block. Registry floors: MIN_SUITE_ENTRIES=71,
+summary counts but never block. Registry floors: MIN_SUITE_ENTRIES=72,
 MIN_LEGACY_ENTRIES=30, MIN_PARANOIA_ENTRIES=15; summary contract requires
 Total == registry size and Blocking failures == 0.
 """
@@ -231,9 +231,14 @@ MPE_TEST_REGIMES = ("default", "light", "heavy", "brittle", "sticky")
 # CAD editor's design model: typed adds + refusal battery, transforms with
 # the left-composition pin, mig_bridge build seam ≡ direct compose with the
 # gap preserved, frozen-spec-grammar persistence round trip, ASCII plan
-# view), so the floor follows the registry 70 -> 71. Loud edit, one gate
-# per raise.
-MIN_SUITE_ENTRIES = 71
+# view), so the floor followed the registry 70 -> 71.
+# DESPOT-2026-11-14: WP4 4.6b added gate 72 `cad_view_math` (the CAD
+# window's view math: orbit-camera basis, perspective unprojection, ray
+# picking vs sphere/box/cylinder with part-local orientation, work-plane
+# drag projection — gated headless while the window TU itself is GUI-only
+# and suite-unlinked), so the floor follows the registry 71 -> 72. Loud
+# edit, one gate per raise.
+MIN_SUITE_ENTRIES = 72
 # DESPOT-2026-10-01: pin per-suite floors so deleting a legacy/paranoia target
 # + its make target together cannot shrink the headline silently (the 220->204
 # drift). Canonical floor above; legacy 30 + paranoia 15 pinned here.

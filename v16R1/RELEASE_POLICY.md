@@ -8,15 +8,16 @@ documentation, and hygiene only — no new features.
 system (MPI hot-plug), per-world config, data-structure upgrades
 (growable pools, O(1) caches), kernel global-state removal, and the TUI
 stress suite. It keeps the v15R3 physics-truth contract (defaults
-bit-identical unless noted) and extends the suite to 71 registered / 69
-blocking green + 2 diag-informational (41 physics + 28 MIG/composite
+bit-identical unless noted) and extends the suite to 72 registered / 70
+blocking green + 2 diag-informational (41 physics + 29 MIG/composite
 gates + 2 diag; 2026-11-11 raised the floor 46 -> 61, then 61 -> 65
 with the WP2.5 convex-hull gates, 65 -> 66 on 2026-11-12 with WP2.6's
 first hull-catalog gate, 66 -> 67 later the same day with the
 generic hull-vs-hull SAT gate, 67 -> 68 with the hull-body
 spawn/consumption gate, 68 -> 69 with the UV-ellipsoid gate, and
 69 -> 70 with the renderer unit-mesh contract gate, WP2.6 2.6.6, and
-70 -> 71 on 2026-11-13 with the CAD editor design-model gate, WP4 4.6).
+70 -> 71 on 2026-11-13 with the CAD editor design-model gate, WP4 4.6,
+71 -> 72 on 2026-11-14 with the CAD view-math gate, WP4 4.6b).
 
 ## What v15 Delivered
 

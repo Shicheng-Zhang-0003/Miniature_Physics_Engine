@@ -319,7 +319,7 @@ tui-smoke: build_tui
 # failing test is never misreported as a build failure); test_<name> builds
 # and runs (human use).
 # TRUE god file split: collision_mechanics.c (2305 lines) → 4 focused TUs
-MPE_TEST_CORE := core/physics_world.c core/rigidbody.c core/mpe_registry.c core/mpe_loader.c core/mpe_diag.c core/event_log.c core/det_math.c core/mpe_primary.c core/mig_mass.c core/mig_spec.c core/mig_hull.c cad/cad_editor.c \
+MPE_TEST_CORE := core/physics_world.c core/rigidbody.c core/mpe_registry.c core/mpe_loader.c core/mpe_diag.c core/event_log.c core/det_math.c core/mpe_primary.c core/mig_mass.c core/mig_spec.c core/mig_hull.c cad/cad_editor.c cad/cad_view_math.c \
 	physics/collision_narrowphase.c physics/collision_cache.c physics/collision_solver.c physics/collision_ccd.c physics/collision_cylinder.c physics/broadphase.c physics/constraint.c physics/revolute_joint.c physics/depenetration.c physics/islands.c \
 	config/mpe_config.c config/mpe_config_schema.c scene/boundary.c ecosystem/mpe_ecosystem.c
 ifeq ($(MPE_WINDOWS),1)

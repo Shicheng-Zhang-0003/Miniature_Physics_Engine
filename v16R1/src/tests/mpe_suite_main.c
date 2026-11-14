@@ -132,6 +132,7 @@ int mpe_t_mig_hull_spawn (void);
 int mpe_t_mig_hull_ellipsoid (void);
 int mpe_t_mig_hull_render_stamp (void);
 int mpe_t_cad_editor_model (void);
+int mpe_t_cad_view_math (void);
 typedef struct {
     const char *name;
     int (*fn) (void);
@@ -311,6 +312,17 @@ static const mpe_entry_t mpe_registry [] = {
      * regression. Standalone: nothing in the shipped GUI calls the model
      * yet — the terminal-style shell is the next brick. */
     {"cad_editor_model", mpe_t_cad_editor_model, 0},
+    /* MIG WP4 4.6b: the CAD window's VIEW MATH (cad/cad_view_math.c) —
+     * orbit-camera basis (orthonormal + eye-on-axis), perspective
+     * unprojection (center/edge rays), ray-vs-sphere/box/cylinder
+     * picking with part-local orientation (quaternion conjugate;
+     * cylinder axle LOCAL X per MPE_FTC_090), and the work-plane drag
+     * projection (parallel/behind refusals). Every target is a
+     * hand-derived closed form in the check comment. Standalone: the
+     * window TU is GUI-only and suite-unlinked (the 4.4 panel
+     * precedent) — the math that decides which part you clicked must
+     * not be. */
+    {"cad_view_math", mpe_t_cad_view_math, 0},
 };
 #define MPE_NTESTS ((int) (sizeof (mpe_registry) / sizeof (mpe_registry [0])))
 /* Returns 0 pass, 1 fail, 2 skipped.

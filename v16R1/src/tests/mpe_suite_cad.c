@@ -37,6 +37,7 @@
  */
 #include "mpe_test.h"
 #include "../cad/cad_editor.h"
+#include "../cad/cad_view_math.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -532,6 +533,234 @@ int mpe_t_cad_editor_model (void) {
      * contains 'o' in "not shown") */
     MPE_CHECK (&t, memchr (cad_gate_line (pv, 24), 'o', 64) == NULL);
     MPE_CHECK (&t, cad_gate_line (pv, 13) [32] == 'o'); /* and back at the origin */
+
+    mpe_test_end (&t);
+    return t.failures;
+}
+
+/* ---- WP4 4.6b gate: cad_view_math ----------------------------------
+ * The CAD window's picking/camera math, gated headless (the window TU
+ * itself is GUI-only and suite-unlinked — the math that decides which
+ * part you clicked must not be). Oracle discipline: every target is a
+ * hand-derived closed form written in the comment beside the check
+ * (orbit basis from the angle definitions, ray-primitive t values from
+ * the quadratic/slab geometry, the spread ray from tan(fov/2) * aspect)
+ * — never computed with the function under test. */
+int mpe_t_cad_view_math (void) {
+    mpe_test_t t;
+    mpe_test_begin (&t, "cad_view_math");
+    mpe_clamp_counters_reset ();
+
+    /* ---- 1. orbit basis ------------------------------------------------ */
+    cad_view_camera cam;
+    memset (&cam, 0, sizeof (cam));
+    cam.target = (vector3) {0.0f, 0.0f, 0.0f};
+    cam.yaw_deg = 0.0f;
+    cam.pitch_deg = 0.0f;
+    cam.distance = 4.0f;
+    cam.fov_y_deg = 90.0f;
+    cam.aspect = 2.0f;
+    /* yaw 0 / pitch 0: eye on +Z looking down -Z. */
+    MPE_CHECK_NEAR (&t, cad_view_forward (&cam).z, -1.0, 1e-5, "fwd -Z");
+    MPE_CHECK_NEAR (&t, cad_view_forward (&cam).x, 0.0, 1e-5, "fwd x 0");
+    MPE_CHECK_NEAR (&t, cad_view_eye (&cam).z, 4.0, 1e-6, "eye z=+d");
+    MPE_CHECK_NEAR (&t, cad_view_right (&cam).x, 1.0, 1e-5, "right +X");
+    MPE_CHECK_NEAR (&t, cad_view_up (&cam).y, 1.0, 1e-5, "up +Y");
+    /* yaw 90: the eye swings to +X, forward -X, screen-right -Z
+     * (cross(fwd, up) = cross((-1,0,0), (0,1,0)) = (0,0,-1)). */
+    cam.yaw_deg = 90.0f;
+    MPE_CHECK_NEAR (&t, cad_view_forward (&cam).x, -1.0, 1e-5, "fwd -X");
+    MPE_CHECK_NEAR (&t, cad_view_eye (&cam).x, 4.0, 1e-5, "eye x=+d");
+    MPE_CHECK_NEAR (&t, cad_view_right (&cam).z, -1.0, 1e-5, "right -Z");
+    /* pitch 30: eye y = d*sin(30) = 2, horizontal reach d*cos(30). */
+    cam.yaw_deg = 0.0f;
+    cam.pitch_deg = 30.0f;
+    MPE_CHECK_NEAR (&t, cad_view_eye (&cam).y, 2.0, 1e-5, "eye y=d*sin30");
+    MPE_CHECK_NEAR (&t, cad_view_eye (&cam).z, 4.0 * 0.8660254037844386, 1e-5,
+                    "eye z=d*cos30");
+    MPE_CHECK_NEAR (&t, cad_view_forward (&cam).y, -0.5, 1e-5, "fwd y=-sin30");
+    /* general pose: the three basis vectors stay orthonormal and the
+     * eye sits exactly one `distance` back along the forward axis. */
+    cam.yaw_deg = 37.0f;
+    cam.pitch_deg = -22.0f;
+    cam.distance = 6.0f;
+    {
+        const vector3 f = cad_view_forward (&cam);
+        const vector3 r = cad_view_right (&cam);
+        const vector3 u = cad_view_up (&cam);
+        const vector3 e = cad_view_eye (&cam);
+        MPE_CHECK_NEAR (&t, (double) vector3_dot (f, f), 1.0, 1e-5, "|f|=1");
+        MPE_CHECK_NEAR (&t, (double) vector3_dot (r, r), 1.0, 1e-5, "|r|=1");
+        MPE_CHECK_NEAR (&t, (double) vector3_dot (u, u), 1.0, 1e-5, "|u|=1");
+        MPE_CHECK_NEAR (&t, (double) vector3_dot (f, r), 0.0, 1e-5, "f.r=0");
+        MPE_CHECK_NEAR (&t, (double) vector3_dot (f, u), 0.0, 1e-5, "f.u=0");
+        MPE_CHECK_NEAR (&t, (double) vector3_dot (r, u), 0.0, 1e-5, "r.u=0");
+        /* eye == target - f*6, component-wise */
+        MPE_CHECK_NEAR (&t, e.x, cam.target.x - 6.0 * (double) f.x, 1e-5, "eye on axis x");
+        MPE_CHECK_NEAR (&t, e.y, cam.target.y - 6.0 * (double) f.y, 1e-5, "eye on axis y");
+        MPE_CHECK_NEAR (&t, e.z, cam.target.z - 6.0 * (double) f.z, 1e-5, "eye on axis z");
+    }
+
+    /* ---- 2. screen -> ray ---------------------------------------------- */
+    cam.yaw_deg = 0.0f;
+    cam.pitch_deg = 0.0f;
+    cam.distance = 4.0f;
+    cam.fov_y_deg = 90.0f; /* tan(fov/2) = 1 */
+    cam.aspect = 2.0f;
+    {
+        const cad_view_ray center = cad_view_ray_from_screen (&cam, 0.0f, 0.0f);
+        MPE_CHECK_NEAR (&t, center.direction.z, -1.0, 1e-6, "center ray -Z");
+        MPE_CHECK_NEAR (&t, center.origin.z, 4.0, 1e-6, "center ray origin");
+        /* ndc (1,1): spread right*1*1*2 + up*1*1 = (2,1,0);
+         * dir = (2,1,-1)/sqrt(6) = (.8165, .4082, -.4082). */
+        const cad_view_ray corner = cad_view_ray_from_screen (&cam, 1.0f, 1.0f);
+        MPE_CHECK_NEAR (&t, corner.direction.x, 0.816496580927726, 1e-5,
+                        "corner ray x");
+        MPE_CHECK_NEAR (&t, corner.direction.y, 0.408248290463863, 1e-5,
+                        "corner ray y");
+        MPE_CHECK_NEAR (&t, corner.direction.z, -0.408248290463863, 1e-5,
+                        "corner ray z");
+        MPE_CHECK_NEAR (&t, (double) vector3_dot (corner.direction,
+                                                  corner.direction), 1.0, 1e-6,
+                        "corner ray unit");
+        /* The center ray through the camera hits a sphere AT the target:
+         * t = d - r = 3.5, surface point (0,0,0.5), outward normal +Z. */
+        const cad_view_hit hit_target =
+            cad_view_pick_sphere (center, (vector3) {0.0f, 0.0f, 0.0f}, 0.5f);
+        MPE_CHECK (&t, hit_target.hit);
+        MPE_CHECK_NEAR (&t, hit_target.t, 3.5, 1e-6, "target sphere t");
+        MPE_CHECK_NEAR (&t, hit_target.normal.z, 1.0, 1e-6, "target sphere n");
+    }
+
+    /* ---- 3. ray-sphere exact ------------------------------------------- */
+    {
+        const cad_view_ray ray = {{0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -1.0f}};
+        /* forward hit: t = 2 - 0.5 = 1.5, point (0,0,-1.5), normal +Z. */
+        const cad_view_hit hit = cad_view_pick_sphere (
+            ray, (vector3) {0.0f, 0.0f, -2.0f}, 0.5f);
+        MPE_CHECK (&t, hit.hit);
+        MPE_CHECK_NEAR (&t, hit.t, 1.5, 1e-6, "sphere t");
+        MPE_CHECK_NEAR (&t, hit.point.z, -1.5, 1e-6, "sphere point");
+        MPE_CHECK_NEAR (&t, hit.normal.z, 1.0, 1e-6, "sphere normal");
+        /* miss (off-axis) and behind-the-ray both refuse */
+        MPE_CHECK (&t, !cad_view_pick_sphere (
+            ray, (vector3) {0.0f, 5.0f, -2.0f}, 0.5f).hit);
+        MPE_CHECK (&t, !cad_view_pick_sphere (
+            ray, (vector3) {0.0f, 0.0f, 2.0f}, 0.5f).hit);
+        /* origin inside: t = exit distance 0.5, normal points OUT -Z. */
+        const cad_view_ray inside = {{0.0f, 0.0f, -2.0f}, {0.0f, 0.0f, -1.0f}};
+        const cad_view_hit exit_hit = cad_view_pick_sphere (
+            inside, (vector3) {0.0f, 0.0f, -2.0f}, 0.5f);
+        MPE_CHECK (&t, exit_hit.hit);
+        MPE_CHECK_NEAR (&t, exit_hit.t, 0.5, 1e-6, "inside t=exit");
+        MPE_CHECK_NEAR (&t, exit_hit.normal.z, -1.0, 1e-6, "inside normal");
+    }
+
+    /* ---- 4. ray-box (slab + ORIENTATION) -------------------------------- */
+    {
+        const cad_view_ray ray = {{0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -1.0f}};
+        /* face hit through z = -2: t = 2, normal +Z. */
+        const cad_view_hit hit = cad_view_pick_box (
+            ray, (vector3) {0.0f, 0.0f, -3.0f}, (vector3) {1.0f, 1.0f, 1.0f},
+            vector4_identity ());
+        MPE_CHECK (&t, hit.hit);
+        MPE_CHECK_NEAR (&t, hit.t, 2.0, 1e-6, "box t");
+        MPE_CHECK_NEAR (&t, hit.point.z, -2.0, 1e-6, "box point");
+        MPE_CHECK_NEAR (&t, hit.normal.z, 1.0, 1e-6, "box normal");
+        /* parallel OUTSIDE the x slab misses outright */
+        const cad_view_ray offset = {{5.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -1.0f}};
+        MPE_CHECK (&t, !cad_view_pick_box (
+            offset, (vector3) {0.0f, 0.0f, -3.0f}, (vector3) {1.0f, 1.0f, 1.0f},
+            vector4_identity ()).hit);
+        /* origin inside: t = 0 */
+        const cad_view_ray inside = {{0.0f, 0.0f, -3.0f}, {0.0f, 0.0f, -1.0f}};
+        const cad_view_hit inside_hit = cad_view_pick_box (
+            inside, (vector3) {0.0f, 0.0f, -3.0f}, (vector3) {1.0f, 1.0f, 1.0f},
+            vector4_identity ());
+        MPE_CHECK (&t, inside_hit.hit && inside_hit.t == 0.0f);
+        /* ORIENTATION: a 2x1x1 box rotated 90 degrees about Z occupies
+         * y in [-2, 2] in the assembly frame (rotating local x-extent 2
+         * onto assembly y). The ray at assembly y = 1.5 misses the
+         * UNROTATED 1x1x1 box but hits the rotated one, both t = 2
+         * through the same face plane — the quat did the work. */
+        const vector4 z90 = {0.7071067811865476f, 0.0f, 0.0f,
+                             0.7071067811865476f};
+        const cad_view_ray at_y15 = {{0.5f, 1.5f, 0.0f}, {0.0f, 0.0f, -1.0f}};
+        MPE_CHECK (&t, !cad_view_pick_box (
+            at_y15, (vector3) {0.0f, 0.0f, -3.0f}, (vector3) {1.0f, 1.0f, 1.0f},
+            vector4_identity ()).hit);
+        const cad_view_hit rot_hit = cad_view_pick_box (
+            at_y15, (vector3) {0.0f, 0.0f, -3.0f}, (vector3) {2.0f, 1.0f, 1.0f},
+            z90);
+        MPE_CHECK (&t, rot_hit.hit);
+        MPE_CHECK_NEAR (&t, rot_hit.t, 2.0, 1e-5, "rotated box t");
+        MPE_CHECK_NEAR (&t, rot_hit.point.y, 1.5, 1e-5, "rotated box point y");
+        MPE_CHECK_NEAR (&t, rot_hit.normal.z, 1.0, 1e-5, "rotated box normal");
+    }
+
+    /* ---- 5. ray-cylinder (axle LOCAL X: sides + caps) ------------------- */
+    {
+        const cad_view_ray ray = {{0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -1.0f}};
+        /* side hit through the cross-section circle: (3 - t)^2 = 0.25
+         * -> t = 2.5 (nearest root), point (0,0,-2.5), normal +Z. */
+        const cad_view_hit side = cad_view_pick_cylinder (
+            ray, (vector3) {0.0f, 0.0f, -3.0f}, 0.5f, 1.0f, vector4_identity ());
+        MPE_CHECK (&t, side.hit);
+        MPE_CHECK_NEAR (&t, side.t, 2.5, 1e-6, "cyl side t");
+        MPE_CHECK_NEAR (&t, side.point.z, -2.5, 1e-6, "cyl side point");
+        MPE_CHECK_NEAR (&t, side.normal.z, 1.0, 1e-6, "cyl side normal");
+        /* cap hit: ray along -X crosses the x = +1 disc at t = 4. */
+        const cad_view_ray cap_ray = {{5.0f, 0.0f, -3.0f}, {-1.0f, 0.0f, 0.0f}};
+        const cad_view_hit cap = cad_view_pick_cylinder (
+            cap_ray, (vector3) {0.0f, 0.0f, -3.0f}, 0.5f, 1.0f,
+            vector4_identity ());
+        MPE_CHECK (&t, cap.hit);
+        MPE_CHECK_NEAR (&t, cap.t, 4.0, 1e-6, "cyl cap t");
+        MPE_CHECK_NEAR (&t, cap.point.x, 1.0, 1e-6, "cyl cap point");
+        MPE_CHECK_NEAR (&t, cap.normal.x, 1.0, 1e-6, "cyl cap normal");
+        /* parallel to the axle but outside the tube radius: the cap
+         * disc check refuses (0.6^2 > 0.5^2) -> miss */
+        const cad_view_ray beside = {{0.0f, 0.6f, -3.0f}, {1.0f, 0.0f, 0.0f}};
+        MPE_CHECK (&t, !cad_view_pick_cylinder (
+            beside, (vector3) {0.0f, 0.0f, -3.0f}, 0.5f, 1.0f,
+            vector4_identity ()).hit);
+        /* cylinder behind the ray: miss */
+        const cad_view_ray away = {{0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}};
+        MPE_CHECK (&t, !cad_view_pick_cylinder (
+            away, (vector3) {0.0f, 0.0f, -3.0f}, 0.5f, 1.0f,
+            vector4_identity ()).hit);
+    }
+
+    /* ---- 6. work-plane drag --------------------------------------------- */
+    {
+        /* ray from (0,2,0) along (0,-1,-1)/sqrt(2) hits y=0 at z = -2:
+         * t = 2 / (1/sqrt(2)) = 2*sqrt(2), point (0, 0, -2). */
+        cad_view_ray ray;
+        ray.origin = (vector3) {0.0f, 2.0f, 0.0f};
+        ray.direction = vector3_normalisation ((vector3) {0.0f, -1.0f, -1.0f});
+        vector3 out = {0.0f, 0.0f, 0.0f};
+        MPE_CHECK (&t, cad_view_ray_plane (ray, (vector3) {0.0f, 0.0f, 0.0f},
+                                           (vector3) {0.0f, 1.0f, 0.0f},
+                                           &out) == 1);
+        MPE_CHECK_NEAR (&t, out.y, 0.0, 1e-5, "plane out y");
+        MPE_CHECK_NEAR (&t, out.z, -2.0, 1e-5, "plane out z");
+        /* parallel ray: 0, out untouched */
+        const cad_view_ray parallel = {{0.0f, 2.0f, 0.0f}, {1.0f, 0.0f, 0.0f}};
+        vector3 untouched = {7.0f, 7.0f, 7.0f};
+        MPE_CHECK (&t, cad_view_ray_plane (parallel, (vector3) {0.0f, 0.0f, 0.0f},
+                                           (vector3) {0.0f, 1.0f, 0.0f},
+                                           &untouched) == 0);
+        MPE_CHECK (&t, untouched.x == 7.0f && untouched.z == 7.0f);
+        /* plane behind the ray: 0 (refuse, don't wrap) */
+        const cad_view_ray away = {{0.0f, 2.0f, 0.0f}, {0.0f, 1.0f, 0.0f}};
+        MPE_CHECK (&t, cad_view_ray_plane (away, (vector3) {0.0f, 0.0f, 0.0f},
+                                           (vector3) {0.0f, 1.0f, 0.0f},
+                                           &out) == 0);
+        /* NULL out refuses */
+        MPE_CHECK (&t, cad_view_ray_plane (ray, (vector3) {0.0f, 0.0f, 0.0f},
+                                           (vector3) {0.0f, 1.0f, 0.0f},
+                                           NULL) == 0);
+    }
 
     mpe_test_end (&t);
     return t.failures;
