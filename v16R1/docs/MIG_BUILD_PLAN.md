@@ -2102,6 +2102,17 @@ Ledger (new entries get a line, never an edit of a past line):
   is the separate "perfect and connect" round. Suite 72/70, quick
   86/86 (build + smoke battery for a GUI-only brick).
 
+- 2026-11-14 — WP4 4.6c polish (this commit, same brick tightened):
+  three review catches on the window TU, no behavior contract
+  changed — (1) the per-part color buffer was written through a
+  const-cast (technically UB); now a plain mutable float[3]; (2) a
+  horizontal wheel scroll (dy == 0) nudged the zoom; now ignored;
+  (3) CAD keys stayed live mid-drag, so a Delete during a drag could
+  shift part indices and retarget the drag at the wrong part; CAD
+  verbs are now frozen while CW_MODE_DRAG (Esc still closes). Build +
+  smoke battery green again: suite 72/70, quick 86/86, tui-smoke
+  PASS, engine clean under -Werror.
+
 ## §10 Definition of done for v16S (the cut checklist)
 
 All gates green at the final floor; policy amendment committed; release

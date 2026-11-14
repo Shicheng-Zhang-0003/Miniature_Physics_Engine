@@ -860,6 +860,7 @@ static void cw_on_scroll (GtkEventControllerScroll *controller, gdouble dx,
     (void) controller;
     (void) dx;
     (void) user_data;
+    if (dy == 0.0) { return; } /* horizontal scroll is not a zoom */
     /* Scroll down = zoom out. */
     const float factor = (dy > 0.0) ? 1.1f : (1.0f / 1.1f);
     cw_camera.distance *= factor;
@@ -881,6 +882,13 @@ static gboolean cw_on_key (GtkEventControllerKey *controller, guint keyval,
     }
     if (cw_window && (gtk_window_get_focus (GTK_WINDOW (cw_window)) ==
                       cw_name_entry)) {
+        return FALSE;
+    }
+    /* Mid-drag the selection indices can shift under a Delete (the
+     * model shifts part indices down), which would retarget the drag
+     * at the wrong part — CAD verbs are frozen until the button
+     * releases. Esc still closes. */
+    if (cw_mode == CW_MODE_DRAG) {
         return FALSE;
     }
     const int shift = (state & GDK_SHIFT_MASK) ? 1 : 0;
@@ -1002,34 +1010,27 @@ static gboolean cw_on_render (GtkGLArea *area, GdkGLContext *context,
     for (int i = 0; i < cw_design.count; i++) {
         const mig_part *p = &cw_design.parts [i];
         vector3 scale = {1.0f, 1.0f, 1.0f};
-        vector3 inv_scale = {1.0f, 1.0f, 1.0f};
-        const float color [3] = {0.5f, 0.5f, 0.5f};
+        float color [3] = {0.5f, 0.5f, 0.5f};
         GLuint vao = cw_vao_sphere;
         int count = cw_count_sphere;
         if (p -> type == mig_part_sphere) {
             scale = (vector3) {p -> radius, p -> radius, p -> radius};
             vao = cw_vao_sphere;
             count = cw_count_sphere;
-            const float c [3] = {0.36f, 0.55f, 0.90f};
-            ((float *) color) [0] = c [0]; ((float *) color) [1] = c [1];
-            ((float *) color) [2] = c [2];
+            color [0] = 0.36f; color [1] = 0.55f; color [2] = 0.90f;
         } else if (p -> type == mig_part_cube) {
             scale = p -> half_extensions;
             vao = cw_vao_cube;
             count = cw_count_cube;
-            const float c [3] = {0.40f, 0.72f, 0.45f};
-            ((float *) color) [0] = c [0]; ((float *) color) [1] = c [1];
-            ((float *) color) [2] = c [2];
+            color [0] = 0.40f; color [1] = 0.72f; color [2] = 0.45f;
         } else {
             /* axle LOCAL X: X extent = half length, Y/Z = radius */
             scale = (vector3) {p -> cylinder_half_length, p -> radius, p -> radius};
             vao = cw_vao_cylinder;
             count = cw_count_cylinder;
-            const float c [3] = {0.90f, 0.60f, 0.30f};
-            ((float *) color) [0] = c [0]; ((float *) color) [1] = c [1];
-            ((float *) color) [2] = c [2];
+            color [0] = 0.90f; color [1] = 0.60f; color [2] = 0.30f;
         }
-        inv_scale = (vector3) {1.0f / scale.x, 1.0f / scale.y, 1.0f / scale.z};
+        const vector3 inv_scale = {1.0f / scale.x, 1.0f / scale.y, 1.0f / scale.z};
         cw_mat4 model;
         cw_mat_model (model, p -> position, p -> orientation, scale);
         glUniformMatrix4fv (cw_u_model, 1, GL_FALSE, model);
