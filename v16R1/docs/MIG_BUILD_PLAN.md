@@ -2175,6 +2175,25 @@ Ledger (new entries get a line, never an edit of a past line):
   Suite 72/70, quick 86/86, tui-smoke PASS, engine clean under
   -Werror.
 
+- 2026-11-14 — WP4 4.6g (this commit, the typing-block ruling): inside
+  the CAD window, the name-entry typing block kills the CAD keybinds;
+  everywhere else in the window they work as normal. Root cause of the
+  old guard never firing: gtk_window_get_focus returns the DEEP focus
+  leaf — for a GtkEntry that is its internal GtkText child, not the
+  GtkEntry itself — so the `focus == cw_name_entry` equality check was
+  always FALSE and keys 1/2/3/D/A/X/Y/Z/Delete/G/R/S/L/P all fired
+  while the user typed ("45" spawned spheres; Delete deleted the
+  selection). The guard now walks the ancestry
+  (gtk_widget_is_ancestor of the leaf under the entry). Focus
+  plumbing so "outside the typing block" is reachable deterministically:
+  the GL viewport is now a focus stop (focusable), a click into the
+  viewport grabs the focus back (keybinds return), and the window
+  opens VIEWPORT-focused (one-shot idle after present beats GTK's
+  first-focusable-child map assignment, which would otherwise hand
+  the keys to the entry on open). Esc still closes from anywhere,
+  including mid-typing. No new gate (GUI-only plumbing). Suite 72/70,
+  quick 86/86, tui-smoke PASS, engine clean under -Werror.
+
 ## §10 Definition of done for v16S (the cut checklist)
 
 All gates green at the final floor; policy amendment committed; release

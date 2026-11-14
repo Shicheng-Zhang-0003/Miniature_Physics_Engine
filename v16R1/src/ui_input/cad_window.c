@@ -30,7 +30,12 @@
  *     R toggles rot-snap 0 <-> 15 degrees, S saves, L loads the spec
  *     selected in the dropdown, P spawns the design into the shared
  *     world (the 4.6e hookup; there is also a Spawn button), Esc
- *     closes.
+ *     closes. Typing-block ruling (WP4 4.6g): while the name entry
+ *     holds focus the CAD keys are dead (typing must not spawn parts;
+ *     the entry's internal GtkText leaf is what GTK reports as the
+ *     focused widget) and only Esc still closes; the window opens
+ *     viewport-focused and a click into the viewport returns the
+ *     keys.
  *
  * Persistence is the frozen spec grammar staged through the shared
  * mig_spec_store (the terminal, microvim and the 4.4 panel all read
@@ -819,6 +824,11 @@ static void cw_on_press (GtkGestureClick *gesture, gint n_press, gdouble x,
                          gdouble y, gpointer user_data) {
     (void) n_press;
     (void) user_data;
+    /* A click into the viewport leaves the typing block: focus moves
+     * to the viewport and the CAD keybinds come back (GTK's own
+     * click-to-focus does the same via focusable; this is the
+     * deterministic guarantee). */
+    gtk_widget_grab_focus (cw_gl_area);
     const guint button = gtk_gesture_single_get_current_button (
         GTK_GESTURE_SINGLE (gesture));
     if (button != 1) { return; } /* LMB only */
@@ -930,8 +940,23 @@ static void cw_on_scroll (GtkEventControllerScroll *controller, gdouble dx,
     if (cw_camera.distance > 80.0f) { cw_camera.distance = 80.0f; }
 }
 
+/* Typing-block guard: TRUE while keyboard focus is inside the name
+ * entry — which in GTK4 means the entry's INTERNAL GtkText leaf, not
+ * the GtkEntry itself (gtk_window_get_focus returns the deep focus
+ * leaf, so an equality check against the entry never fires — the 4.6g
+ * keybinds-while-typed fix). */
+static gboolean cw_focus_in_name_entry (void) {
+    if (!cw_window || !cw_name_entry) { return FALSE; }
+    GtkWidget *focus = gtk_window_get_focus (GTK_WINDOW (cw_window));
+    return focus && ((focus == cw_name_entry) ||
+                     gtk_widget_is_ancestor (focus, cw_name_entry));
+}
+
 /* CAD keys skip the name entry (typing "4sphere2" must not spawn
- * spheres): only Esc is handled while the entry holds focus. */
+ * spheres): while the typing block holds focus, only Esc is handled
+ * here and everything else propagates to the entry. Outside it —
+ * viewport, buttons, dropdown, nothing focused — keybinds work as
+ * normal. */
 static gboolean cw_on_key (GtkEventControllerKey *controller, guint keyval,
                            guint keycode, GdkModifierType state,
                            gpointer user_data) {
@@ -942,8 +967,7 @@ static gboolean cw_on_key (GtkEventControllerKey *controller, guint keyval,
         if (cw_window) { gtk_window_destroy (GTK_WINDOW (cw_window)); }
         return TRUE;
     }
-    if (cw_window && (gtk_window_get_focus (GTK_WINDOW (cw_window)) ==
-                      cw_name_entry)) {
+    if (cw_focus_in_name_entry ()) {
         return FALSE;
     }
     /* Mid-drag the selection indices can shift under a Delete (the
@@ -1116,6 +1140,17 @@ static gboolean cw_tick (gpointer user_data) {
     return G_SOURCE_CONTINUE;
 }
 
+/* One-shot after present: the window opens VIEWPORT-focused so the CAD
+ * keybinds work immediately (the name entry is opt-in by click or
+ * Tab). The idle runs after the map, so the grab lands instead of
+ * racing GTK's first-focusable-child assignment — the entry is first
+ * in the box and would otherwise own the keys on open. */
+static gboolean cw_focus_viewport_idle (gpointer user_data) {
+    (void) user_data;
+    if (cw_gl_area) { gtk_widget_grab_focus (cw_gl_area); }
+    return G_SOURCE_REMOVE;
+}
+
 static void cw_on_destroy (GtkWidget *widget, gpointer user_data) {
     (void) widget;
     (void) user_data;
@@ -1272,6 +1307,10 @@ void cad_window_toggle (void) {
     gtk_gl_area_set_has_depth_buffer (GTK_GL_AREA (cw_gl_area), TRUE);
     gtk_gl_area_set_allowed_apis (GTK_GL_AREA (cw_gl_area), GDK_GL_API_GL);
     gtk_widget_set_vexpand (cw_gl_area, TRUE);
+    /* WP4 4.6g: the viewport is a focus stop, so a click into it
+     * returns the keyboard from the typing block (the CAD keybinds
+     * follow the focus). */
+    gtk_widget_set_focusable (cw_gl_area, TRUE);
     g_signal_connect (cw_gl_area, "realize", G_CALLBACK (cw_on_realize), NULL);
     g_signal_connect (cw_gl_area, "render", G_CALLBACK (cw_on_render), NULL);
     GtkEventController *motion = gtk_event_controller_motion_new ();
@@ -1297,6 +1336,7 @@ void cad_window_toggle (void) {
     cw_refresh_dropdown ();
     cw_status_refresh ();
     gtk_window_present (GTK_WINDOW (cw_window));
+    g_idle_add (cw_focus_viewport_idle, NULL);
 }
 
 int cad_window_active (void) {
