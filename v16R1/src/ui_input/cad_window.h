@@ -6,12 +6,15 @@
  *
  * WP4 4.6d lifted the dead-code ruling (the user's connect call): key
  * 2 in the FREE state opens/closes this window (simulation_input_dispatch
- * -> cad_window_toggle, the resize-panel T pattern). The design model
- * (cad_editor.c) and the view math (cad_view_math.c) it drives are
- * already gated; the window itself is GUI-only and suite-unlinked.
- * The spawn-to-world hookup (cad_build -> physics_world_add_composite)
- * is the NEXT brick — this TU is where it will live, and it is the only
- * place allowed to include physics_world.h.
+ * -> cad_window_toggle, the resize-panel T pattern). WP4 4.6e completed
+ * the connect: P / the Spawn button push the design into the SHARED
+ * world through the engine's public MIG API physics_world_add_composite
+ * (validated first by the gated cad_build seam) — this TU is the ONLY
+ * place the 4.6 family touches the physics world; the editor model
+ * itself (cad_editor.c) stays world-free BY DESIGN, which is what
+ * keeps it gateable. The design model (cad_editor.c) and the view
+ * math (cad_view_math.c) the window drives are gated; the window
+ * itself is GUI-only and suite-unlinked.
  */
 #ifndef cad_window_h
 #define cad_window_h

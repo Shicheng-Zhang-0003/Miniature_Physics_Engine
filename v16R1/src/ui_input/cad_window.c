@@ -28,7 +28,9 @@
  *     first-cut), X/Y/Z rotate the selection +-15 degrees about the
  *     ASSEMBLY axis (Shift = -15), G toggles snap 0 <-> 0.25 m,
  *     R toggles rot-snap 0 <-> 15 degrees, S saves, L loads the spec
- *     selected in the dropdown, Esc closes.
+ *     selected in the dropdown, P spawns the design into the shared
+ *     world (the 4.6e hookup; there is also a Spawn button), Esc
+ *     closes.
  *
  * Persistence is the frozen spec grammar staged through the shared
  * mig_spec_store (the terminal, microvim and the 4.4 panel all read
@@ -39,11 +41,15 @@
  * Connection ruling history (the user's calls): WP4 4.6c shipped this
  * window as DEAD CODE (no keybind, nothing called it). WP4 4.6d lifted
  * that: key 2 in the FREE state toggles the window through
- * simulation_input_dispatch (the resize-panel T pattern). The
- * spawn-to-world hookup (cad_build -> physics_world_add_composite) is
- * the NEXT brick — this TU never includes physics_world.h YET; when it
- * does, it will be the only TU allowed to (the editor model cannot
- * mutate a world BY DESIGN, which is what keeps it gateable).
+ * simulation_input_dispatch (the resize-panel T pattern). WP4 4.6e
+ * completed the connect: P / the Spawn button validate through
+ * cad_build (the gated seam) and hand the RAW assembly-frame parts to
+ * physics_world_add_composite — the body spawns at the design's COM,
+ * i.e. exactly as drawn, because the CAD frame IS the world frame.
+ * This is the ONLY TU of the 4.6 family that touches the physics
+ * world; the editor model cannot mutate a world BY DESIGN, which is
+ * what keeps it gateable (mpe_engine.h already carries
+ * core/physics_world.h transitively — no new include).
  *
  * Determinism: this is authoring-path math (a human holds the mouse);
  * sinf/cosf here are the documented cold-path ruling, the per-tick
@@ -654,6 +660,49 @@ static void cw_rename_from_entry (void) {
     cw_status_ok (buf);
 }
 
+/* ---- the world hookup (WP4 4.6e) --------------------------------------
+ * The ONLY place the 4.6 family touches the physics world. Flow: the
+ * gated build seam validates the design first (cad_build -> the compose
+ * refusal battery + totals for the status line), then the engine's
+ * public MIG API spawns it. The RAW assembly-frame parts are handed
+ * over — physics_world_add_composite composes and re-anchors
+ * internally and spawns the body at the parts' COM, and the CAD frame
+ * IS the world frame (y-up, floor y = 0 in both), so the composite
+ * lands exactly as drawn (the drag-weld caller passes world-frame
+ * parts on the same principle). Handing the pre-rebased bridge copy
+ * instead would subtract the COM twice and drop the body at the
+ * origin, discarding the authored placement. */
+static void cw_spawn_to_world (void) {
+    if (cw_design.count == 0) {
+        cw_status_err ("spawn: design is empty (1/2/3 add parts)");
+        return;
+    }
+    mig_part bridge_parts [CAD_MAX_PARTS];
+    mig_bridge bridge;
+    const int rc = cad_build (&cw_design, bridge_parts, &bridge);
+    if (rc != cad_ok) {
+        char buf [128];
+        snprintf (buf, sizeof (buf), "spawn refused (%s)", cw_err_name (rc));
+        cw_status_err (buf);
+        return;
+    }
+    physics_world *world = physics_world_get_primary ();
+    const int body_index = physics_world_add_composite (world,
+                                                        cw_design.parts,
+                                                        cw_design.count);
+    if (body_index < 0) {
+        cw_status_err ("spawn refused (engine: mass/bound window or part cap)");
+        return;
+    }
+    char buf [256];
+    snprintf (buf, sizeof (buf),
+              "spawned %s: %d parts, %.4g kg, COM (%.2f, %.2f, %.2f) -> body #%d",
+              cw_design.name, cw_design.count, (double) bridge.totals.mass,
+              (double) bridge.totals.com.x, (double) bridge.totals.com.y,
+              (double) bridge.totals.com.z, body_index);
+    cw_status_ok (buf);
+}
+
 /* Add at the spawn point: the camera target's XZ, rest height of the
  * identity orientation (sphere r, cube he.y, cylinder r — the axle is
  * LOCAL X, so the tube lies along the ground with radius up). The
@@ -917,6 +966,8 @@ static gboolean cw_on_key (GtkEventControllerKey *controller, guint keyval,
         case GDK_KEY_S: cw_save_design (); return TRUE;
         case GDK_KEY_l:
         case GDK_KEY_L: cw_load_selected (); return TRUE;
+        case GDK_KEY_p:
+        case GDK_KEY_P: cw_spawn_to_world (); return TRUE;
         default: return FALSE;
     }
 }
@@ -1089,6 +1140,12 @@ static void cw_on_load_clicked (GtkButton *button, gpointer user_data) {
     cw_load_selected ();
 }
 
+static void cw_on_spawn_clicked (GtkButton *button, gpointer user_data) {
+    (void) button;
+    (void) user_data;
+    cw_spawn_to_world ();
+}
+
 static void cw_on_name_activate (GtkEntry *entry, gpointer user_data) {
     (void) entry;
     (void) user_data;
@@ -1168,6 +1225,14 @@ void cad_window_toggle (void) {
     gtk_widget_add_css_class (save_btn, "suggested-action");
     g_signal_connect (save_btn, "clicked", G_CALLBACK (cw_on_save_clicked), NULL);
     gtk_box_append (GTK_BOX (bar), save_btn);
+    /* WP4 4.6e: the world hookup button (P does the same in the
+     * viewport). The spawned composite is the design's own body in the
+     * shared world — the main viewport shows it exactly where the CAD
+     * grid had it. */
+    GtkWidget *spawn_btn = gtk_button_new_with_label ("Spawn to world");
+    g_signal_connect (spawn_btn, "clicked", G_CALLBACK (cw_on_spawn_clicked),
+                      NULL);
+    gtk_box_append (GTK_BOX (bar), spawn_btn);
     cw_spec_dropdown = gtk_drop_down_new (NULL, NULL);
     gtk_widget_set_hexpand (cw_spec_dropdown, TRUE);
     gtk_box_append (GTK_BOX (bar), cw_spec_dropdown);

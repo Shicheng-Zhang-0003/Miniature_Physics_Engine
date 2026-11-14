@@ -2127,6 +2127,33 @@ Ledger (new entries get a line, never an edit of a past line):
   battery: suite 72/70, quick 86/86, tui-smoke PASS, engine clean
   under -Werror.
 
+- 2026-11-14 — WP4 4.6e (this commit, THE HOOKUP — the connect round
+  completes): the design spawns into the SHARED world. P / the Spawn
+  button in the CAD window validate through the gated cad_build seam
+  (compose refusal battery + totals for the status line), then hand
+  the RAW assembly-frame parts to the engine's public MIG API
+  physics_world_add_composite — which composes and re-anchors
+  internally and spawns the body at the parts' COM. The CAD frame IS
+  the world frame (y-up, floor y = 0 in both), so the composite lands
+  EXACTLY AS DRAWN: drag it to (5, 0, 5) in the window, spawn, and the
+  main viewport shows it there (the drag-weld caller passes world-
+  frame parts on the same principle). Handing the pre-rebased bridge
+  copy would subtract the COM twice and drop the body at the origin,
+  discarding the authored placement — the landed 4.6 doc assumed
+  origin-spawn before the window existed; the hookup refines it, and
+  cad_editor.h's cad_build comment now records the semantics (the
+  rebased copy still serves callers that want COM-relative geometry).
+  Refusals are honest at every layer: empty design (cad_empty),
+  compose errors (cad_err names), engine mass/bound window or part
+  cap (add_composite -1) — each reported in the window status line,
+  design untouched on refusal. No new gate (the two halves the glue
+  joins are already gated: cad_build ≡ direct mig_compose; add_composite
+  is engine-tested in the physics gates — the hookup itself is
+  GUI-only orchestration, the drag-weld precedent). Suite 72/70,
+  quick 86/86, tui-smoke PASS, mgb + mfs + FTC green, engine +
+  everything clean under -Werror (one tui-smoke 126 was a concurrent-
+  make race with the everything run, re-run sequentially green).
+
 ## §10 Definition of done for v16S (the cut checklist)
 
 All gates green at the final floor; policy amendment committed; release

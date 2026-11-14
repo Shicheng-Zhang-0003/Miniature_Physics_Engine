@@ -201,11 +201,17 @@ int cad_load (cad_design *design, const char *path, int max_parts, int *spec_err
 /* ---- the engine seam ---- */
 
 /* mig_make_bridge over the design: composed totals (mass, COM,
- * inertia about COM) + the COM-rebased part copy, ready for the later
- * hookup to hand to physics_world_add_composite. `out_parts` must hold
- * count slots and must NOT alias design->parts. Empty design refuses
- * with cad_empty (mig_compose's null rule). Compose errors map to the
- * same-named cad_err values verbatim. */
+ * inertia about COM) + the COM-rebased part copy. WP4 4.6e hookup
+ * semantics: the CAD window validates through this call, then hands
+ * the RAW assembly-frame parts to physics_world_add_composite — the
+ * engine composes and re-anchors internally and spawns the body at
+ * the parts' COM, so the authored placement survives (the CAD frame
+ * is the world frame; handing the pre-rebased copy would subtract the
+ * COM twice and drop the body at the origin). The rebased copy still
+ * serves callers that want COM-relative geometry. `out_parts` must
+ * hold count slots and must NOT alias design->parts. Empty design
+ * refuses with cad_empty (mig_compose's null rule). Compose errors
+ * map to the same-named cad_err values verbatim. */
 int cad_build (const cad_design *design, mig_part *out_parts, mig_bridge *out);
 
 /* ---- the ASCII workbench ---- */
