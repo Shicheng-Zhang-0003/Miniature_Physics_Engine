@@ -30,13 +30,21 @@
  * scheme over the 4.6j engine core — the lock/steer/fly/crosshair/
  * carry/drop-rule machinery and the S4b/typing-block/focus rulings
  * are untouched:
- *   - FLY: pointer-locked mouse-look at steer_sensitivity (Wayland
- *     drains the relative deltas once per tick; X11 steers per motion
- *     event with the re-centre warp), WASD + Space/Shift at
- *     move_speed x0.2 (the engine's debug-fly). The scroll wheel
- *     keeps its orbit-distance zoom (a camera control, not a
- *     keybind). UNLOCKED plain LMB stays the engine's re-engage (the
- *     S4b rule): the click ACQUIRES the lock and nothing else.
+ *   - FLY + FREE LOOK (WP4 4.6n — the user's fix ruling: "make it so
+ *     that the camera with the mouse pivot is free JUST like the
+ *     original engine itself"): pointer-locked mouse-look at
+ *     steer_sensitivity (Wayland drains the relative deltas once per
+ *     tick; X11 steers per motion event with the re-centre warp), WASD
+ *     + Space/Shift at move_speed x0.2 (the engine's debug-fly), the
+ *     scroll wheel dollies the eye along the view (a camera control,
+ *     not a keybind). The camera is FIRST-PERSON: a look rotates the
+ *     view about the EYE — cw_rotate_view captures the eye BEFORE the
+ *     yaw/pitch change and recomputes the orbit bookkeeping (target =
+ *     eye + forward*distance) AFTER — instead of 4.6j's orbit swing,
+ *     which pivoted the eye around a target point pinned on the grid
+ *     (the reported "view is LOCKED to the grid itself"). UNLOCKED
+ *     plain LMB stays the engine's re-engage (the S4b rule): the
+ *     click ACQUIRES the lock and nothing else.
  *   - LMB (locked): grab the part under the crosshair (the
  *     drag_weld_press port: pick selects, miss clears, grab at the
  *     hit depth, the part rides the ray every frame with the floor
@@ -45,15 +53,23 @@
  *     straight-down gravity settle to the highest supporter or the
  *     floor, landed EXACTLY). An Esc mid-carry unlocks and the carry
  *     follows the cursor until the release.
- *   - IJKL while CARRYING — the user's "just like the mouse can move
- *     the objects around, ijkl moves objects around much more
- *     precisely" (the DIRECT nudge ruling): the camera does NOT move;
- *     I/K push the carried part farther/closer ALONG the view ray
- *     (cw_drag_t, floored above the eye) and J/L slide it left/right
- *     ACROSS the view (the grip offset along the camera's right) at
- *     CW_NUDGE_SPEED (0.5 m/s — a tenth of the fly). Latched like the
- *     fly keys (press sets, release clears, the tick polls), in BOTH
- *     pointer modes, dead unless a carry is live.
+ *   - IJKL (WP4 4.6n — DUAL meaning, the user's fix ruling "fix the
+ *     ijkl": 4.6m made it carry-only, so free it did NOTHING):
+ *     while FREE (locked, not carrying) it is the ENGINE's own IJKL
+ *     fine steer, verbatim signs from simulation_camera.c:63-67
+ *     (I=pitch+, K=pitch−, J=yaw−, L=yaw+ at ijkl_speed*dt), mapped
+ *     through the CAD camera's two documented flips (its yaw+ turns
+ *     left, its pitch+ is eye elevation) — so I looks up, K looks
+ *     down, J turns left, L turns right, and the eye never moves (a
+ *     LOOK, via cw_rotate_view). While CARRYING it stays the 4.6m
+ *     DIRECT nudge — the user's "just like the mouse can move the
+ *     objects around, ijkl moves objects around much more
+ *     precisely": the camera does NOT move; I/K push the carried
+ *     part farther/closer ALONG the view ray (cw_drag_t, floored
+ *     above the eye) and J/L slide it left/right ACROSS the view
+ *     (the grip offset along the camera's right) at CW_NUDGE_SPEED
+ *     (0.5 m/s — a tenth of the fly). Latched like the fly keys
+ *     (press sets, release clears, the tick polls) in BOTH modes.
  *   - RMB: PLACE the picker shape at the aim point — the crosshair
  *     while locked, the cursor ray while unlocked; no-op while a
  *     carry is live (the carried part sits at the crosshair; a place
@@ -1463,22 +1479,45 @@ static void cw_snap_selected (void) {
  * main_inputs.is_mouse_locked, so the engine's delta poll (gated on
  * that flag) never sees CAD deltas — the 4.6f isolation holds. */
 
-/* Steering applied in the ENGINE'S delta convention (dx right+,
- * dy up+). The CAD camera is the orbit camera: cad_view_forward's
- * forward_x = -sin(yaw)*cos(pitch), so yaw_deg+ turns LEFT (the eye
- * swings +x while looking at the target) — mouse-right must turn
- * right, hence the yaw negation; and pitch_deg is the EYE's elevation
- * above the target, so looking UP lowers it — the pitch negation.
- * Both flips live HERE and nowhere else. Sensitivity is the engine's
- * own config (camera.steer_sensitivity, default 0.12). The pitch
- * clamp is the view-math contract's caller-side clamp (±85, the same
- * bound the 4.6c orbit already used). */
-static void cw_apply_steer (float dx_right, float dy_up) {
-    const float s = g_cfg.camera.steer_sensitivity;
-    cw_camera.yaw_deg -= dx_right * s;
-    cw_camera.pitch_deg -= dy_up * s;
+/* The free-look primitive (WP4 4.6n — the user's fix ruling: "make it
+ * so that the camera with the mouse pivot is free JUST like the
+ * original engine itself"). Rotates the view about the EYE by
+ * (d_yaw_deg, d_pitch_deg): the eye is captured BEFORE the yaw/pitch
+ * change and the orbit bookkeeping (target = eye + forward*distance)
+ * is recomputed AFTER, so the eye itself never moves — a pure LOOK,
+ * the engine's own first-person turn. 4.6j instead changed yaw/pitch
+ * directly, which swung the eye around a target point pinned on the
+ * grid (the reported "view is LOCKED to the grid itself"). Early
+ * return when both deltas are zero (a no-op must not perturb the
+ * target). Pitch clamps to ±85 AFTER the change (the view-math
+ * contract's caller-side clamp, cp > 0 there so cad_view_forward
+ * stays normalized by construction). */
+static void cw_rotate_view (float d_yaw_deg, float d_pitch_deg) {
+    if (d_yaw_deg == 0.0f && d_pitch_deg == 0.0f) { return; }
+    const vector3 eye = cad_view_eye (&cw_camera);
+    cw_camera.yaw_deg += d_yaw_deg;
+    cw_camera.pitch_deg += d_pitch_deg;
     if (cw_camera.pitch_deg > 85.0f) { cw_camera.pitch_deg = 85.0f; }
     if (cw_camera.pitch_deg < -85.0f) { cw_camera.pitch_deg = -85.0f; }
+    const vector3 forward = cad_view_forward (&cw_camera);
+    cw_camera.target = vector3_addition (
+        eye, vector3_scaling (forward, cw_camera.distance));
+}
+
+/* Steering applied in the ENGINE'S delta convention (dx right+,
+ * dy up+). The struct still carries the orbit fields (target, yaw,
+ * pitch, distance — cad_view_math's gated basis), but the BEHAVIOUR
+ * is now first-person free look: the rotation routes through
+ * cw_rotate_view, which rotates about the eye. cad_view_forward's
+ * forward_x = -sin(yaw)*cos(pitch), so yaw_deg+ turns LEFT — mouse-
+ * right must turn right, hence the yaw negation; pitch_deg is the
+ * EYE's elevation above the target, so looking UP lowers it — the
+ * pitch negation. The MOUSE flips live here; the IJKL flips live at
+ * cw_steer_keys. Sensitivity is the engine's own config
+ * (camera.steer_sensitivity, default 0.12). */
+static void cw_apply_steer (float dx_right, float dy_up) {
+    const float s = g_cfg.camera.steer_sensitivity;
+    cw_rotate_view (-dx_right * s, -dy_up * s);
 }
 
 /* Wayland path: drain the relative-pointer deltas ONCE per tick (the
@@ -1518,6 +1557,26 @@ static void cw_fly_translate (float dt) {
     if (cw_key_up) { t.y += speed; }
     if (cw_key_down) { t.y -= speed; }
     cw_camera.target = t;
+}
+
+/* The ENGINE's own IJKL fine steer, ported (WP4 4.6n — the user's
+ * "fix the ijkl": 4.6m made IJKL carry-only, so free it did nothing).
+ * simulation_camera.c:63-67 verbatim:
+ *   I = pitch+ (look up), K = pitch- (look down),
+ *   J = yaw- (turn left),  L = yaw+ (turn right),
+ * at g_cfg.camera.ijkl_speed (deg/s, default 35) * dt, gated on the
+ * engine's debug mode — this window IS that mode while locked. The
+ * CAD camera's two documented flips map the intent: pitch_deg is the
+ * EYE's elevation (so CAD pitch+ looks DOWN — I negates, K keeps),
+ * and yaw_deg+ turns LEFT (so CAD yaw+ IS J's left — J keeps, L
+ * negates). Each press routes through cw_rotate_view, so the eye
+ * never moves: IJKL turns the view exactly like the mouse does. */
+static void cw_steer_keys (float dt) {
+    const float speed = g_cfg.camera.ijkl_speed * dt;
+    if (cw_key_i) { cw_rotate_view (0.0f, -speed); } /* look up */
+    if (cw_key_k) { cw_rotate_view (0.0f, speed); }  /* look down */
+    if (cw_key_j) { cw_rotate_view (speed, 0.0f); }  /* turn left */
+    if (cw_key_l) { cw_rotate_view (-speed, 0.0f); } /* turn right */
 }
 
 /* Kill every MOVE latch — the fly keys AND the IJKL carry nudge (WP4
@@ -1760,12 +1819,14 @@ static gboolean cw_on_key (GtkEventControllerKey *controller, guint keyval,
     if (cw_focus_in_name_entry ()) {
         return FALSE;
     }
-    /* The MOVE latches (the fly keys AND the IJKL carry nudge): press
-     * sets, the tick polls, release clears (key repeat irrelevant —
-     * the engine's on_keypress pattern). Mode-free: the fly only runs
-     * while locked (the tick gates it) and the nudge only while a
-     * carry is live — a latch set in the wrong context is simply
-     * dead. */
+    /* The MOVE latches (the fly keys AND the IJKL keys — dual duty
+     * since WP4 4.6n: fine steer while locked and free, the direct
+     * carry nudge while a carry is live): press sets, the tick polls,
+     * release clears (key repeat irrelevant — the engine's on_keypress
+     * pattern). Mode-free: the fly only runs while locked (the tick
+     * gates it), the steer only while locked AND free, the nudge only
+     * while a carry is live — a latch set in the wrong context is
+     * simply dead. */
     switch (keyval) {
         case GDK_KEY_w: case GDK_KEY_W: cw_key_w = 1; return TRUE;
         case GDK_KEY_a: case GDK_KEY_A: cw_key_a = 1; return TRUE;
@@ -2006,6 +2067,9 @@ static gboolean cw_tick (gpointer user_data) {
      *     input_control_poll_locked_mouse analog; X11 steers per
      *     motion event instead);
      *   - fly: the latched WASD/Space/Shift translate;
+     *   - free IJKL (WP4 4.6n): the engine's own fine steer while
+     *     locked and NOT carrying (mid-carry IJKL stays the 4.6m
+     *     direct object nudge, polled in the carry branch below);
      *   - the carried part follows EVERY frame — the crosshair ray
      *     while locked, the stored cursor otherwise (zoom mid-carry
      *     keeps it glued); a settling part falls at the world's own
@@ -2013,6 +2077,7 @@ static gboolean cw_tick (gpointer user_data) {
     if (cw_look_locked) {
         cw_look_steer ();
         cw_fly_translate (0.016f);
+        if (cw_mode != CW_MODE_CARRY) { cw_steer_keys (0.016f); }
     }
     if (cw_mode == CW_MODE_CARRY) {
         /* WP4 4.6m: IJKL nudges the CARRIED part directly — BEFORE the

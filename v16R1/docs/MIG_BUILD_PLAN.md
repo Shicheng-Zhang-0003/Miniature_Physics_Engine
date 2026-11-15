@@ -2461,6 +2461,52 @@ Ledger (new entries get a line, never an edit of a past line):
   PASS 44 FAIL 0, tier B skips sans s2tui); mfs FTC gated 5/5
   (12 ungated diags); tui-smoke PASS (all scenes finite); make
   everything green in background.
+- 2026-11-15 — WP4 4.6n (this commit, CAD FREE LOOK + IJKL FIX — the
+  user's two reports: "right now what is happening is that ijkl
+  doesn't work, and that the view is LOCKED to the grid itself. what
+  I need you to do is to fix the ijkl and make it so that the camera
+  with the mouse pivot is free JUST like the original engine
+  itself"). Audit first: the 4.6m nudge/tick/key code was correct as
+  written — the IJKL deadness was SEMANTIC (it was carry-only, so
+  with nothing grabbed the keys did nothing at all), and the
+  "locked to the grid" was the ORBIT camera: 4.6j's steer changed
+  yaw/pitch directly, and cad_view_eye = target - forward*distance
+  then swung the EYE around a target point pinned on the grid (the
+  window always orbits a fixed bookkeeping point — the user
+  experienced the pivot, not the eye). The fix is ONE primitive,
+  cw_rotate_view (d_yaw_deg, d_pitch_deg): it captures the eye
+  BEFORE the yaw/pitch change, clamps pitch to ±85 after, then
+  recomputes the orbit bookkeeping target = eye + forward*distance —
+  the eye itself NEVER moves on a look; a pure first-person turn,
+  the engine's own. Early return when both deltas are zero (a no-op
+  must not perturb the target). Everything look-shaped routes
+  through it: cw_apply_steer (the mouse, both flips preserved:
+  -dx*s on yaw, -dy*s on pitch — CAD yaw+ turns left, CAD pitch+ is
+  eye elevation) and the NEW cw_steer_keys, the engine's own IJKL
+  ported VERBATIM from simulation_camera.c:63-67 (I=pitch+, K=
+  pitch−, J=yaw−, L=yaw+ at g_cfg.camera.ijkl_speed — a real config
+  field, deg/s, default 35 — times dt) mapped through the CAD
+  camera's two documented flips, so I looks up, K looks down, J
+  turns left, L turns right — the same keys, the same directions,
+  the same feel. Gated in cw_tick on cw_look_locked AND
+  cw_mode != CW_MODE_CARRY: mid-carry IJKL stays the 4.6m DIRECT
+  object nudge (the user's precise-movement ruling stands; free
+  IJKL and carry IJKL share the latches, each dead in the other's
+  context). Fly is untouched (moving the target moves the eye —
+  that IS first-person flight) and the scroll wheel becomes a pure
+  eye dolly along the view (distance change, target fixed — eye =
+  target - forward*distance), still a camera control, not a
+  keybind. cw_mat_look_at derives the eye from the struct, so the
+  pin propagates to the view matrix and to every pick/carry/place
+  ray automatically; yaw stays unbounded, pitch clamps at ±85 (cp
+  > 0 keeps cad_view_forward normalized by construction). Header
+  bullets updated (FLY + FREE LOOK; IJKL dual duty). cad_window.c
+  is an ENGINE TU (ENGINE_SRCS wildcard) — full battery: engine +
+  build_tui with ZERO warnings (-Werror); suite 72 registered / 70
+  blocking / 0 failures; quick 86/86 (cad_view_math still pins);
+  mgb PASS 44 FAIL 0 (tier B skips sans s2tui); mfs FTC gated 5/5
+  (12 ungated diags); tui-smoke PASS; make everything green in
+  background.
 
 ## §10 Definition of done for v16S (the cut checklist)
 
