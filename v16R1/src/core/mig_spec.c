@@ -521,7 +521,14 @@ int mig_spec_parse_file (const char *path, int max_parts, mig_spec *out) {
             }
             if (!ok) { diag (&c, mig_spec_bad_name, name, ""); break; }
             seen_mig = 1;
-            snprintf (spec.name, sizeof (spec.name), "%s", name);
+            /* %.63s: the output bound makes the nl<=63 guard's safety
+             * provable at every optimization level — at -O0 the
+             * front-end cannot carry the tokenizer's length check into
+             * this call, so a bare %s reads as a may-truncate (the
+             * build-modes split compiles tests at -O0 under -Werror).
+             * For every legal name (1..63 bytes) behavior is
+             * identical. */
+            snprintf (spec.name, sizeof (spec.name), "%.63s", name);
             continue;
         }
 

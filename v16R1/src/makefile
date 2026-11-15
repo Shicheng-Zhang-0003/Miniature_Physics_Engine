@@ -113,14 +113,28 @@ DETERMINISM_FLAGS = -ffp-contract=off -fno-fast-math
 MPE_SIMD ?= 1
 ifeq ($(MPE_SIMD),0)
 override CFLAGS += -DMPE_SIMD_OFF
+override RELEASE_CFLAGS += -DMPE_SIMD_OFF
 endif
 # DESPOT-2026-10-08 MSVC scope (LIE-06): GCC/Clang pin above. MSVC (cl) needs
 # /fp:strict (no FMA contraction) + /Oi- guard for the same guarantee.
 # Bitwise twins are GCC/Clang-only until MSVC flags land in CI. When CC is
 # cl, append /fp:strict automatically; cross-check with `nmake /F msvc.mak`.
 MSVC_FP_FLAG := $(if $(findstring cl,$(CC)),/fp:strict,)
+# DESPOT-2026-11-14 (the user's ruling): TWO optimization policies.
+#   TEST builds compile -O0: headless, the canonical suite (+ the scalar
+#   SIMD-off proof), all 30 legacy + 15 paranoia batteries, asan/tsan,
+#   the MFS test bundle and the MGB test binary. Fast to build, fully
+#   debuggable, and determinism-safe: -ffp-contract=off + -fno-fast-math
+#   + SSE math pin the FP semantics, so O0 results are bitwise the O3
+#   results (the suite itself gates this every run).
+#   RELEASE builds compile -O3: the engine, the TUI (both shipped by
+#   install) and the engine's runtime plugin artifacts. RELEASE_CFLAGS
+#   is the mirror channel of CFLAGS — same BASE_CFLAGS invariants and
+#   the same hard-appended traps below, ONLY the -O level differs — so
+#   every test recipe keeps its $(CFLAGS) reference untouched.
 # Command-line CFLAGS/LIBS (e.g. compile_asan) override these defaults.
-CFLAGS ?= $(BASE_CFLAGS) -O3
+CFLAGS ?= $(BASE_CFLAGS) -O0
+RELEASE_CFLAGS ?= $(BASE_CFLAGS) -O3
 LIBS ?= $(BASE_LIBS)
 # TRUTH: hard-append determinism flags so NEITHER environment NOR
 # command-line CFLAGS can silently drop -ffp-contract=off (bitwise twins
@@ -132,13 +146,17 @@ LIBS ?= $(BASE_LIBS)
 # made the project's headline determinism guarantee opt-out by accident.
 # `override` makes the append unconditional, so every one of the 40 recipes
 # that reference $(CFLAGS) is covered without touching each of them.
+# The RELEASE_CFLAGS mirror channel gets the identical appends (same
+# traps, same reason).
 override CFLAGS += $(DETERMINISM_FLAGS)
+override RELEASE_CFLAGS += $(DETERMINISM_FLAGS)
 # DESPOT-2026-09-29: the same trap applied to dependency generation. -MMD -MP
 # lives in BASE_CFLAGS, which `CFLAGS ?= $(BASE_CFLAGS) -O3` only reaches when
 # CFLAGS is unset -- so `CFLAGS=-O2 make` silently stopped producing .d files,
 # and header edits stopped triggering rebuilds. Appended with `override` so it
 # survives an environment or command-line CFLAGS.
 override CFLAGS += -MMD -MP
+override RELEASE_CFLAGS += -MMD -MP
 # DESPOT-2026-10-20 (OPERATIONAL): the same trap bit the V-01 sanitizer gate
 # (validation/V01.sh passes CFLAGS on the command line): GTK_DEFINES carry
 # the build-mode selection for the source tree (-DMPE_GTK4=1,
@@ -149,6 +167,7 @@ override CFLAGS += -MMD -MP
 # GTK_DEFINES are idempotent defines; double-defining via BASE_CFLAGS is a
 # no-op, and normal builds are untouched.
 override CFLAGS += $(GTK_DEFINES)
+override RELEASE_CFLAGS += $(GTK_DEFINES)
 
 BUILD_DIR ?= build
 # ENGINE_SRCS uses a wildcard (not an explicit list) so new engine TUs are
@@ -169,9 +188,9 @@ DEPS := $(OBJECTS:.o=.d)
 
 engine: $(OBJECTS)
 ifeq ($(MPE_WINDOWS),1)
-	$(CC) $(CFLAGS) $(DETERMINISM_FLAGS) $(OBJECTS) $(LIBS) -Wl,--export-all-symbols -Wl,--out-implib,libengine.a -o engine$(EXE_EXT)
+	$(CC) $(RELEASE_CFLAGS) $(DETERMINISM_FLAGS) $(OBJECTS) $(LIBS) -Wl,--export-all-symbols -Wl,--out-implib,libengine.a -o engine$(EXE_EXT)
 else
-	$(CC) $(CFLAGS) $(DETERMINISM_FLAGS) $(OBJECTS) $(LIBS) $(HARD_LIBS) -o engine$(EXE_EXT)
+	$(CC) $(RELEASE_CFLAGS) $(DETERMINISM_FLAGS) $(OBJECTS) $(LIBS) $(HARD_LIBS) -o engine$(EXE_EXT)
 endif
 
 # ---- Headless test binary (no GTK/GL deps) ----
@@ -181,12 +200,14 @@ headless:
 .PHONY: headless test_two_world
 
 # Debug build (separate object dir so objects never mix with release).
+# Both steer the RELEASE_CFLAGS channel (the object pattern rule reads it):
+# debug = -O0 -g, release = -O3 + NDEBUG.
 debug:
-	$(MAKE) BUILD_DIR=build-debug CFLAGS="$(BASE_CFLAGS) -O0 -g" engine
+	$(MAKE) BUILD_DIR=build-debug RELEASE_CFLAGS="$(BASE_CFLAGS) -O0 -g" engine
 
 # Optimised release rebuild from scratch.
 release:
-	$(MAKE) BUILD_DIR=build-release CFLAGS="$(BASE_CFLAGS) -O3 -DNDEBUG" engine
+	$(MAKE) BUILD_DIR=build-release RELEASE_CFLAGS="$(BASE_CFLAGS) -O3 -DNDEBUG" engine
 
 PREFIX ?= $(HOME)/.local
 install: engine mpe-tui ecosystem/capsule/mpe_capsule$(PLUGIN_EXT)
@@ -228,6 +249,7 @@ check-flags:
 	@if [ "$(ENABLE_NATIVE)" = "1" ] && [ "$(ALLOW_NONPORTABLE)" != "1" ]; then echo "FAIL: ENABLE_NATIVE=1 breaks bitwise determinism; set ALLOW_NONPORTABLE=1 to override"; exit 1; fi
 	@if [ "$(ENABLE_NATIVE)" = "1" ]; then echo "WARNING: NATIVE BUILD - NOT BITWISE PORTABLE"; fi
 	@echo "$(CFLAGS)" | grep -q "ffp-contract=off" || (echo "FAIL: -ffp-contract=off missing from CFLAGS"; exit 1)
+	@echo "$(RELEASE_CFLAGS)" | grep -q "ffp-contract=off" || (echo "FAIL: -ffp-contract=off missing from RELEASE_CFLAGS"; exit 1)
 	@echo "flags OK"
 
 check-new-files:
@@ -236,6 +258,7 @@ check-new-files:
 help:
 	@echo "targets: engine (default) | everything (full build-only rebuild: engine, mpe-tui, headless,"
 	@echo "         suite+scalar, all 30 legacy + 15 paranoia binaries, capsule/MFS/MGB modules; runs nothing)"
+	@echo "         optimization: release (engine/mpe-tui/plugins) -O3 | tests -O0 (CFLAGS/RELEASE_CFLAGS channels)"
 	@echo "         debug | release | install | installcheck | installcheck-v1 | clean | distclean"
 	@echo "         test_<name> (build+run) | build_<name> (build only) | paranoia_*"
 	@echo "         test_runner.py --profile quick|physics|full (runner default: full; make default: engine)"
@@ -255,7 +278,7 @@ help:
 
 $(BUILD_DIR)/%.o: %.c
 	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(DETERMINISM_FLAGS) -c $< -o $@
+	$(CC) $(RELEASE_CFLAGS) $(DETERMINISM_FLAGS) -c $< -o $@
 
 clean:
 	rm -rf build build-debug build-release engine engine.exe test_* mpe-tui mpe-tui.exe *.so *.dll *.a *.lib ecosystem/capsule/*.so ecosystem/capsule/*.dll
@@ -295,7 +318,7 @@ else
     TUI_LIBS := -lm $(shell pkg-config --libs ncurses) $(shell pkg-config --libs epoxy) -ldl -rdynamic
 endif
 build_tui: $(TUI_SRCS) $(TUI_CORE)
-	$(CC) $(CFLAGS) -Dmpe_tui_main $(TUI_SRCS) $(TUI_CORE) $(TUI_LIBS) -o mpe-tui$(EXE_EXT)
+	$(CC) $(RELEASE_CFLAGS) -Dmpe_tui_main $(TUI_SRCS) $(TUI_CORE) $(TUI_LIBS) -o mpe-tui$(EXE_EXT)
 mpe-tui: build_tui
 tui-smoke: build_tui
 	mkdir -p $(TUI_OUT)
@@ -487,7 +510,7 @@ test_module: build_module
 # mpe_register_pair_handler at load time.
 ecosystem/capsule/mpe_capsule$(PLUGIN_EXT): ecosystem/capsule/mpe_capsule.c core/mpe_module.h core/mpe_registry.h
 	mkdir -p ecosystem/capsule
-	$(CC) $(BASE_CFLAGS) -I. -fPIC -shared ecosystem/capsule/mpe_capsule.c -o ecosystem/capsule/mpe_capsule$(PLUGIN_EXT)
+	$(CC) $(BASE_CFLAGS) -O3 -I. -fPIC -shared ecosystem/capsule/mpe_capsule.c -o ecosystem/capsule/mpe_capsule$(PLUGIN_EXT)
 # ---- Suite v2: single-binary C regression suite (from-scratch rewrite) ----
 # One binary, exact-name dispatch, shared builders (no 30x core recompile).
 # Links core + spring physics + scene I/O (stubs for scene_init/camera live
@@ -651,6 +674,9 @@ test_paranoia_config: build_paranoia_config
 # suite invocation lives below: compile must never execute code, only
 # produce it. (asan/tsan binaries and temp/ MFS verification binaries
 # stay runner-owned: the runner rebuilds them with its own flags/OUTDIR.)
+# Optimization policies (DESPOT-2026-11-14): engine + mpe-tui + the
+# capsule plugin build -O3 (RELEASE_CFLAGS); every test binary builds
+# -O0 (the CFLAGS default). See the ruling comment at the CFLAGS?= lines.
 # Drift guard: keep these lists in sync with the build_* rules above AND
 # with tools/test_runner.py MIN_LEGACY_ENTRIES=30 / MIN_PARANOIA_ENTRIES=15.
 build_all_legacy: build_two_world build_revolute build_cylinder_drop build_driven_wheel build_math3_inverse \

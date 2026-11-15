@@ -2329,6 +2329,46 @@ Ledger (new entries get a line, never an edit of a past line):
   gated view-math/model contracts drive everything). Suite 72/70,
   quick 86/86, tui-smoke PASS, engine clean under -Werror.
 
+- 2026-11-14 — WP4 4.6k (this commit, BUILD MODES — the user's
+  ruling: "properly recompile everything, and add stuff to the
+  makefile to compile everything, O0 for test, O3 for normal non
+  testing compile"). The main makefile now has TWO optimization
+  channels with identical invariants: CFLAGS (the TEST channel)
+  defaults -O0 — headless, the canonical suite (+ the scalar SIMD-off
+  proof), all 30 legacy + 15 paranoia batteries, analyze/asan/tsan,
+  the MFS test bundle and the MGB test binary build fast and fully
+  debuggable, and every one of those ~40 recipes keeps its
+  $(CFLAGS) reference untouched; RELEASE_CFLAGS (the mirror channel —
+  same BASE_CFLAGS invariants plus the same hard-appended
+  DETERMINISM_FLAGS / -MMD -MP / GTK_DEFINES / MPE_SIMD_OFF traps via
+  override) defaults -O3 and drives the engine's object pattern rule,
+  both engine link lines, build_tui (the shipped TUI) and the capsule
+  plugin recipe (now -O3 explicit). The debug/release convenience
+  targets steer the new channel (their BUILD_DIR variants
+  preserved); check-flags gates ffp-contract=off on BOTH channels;
+  help + the everything header document the policies. Ecosystem
+  aligned to the same ruling: mfs build_tests.sh test binaries
+  -O2 -> -O0 (the module .so builds stay -O3; the float-builds
+  comment updated), mgb split — mgb_bridge.so + probe -O2 -> -O3,
+  mgb_mpe_test on a new -O0 TEST_CFLAGS. THE LOAD-BEARING INVARIANT
+  is determinism: -ffp-contract=off + -fno-fast-math + SSE math pin
+  the FP semantics, so O0 results are bitwise the O3 results and the
+  suite's gates mean the same thing at either level — the suite ran
+  green AT O0 this time, which is that proof, every run. One source
+  fix fell out (the only O0-only warning in the whole test channel,
+  found by pre-flighting all ~70 test TUs at -O0 -Werror):
+  core/mig_spec.c's spec-name copy is now %.63s — the nl<=63 guard's
+  safety becomes locally provable at every optimization level (-O0's
+  front-end cannot carry the tokenizer's length check into the
+  snprintf, so a bare %s read as a may-truncate under -Werror);
+  behavior is identical for every legal name (1..63 bytes, buffer
+  MIG_SPEC_NAME_LEN 64). The proper rebuild ran for real this time:
+  make clean && make -j everything (the ./compile flow), exit 0, with
+  the build log proving the split live (engine objects + link + tui +
+  capsule at -O3; suite/legacy/paranoia at -O0). Suite 72/70 (at
+  -O0), quick 86/86, tui-smoke PASS, mgb 0 errors, mfs all + FTC
+  gated 5/5.
+
 ## §10 Definition of done for v16S (the cut checklist)
 
 All gates green at the final floor; policy amendment committed; release

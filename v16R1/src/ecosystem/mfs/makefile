@@ -59,9 +59,11 @@ else
   MPE_WIN_LIBS :=
   MPE_FPIC := -fPIC
 endif
-# NOTE (float builds, FIX-AUDIT-DESPOT): -O3 here vs -O2 in build_tests.sh.
-# Both pass -ffp-contract=off, but -O3 vectorises/reorders FP math, so .so
-# results are not promised bit-identical to the -O2 test binaries
+# NOTE (float builds, FIX-AUDIT-DESPOT + 2026-11-14 policy): -O3 here (the
+# shipped modules) vs -O0 in build_tests.sh (the test binaries, the
+# engine makefile's ruling). Both pass -ffp-contract=off, but -O3
+# vectorises/reorders FP math, so .so results are not promised
+# bit-identical to the -O0 test binaries
 # (IEEE-exact only within one build config + libm).
 # -MMD -MP: emit a .d sidecar per object so header edits force a rebuild.
 # CRITICAL, not tidiness: these objects are compiled against ENGINE headers

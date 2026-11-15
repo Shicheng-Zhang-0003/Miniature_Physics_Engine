@@ -7,8 +7,13 @@
 CC      = gcc
 MGB     := $(shell cd "$(dirname $(lastword $(MAKEFILE_LIST)))" && pwd)
 SRC     ?= $(MGB)/../..
-CFLAGS  = -O2 -g -Wall -Wextra -std=c11 -I$(MGB) -I$(MGB)/include \
+# 2026-11-14 policy (mirrors the engine makefile): shipped artifacts
+# (bridge module, probe) build -O3; the test binary builds -O0 (fast,
+# debuggable, same pinned FP semantics via -ffp-contract=off).
+BASE    = -g -Wall -Wextra -std=c11 -I$(MGB) -I$(MGB)/include \
           -I$(SRC) -ffp-contract=off -pthread
+CFLAGS  = -O3 $(BASE)
+TEST_CFLAGS = -O0 $(BASE)
 PIC     = -fPIC
 OUT     = $(MGB)/build
 DL      = -ldl
@@ -46,7 +51,7 @@ $(OUT)/s2_bridge.o: $(MGB_MOD)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OUT)/mgb_mpe_test: $(MGB)/tests/mgb_mpe_test.c $(MGB_CORE) $(MGB_MOD_OBJ) $(CORE)
-	$(CC) $(CFLAGS) $(MGB)/tests/mgb_mpe_test.c $(MGB_CORE) $(MGB_MOD_OBJ) $(CORE) \
+	$(CC) $(TEST_CFLAGS) $(MGB)/tests/mgb_mpe_test.c $(MGB_CORE) $(MGB_MOD_OBJ) $(CORE) \
 	    -lm $(DL) $(EPOXY) -o $@
 
 # Thin plugin (MFS rule): module objects only; engine symbols resolve
