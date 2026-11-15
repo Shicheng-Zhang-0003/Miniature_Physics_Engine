@@ -1,4 +1,12 @@
 #define _POSIX_C_SOURCE 200809L /* setenv prototype */
+/* realpath needs more than the POSIX feature set under -std=c11:
+ * strict-ANSI hides the BSD/misc side of <stdlib.h>, and this glibc
+ * (2.39) declares realpath only for that set or X/Open — probed:
+ * _POSIX_C_SOURCE 200809L alone leaves NO realpath declaration in the
+ * preprocessed <stdlib.h>, so the calls below compiled as an implicit
+ * int return and the != NULL CHECK compared a truncated pointer.
+ * _DEFAULT_SOURCE adds that set without disturbing the POSIX level. */
+#define _DEFAULT_SOURCE
 #include <errno.h>
 #include <sys/stat.h>
 /* mgb_mpe_test.c — headless gates for the 475 copy.

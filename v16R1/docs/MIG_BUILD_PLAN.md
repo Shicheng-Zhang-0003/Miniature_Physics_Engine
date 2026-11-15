@@ -2369,6 +2369,41 @@ Ledger (new entries get a line, never an edit of a past line):
   -O0), quick 86/86, tui-smoke PASS, mgb 0 errors, mfs all + FTC
   gated 5/5.
 
+- 2026-11-15 — WP4 4.6l (this commit, MGB POSIX FIX — the user's
+  "check and fix immediately" on the mgb build's realpath warnings:
+  implicit declaration at tests/mgb_mpe_test.c:369 plus a
+  pointer-vs-integer comparison — latent WRONG CODE, not noise).
+  Under -std=c11 glibc compiles in strict-ANSI mode, and this glibc
+  (2.39, Ubuntu) declares realpath in <stdlib.h> only for the
+  BSD/misc (__USE_MISC) or X/Open (__USE_XOPEN_EXTENDED) feature set —
+  the guard at stdlib.h:935 is literally "#if defined __USE_MISC ||
+  defined __USE_XOPEN_EXTENDED" — so _POSIX_C_SOURCE 200809L (line 1,
+  kept for setenv/unsetenv, which ARE POSIX-gated) does NOT expose
+  realpath. Probed directly on this glibc: with _POSIX_C_SOURCE
+  200809L alone the preprocessed <stdlib.h> contains NO realpath
+  declaration; _XOPEN_SOURCE 700 and _DEFAULT_SOURCE both expose it,
+  and setenv stays declared either way. So the implicit declaration
+  compiled as an int return and CHECK (realpath (got, real) != NULL)
+  compared a truncated pointer against NULL — it happened to pass
+  because a truncated 64-bit pointer is essentially never zero, which
+  is why the battery stayed green while the code was wrong; GCC 14+
+  turns implicit-function-declaration into an error and would have
+  broken this build outright. Fix: one macro — #define _DEFAULT_SOURCE
+  in tests/mgb_mpe_test.c after the existing POSIX macro (both
+  precede every include). Scope swept across the whole mgb tree:
+  modules/s2/s2_bridge.c already opens #define _GNU_SOURCE
+  (dladdr + Dl_info) so its realpath uses (143, 174-175) were never
+  broken; tests/test_mgb.c's macro covers its setenv/chmod use and it
+  is not built by this makefile; the engine CORE objects mgb compiles
+  under the same -std=c11 produced zero warnings (full-log
+  enumeration: the only two warning lines in the pre-fix build were
+  both mgb_mpe_test.c:369 — the second the pointer-vs-integer
+  consequence of the first). Battery: mgb clean + full rebuild with
+  ZERO warnings (grep of the complete log, not just errors); make
+  test green (tier A PASS 44 FAIL 0 — the realpath canonicalisation
+  gates now run with a real prototype; tier B skips without s2tui by
+  design); suite 72/70; quick 86/86.
+
 ## §10 Definition of done for v16S (the cut checklist)
 
 All gates green at the final floor; policy amendment committed; release
