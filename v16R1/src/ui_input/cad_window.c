@@ -17,66 +17,90 @@
  *   - cad_view_camera / ray-from-screen / pick_* / ray_plane
  *     (cad/cad_view_math.c) — the clicking and dragging.
  *
- * Interaction (WP4 4.6h + 4.6i + 4.6j). 4.6h/4.6i ported the engine's
- * MOUSE SEMANTICS (the drag_weld grab, the S4c weld-or-settle drop,
- * the engine's MMB delete — all from drag_weld.c / object_selector.c /
- * the dispatch, not invented). 4.6j completes it on the user's ruling:
- * "I want the CAD editor just like the controls of the actual MPE
- * engine itself BUT with cad specific keybinds and capabilities and
- * everything" — the window now runs the ENGINE'S OWN CONTROL SCHEME:
- * pointer-locked mouse-look, fly movement, crosshair actions
- * (input_control.c / simulation_camera.c / mouse_lock.c patterns).
- * The lock machinery is REUSED as-is (mouse_lock_enable/disable touch
- * no engine state), and the engine's per-frame delta poll is gated on
- * main_inputs.is_mouse_locked — which this window NEVER sets — so the
- * 4.6f isolation holds with zero engine-core changes:
- *   - UNLOCKED LMB: the engine's re-engage — the click ACQUIRES the
- *     pointer lock and nothing else (the S4b rule: the click that
- *     acquires the lock must not also grab). RMB picks under the
- *     cursor (miss deselects); MMB deletes the selection; wheel
- *     zooms.
- *   - LOCKED (pointer hidden, crosshair drawn): mouse-look steers the
- *     camera at the engine's steer_sensitivity (Wayland: the
- *     relative-pointer deltas drained once per tick — the
- *     input_control_poll_locked_mouse pattern; X11: motion-event
- *     deltas + the re-centre warp — the on_mouse_movements pattern).
- *     LMB grabs under the crosshair (the drag_weld_press port: pick
- *     selects, miss clears, grab at the hit depth, every-frame
- *     follow, floor clamp), LMB release runs the 4.6i DROP RULE
- *     (covering bounds touch/overlap = the pose JOINS the composite;
- *     free space = straight-down gravity settle to the highest
- *     supporter or the floor, landed EXACTLY); RMB selects under the
- *     crosshair; MMB deletes; WASD + Space/Shift FLY (the engine's
- *     debug-fly translate — W/S along the forward, A/D along the
- *     side, Space up / Shift down — at move_speed x0.2 = 5 m/s: the
- *     25 m/s default is tuned for the engine's 500 m arena, this
- *     scene is ~10 m; steering sensitivity is used unscaled); Esc
- *     frees the pointer (the engine's Esc convention). You can fly
- *     WHILE carrying (the engine's grab is camera-relative too).
- *   - Esc while unlocked closes the window — the two-stage engine
- *     convention (lock -> unlock -> close; the 4.6c close ruling
- *     preserved on the second stage).
- *   - CAD-SPECIFIC (the "but with cad capabilities" layer):
- *     1/2/3 add sphere/cube/cylinder at the spawn point, Delete/MMB
- *     delete, D duplicate (+0.5 m X), A array (3 copies, 0.5 m X), X/
- *     Y/Z rotate the selection +-15 degrees (Shift = -15), G toggles
- *     snap (0.25 m; new designs start ON), R toggles rot-snap
- *     (0 <-> 15 deg), M toggles the MAGNET (a carried part snaps to
- *     TOUCH the nearest other part along the line of centers at
- *     covering-sphere distance, within 0.25 m; the touch is written
- *     EXACTLY so the weld-on-drop rule holds), F drops the selection
- *     to REST (the settle's support seek — onto a stack or the floor,
- *     exact), S saves, L loads the spec selected in the dropdown, P
- *     spawns the design into the shared world (the 4.6e hookup; also
- *     the Spawn button). M/F/G/R/X/Y/Z/P/1/2/3/Delete work in BOTH
- *     pointer modes; D/A/S/L collide with the fly keys and run
- *     UNLOCKED only — engine controls win while the pointer is
- *     locked, which is the "just like the engine" half of the
- *     ruling. Shift+LMB while UNLOCKED stays the CURSOR precision
- *     fallback: pan on empty space, the y-locked work-plane carry on
- *     a part (the pose stays exactly where slid, NO settle —
- *     floating and interpenetrating assemblies the engine would
- *     never hold stay buildable on purpose).
+ * Interaction (WP4 4.6m — THE FROM-SCRATCH CONTROL PURGE; the user's
+ * ruling: "wasd and mouse to move around, just like the real engine
+ * itself. right click to place a object, left click ON a object to
+ * move it around, middle click to destroy the object, when the object
+ * is being clicked, ikl keys determine precise movements (just like
+ * the mosue can move the objects around, ijkl moves objects around
+ * much more precisely.). arrow keys resize statically the object
+ * being selected (left and right for x axis, up arrow for y axis,
+ * down arrow for z axis changes). remove ALL OTHER KEYBINDS for now
+ * we are making this from scratch"). The window runs EXACTLY this
+ * scheme over the 4.6j engine core — the lock/steer/fly/crosshair/
+ * carry/drop-rule machinery and the S4b/typing-block/focus rulings
+ * are untouched:
+ *   - FLY: pointer-locked mouse-look at steer_sensitivity (Wayland
+ *     drains the relative deltas once per tick; X11 steers per motion
+ *     event with the re-centre warp), WASD + Space/Shift at
+ *     move_speed x0.2 (the engine's debug-fly). The scroll wheel
+ *     keeps its orbit-distance zoom (a camera control, not a
+ *     keybind). UNLOCKED plain LMB stays the engine's re-engage (the
+ *     S4b rule): the click ACQUIRES the lock and nothing else.
+ *   - LMB (locked): grab the part under the crosshair (the
+ *     drag_weld_press port: pick selects, miss clears, grab at the
+ *     hit depth, the part rides the ray every frame with the floor
+ *     clamp); release runs the 4.6i DROP RULE (covering bounds
+ *     touch/overlap = the pose JOINS the composite; free space =
+ *     straight-down gravity settle to the highest supporter or the
+ *     floor, landed EXACTLY). An Esc mid-carry unlocks and the carry
+ *     follows the cursor until the release.
+ *   - IJKL while CARRYING — the user's "just like the mouse can move
+ *     the objects around, ijkl moves objects around much more
+ *     precisely" (the DIRECT nudge ruling): the camera does NOT move;
+ *     I/K push the carried part farther/closer ALONG the view ray
+ *     (cw_drag_t, floored above the eye) and J/L slide it left/right
+ *     ACROSS the view (the grip offset along the camera's right) at
+ *     CW_NUDGE_SPEED (0.5 m/s — a tenth of the fly). Latched like the
+ *     fly keys (press sets, release clears, the tick polls), in BOTH
+ *     pointer modes, dead unless a carry is live.
+ *   - RMB: PLACE the picker shape at the aim point — the crosshair
+ *     while locked, the cursor ray while unlocked; no-op while a
+ *     carry is live (the carried part sits at the crosshair; a place
+ *     there would double-book the spot). ON a part surface the new
+ *     part's center is the hit point PLUS the outward normal scaled
+ *     by the new part's extent along that normal — it TOUCHES the
+ *     surface exactly (the magnet's exact-touch rule, so the
+ *     weld-on-drop release rule holds); on empty space it rests on
+ *     the floor under the ray (the y = 0 plane), or floats
+ *     CW_PLACE_REACH (3 m) out when the ray never meets the floor.
+ *     1/2/3 PICK the shape RMB places (sphere/cube/cylinder at the
+ *     standing 0.25 m dims; default cube) — the user's "keep 1/2/3 as
+ *     pickers" ruling; they no longer add parts directly.
+ *   - MMB: DESTROY — under the crosshair while locked (the user's
+ *     "middle click to destroy the object"), the selection while
+ *     unlocked. cad_delete re-indexes the design, so the carry and
+ *     settle slots are retargeted or cancelled BEFORE the delete
+ *     (the keyboard verbs' mid-motion guard, now applied to the mouse
+ *     verb — the 4.6j MMB-mid-carry hazard closed).
+ *   - ARROWS (the user's axis ruling: "right, up, down is x, y, z
+ *     axis, and the left arrow is a toggle for is it increasing or is
+ *     it decreasing"): Right/Up/Down step the SELECTED part's X/Y/Z
+ *     dimension by CW_RESIZE_STEP (0.05 m; GTK key repeat keeps a
+ *     held arrow stepping) in the current direction; LEFT toggles
+ *     that direction (+/-, shown in the status). A sphere's arrows
+ *     all drive its one radius; a cube's arrow drives the matching
+ *     half extension; a cylinder's X arrow drives its half length
+ *     (the axle is LOCAL X) and Y/Z drive the radius. Resize never
+ *     shifts indices, so arrows work MID-CARRY (the carried part's
+ *     floor clamp refreshes with the new extent); they freeze during
+ *     the settle fall. The floor wins after every resize (the lift is
+ *     written exact).
+ *   - G (the user's snap ruling: "free placement, BUT with a keybind
+ *     when a object is selected to place it in the nearest snap"): a
+ *     ONE-SHOT that snaps the SELECTED part to the nearest
+ *     CW_SNAP_STEP (0.25 m) grid multiple, the floor winning (the
+ *     lift is written exact). New designs start FREE (snap 0): with
+ *     the G toggle purged, the 4.6h snapped default would quantize
+ *     every move and nudge — this supersedes that default.
+ *   - REMOVED with the purge: 1/2/3 direct adds, the Delete key, D
+ *     duplicate, A array, X/Y/Z rotate, G-as-toggle, R rot-snap, M
+ *     magnet (the magnet machinery went with its keybind; the
+ *     weld-on-drop release rule keeps its covering-sphere math), F
+ *     floor-drop, S/L save/load keys, P spawn key, and the unlocked
+ *     Shift+LMB pan/plane-drag modes (Shift is fly-down only).
+ *     Save/Load/Spawn remain as BUTTONS; the two-stage Esc, the
+ *     typing block and the focus-leave unlock are unchanged.
  *   - The lock releases when the window loses keyboard focus (the
  *     engine's on_focus_out pattern) and on destroy. Typing-block
  *     ruling (WP4 4.6g) unchanged: while the name entry holds focus
@@ -146,36 +170,46 @@ static cad_view_camera cw_camera;
 static int cw_design_ready = 0;
 
 /* Interaction modes: one motion at a time. WP4 4.6h split the old
- * CW_MODE_DRAG: CW_MODE_CARRY is the ENGINE grab (the drag_weld
- * precedent — grab at the hit point, the part rides the ray at the
- * grabbed depth, full 3D); CW_MODE_PLANE_DRAG keeps the old y-locked
- * work-plane slide for flat layout work (Shift+LMB). WP4 4.6i added
- * CW_MODE_SETTLING: the post-release gravity drop (the engine's
- * dropped-body rule — see cw_release_carry). WP4 4.6j REMOVED
- * CW_MODE_ORBIT: unlocked LMB now ACQUIRES the pointer lock (the
- * engine's re-engage rule) instead of orbiting; looking around is the
- * locked mouse-look. */
+ * CW_MODE_DRAG into CW_MODE_CARRY (the ENGINE grab — the drag_weld
+ * precedent: grab at the hit point, the part rides the ray at the
+ * grabbed depth, full 3D); WP4 4.6i added CW_MODE_SETTLING: the
+ * post-release gravity drop (the engine's dropped-body rule — see
+ * cw_release_carry). WP4 4.6j REMOVED CW_MODE_ORBIT: unlocked LMB now
+ * ACQUIRES the pointer lock (the engine's re-engage rule) instead of
+ * orbiting; looking around is the locked mouse-look. WP4 4.6m removed
+ * CW_MODE_PAN / CW_MODE_PLANE_DRAG with the unlocked Shift+LMB
+ * fallback (Shift is fly-down only now). */
 enum {
     CW_MODE_IDLE = 0,
-    CW_MODE_PAN,        /* Shift+LMB on empty space */
     CW_MODE_CARRY,      /* LMB: engine-style ray carry (crosshair while locked) */
-    CW_MODE_PLANE_DRAG, /* Shift+LMB on a part: y-locked plane move */
     CW_MODE_SETTLING    /* post-release gravity drop to rest */
 };
 static int cw_mode = CW_MODE_IDLE;
 static double cw_last_x = 0.0;
 static double cw_last_y = 0.0;
-static int cw_drag_part = -1;     /* index while CARRY / PLANE_DRAG */
-static float cw_drag_plane_y = 0.0f;  /* PLANE_DRAG: the work plane's height */
+static int cw_drag_part = -1;     /* index while CARRY */
 static vector3 cw_drag_offset = {0.0f, 0.0f, 0.0f}; /* part - grab point */
 /* WP4 4.6h carry + placement state (window-local, like the camera —
  * the design struct stays pure model data). cw_drag_t = the grabbed
  * depth along the pick ray (drag_weld's grab-distance semantics);
  * cw_drag_floor_y = the part's oriented down-extent at grab time (the
- * carry never dips it under the floor); cw_magnet_on = the M toggle. */
+ * carry never dips it under the floor). */
 static float cw_drag_t = 0.0f;
 static float cw_drag_floor_y = 0.0f;
-static int cw_magnet_on = 0;
+/* WP4 4.6m, the from-scratch control purge: IJKL is the DIRECT carry
+ * nudge (not camera steer — the engine's IJKL meaning does not apply
+ * inside this window; the user picked "Direct object nudge"), so the
+ * nudge latches ride with the fly latches. cw_place_type is the shape
+ * RMB places (1/2/3 pick it; default cube); cw_resize_grow is the
+ * arrow-key resize DIRECTION the Left arrow toggles (+1 grow, -1
+ * shrink; the user's axis ruling: right/up/down = x/y/z, left = the
+ * toggle). */
+static int cw_key_i = 0;
+static int cw_key_j = 0;
+static int cw_key_k = 0;
+static int cw_key_l = 0;
+static int cw_place_type = mig_part_cube;
+static int cw_resize_grow = 1;
 /* WP4 4.6i: the tick-driven carry recomputes the target EVERY frame
  * (the drag_weld_tick analog — the engine's carry also runs from the
  * frame dispatch, not from motion events), so it needs the last
@@ -582,8 +616,11 @@ static int cw_widget_pixels (int *out_w, int *out_h) {
 /* ---- picking ----------------------------------------------------------- */
 
 /* Nearest part under the pixel. Returns the index or -1; the hit point
- * (when picked) goes to out_point. */
-static int cw_pick (double px, double py, float *out_t, vector3 *out_point) {
+ * (when picked) goes to out_point and the surface's OUTWARD normal to
+ * out_normal (WP4 4.6m — RMB place touches the surface exactly along
+ * it; either output pointer may be NULL). */
+static int cw_pick (double px, double py, float *out_t, vector3 *out_point,
+                    vector3 *out_normal) {
     int w = 0;
     int h = 0;
     if (!cw_widget_pixels (&w, &h)) { return -1; }
@@ -611,6 +648,7 @@ static int cw_pick (double px, double py, float *out_t, vector3 *out_point) {
             best = i;
             best_t = hit.t;
             if (out_point) { *out_point = hit.point; }
+            if (out_normal) { *out_normal = hit.normal; }
         }
     }
     if ((best >= 0) && out_t) { *out_t = best_t; }
@@ -639,22 +677,28 @@ static const char *cw_err_name (int err) {
     }
 }
 
+static const char *cw_type_name (int type) {
+    static const char *names [3] = {"sphere", "cube", "cylinder"};
+    if ((type < 0) || (type > 2)) { return "?"; }
+    return names [type];
+}
+
 static void cw_status_refresh (void) {
     if (!cw_status_label) { return; }
     const char *sel = "none";
     char selbuf [32];
     if ((cw_design.selected >= 0) && (cw_design.selected < cw_design.count)) {
-        static const char *type_names [3] = {"sphere", "cube", "cylinder"};
         snprintf (selbuf, sizeof (selbuf), "%d %s", cw_design.selected,
-                  type_names [cw_design.parts [cw_design.selected].type]);
+                  cw_type_name (cw_design.parts [cw_design.selected].type));
         sel = selbuf;
     }
     char buf [256];
     snprintf (buf, sizeof (buf),
-              "parts %d/%d | sel %s | snap %.3g m | rotsnap %.3g deg | magnet %s | look %s | %s",
+              "parts %d/%d | sel %s | place %s | res %s | snap %.3g m | look %s | %s",
               cw_design.count, cw_design.max_parts, sel,
-              (double) cw_design.snap_step, (double) cw_design.rot_snap_deg,
-              cw_magnet_on ? "on" : "off",
+              cw_type_name (cw_place_type),
+              (cw_resize_grow > 0) ? "+" : "-",
+              (double) cw_design.snap_step,
               cw_look_locked ? "locked" : "free", cw_design.name);
     gtk_label_set_text (GTK_LABEL (cw_status_label), buf);
 }
@@ -812,7 +856,7 @@ static void cw_rename_from_entry (void) {
  * origin, discarding the authored placement. */
 static void cw_spawn_to_world (void) {
     if (cw_design.count == 0) {
-        cw_status_err ("spawn: design is empty (1/2/3 add parts)");
+        cw_status_err ("spawn: design is empty (RMB places parts)");
         return;
     }
     mig_part bridge_parts [CAD_MAX_PARTS];
@@ -841,108 +885,22 @@ static void cw_spawn_to_world (void) {
     cw_status_ok (buf);
 }
 
-/* Add at the spawn point: the camera target's XZ, rest height of the
- * identity orientation (sphere r, cube he.y, cylinder r — the axle is
- * LOCAL X, so the tube lies along the ground with radius up). The
- * standing-vs-lying spawn ruling stays deferred to the connect round;
- * identity orientation is the spec grammar's default pose. */
-static void cw_add_part (int type) {
-    const vector3 spawn = {cw_camera.target.x, 0.25f, cw_camera.target.z};
-    int rc = cad_full;
-    if (type == mig_part_sphere) {
-        rc = cad_add_sphere (&cw_design, 0.25f, spawn);
-    } else if (type == mig_part_cube) {
-        rc = cad_add_cube (&cw_design, (vector3) {0.25f, 0.25f, 0.25f}, spawn);
-    } else {
-        rc = cad_add_cylinder (&cw_design, 0.25f, 0.5f, spawn);
-    }
-    if (rc != cad_ok) {
-        char buf [128];
-        snprintf (buf, sizeof (buf), "add refused (%s)", cw_err_name (rc));
-        cw_status_err (buf);
-        return;
-    }
-    cad_select (&cw_design, cw_design.count - 1);
-    cw_status_refresh ();
-}
+/* ---- placement helpers (WP4 4.6h; the constants are WP4 4.6m — the
+ * from-scratch control purge retuned the scheme around them) ---- */
 
-static void cw_delete_selected (void) {
-    int rc = cad_delete (&cw_design, cw_design.selected);
-    if (rc != cad_ok) {
-        char buf [128];
-        snprintf (buf, sizeof (buf), "delete refused (%s)", cw_err_name (rc));
-        cw_status_err (buf);
-        return;
-    }
-    cw_status_refresh ();
-}
-
-static void cw_duplicate_selected (void) {
-    /* First-cut offset: +0.5 m on X (snapped by the model when snap is
-     * on); the copy becomes the new selection. */
-    const vector3 offset = {0.5f, 0.0f, 0.0f};
-    int rc = cad_duplicate (&cw_design, cw_design.selected, offset);
-    if (rc != cad_ok) {
-        char buf [128];
-        snprintf (buf, sizeof (buf), "duplicate refused (%s)", cw_err_name (rc));
-        cw_status_err (buf);
-        return;
-    }
-    cad_select (&cw_design, cw_design.count - 1);
-    cw_status_refresh ();
-}
-
-static void cw_array_selected (void) {
-    /* First-cut pattern: 3 total (original + 2 copies), 0.5 m X step. */
-    const vector3 step = {0.5f, 0.0f, 0.0f};
-    int rc = cad_array (&cw_design, cw_design.selected, 3, step);
-    if (rc != cad_ok) {
-        char buf [128];
-        snprintf (buf, sizeof (buf), "array refused (%s)", cw_err_name (rc));
-        cw_status_err (buf);
-        return;
-    }
-    cw_status_refresh ();
-}
-
-static void cw_rotate_selected (int axis, float degrees) {
-    int rc = cad_rotate_degrees (&cw_design, cw_design.selected, axis, degrees);
-    if (rc != cad_ok) {
-        char buf [128];
-        snprintf (buf, sizeof (buf), "rotate refused (%s)", cw_err_name (rc));
-        cw_status_err (buf);
-        return;
-    }
-    cw_status_refresh ();
-}
-
-static void cw_toggle_snap (void) {
-    const float next = (cw_design.snap_step > 0.0f) ? 0.0f : 0.25f;
-    int rc = cad_set_snap (&cw_design, next);
-    if (rc != cad_ok) {
-        char buf [128];
-        snprintf (buf, sizeof (buf), "snap toggle refused (%s)", cw_err_name (rc));
-        cw_status_err (buf);
-        return;
-    }
-    cw_status_refresh ();
-}
-
-static void cw_toggle_rot_snap (void) {
-    const float next = (cw_design.rot_snap_deg > 0.0f) ? 0.0f : 15.0f;
-    int rc = cad_set_rot_snap (&cw_design, next);
-    if (rc != cad_ok) {
-        char buf [128];
-        snprintf (buf, sizeof (buf), "rot-snap toggle refused (%s)", cw_err_name (rc));
-        cw_status_err (buf);
-        return;
-    }
-    cw_status_refresh ();
-}
-
-/* ---- placement helpers (WP4 4.6h) -------------------------------------- */
-
-#define CW_MAGNET_ENGAGE 0.25f
+/* IJKL carry-nudge speed (m/s) — a tenth of the fly's 5 m/s: the user's
+ * "much more precisely" (the direct-nudge ruling). */
+#define CW_NUDGE_SPEED 0.5f
+/* Arrow-key resize step (m per keypress, in the toggled +/- direction). */
+#define CW_RESIZE_STEP 0.05f
+/* The G one-shot's grid pitch: snap the SELECTED part to the nearest
+ * multiple of this (free placement stays the default — the user's
+ * "free placement, BUT with a keybind ... to place it in the nearest
+ * snap" ruling). */
+#define CW_SNAP_STEP 0.25f
+/* RMB place reach (m): where a part lands when the ray misses both
+ * parts and the floor plane. */
+#define CW_PLACE_REACH 3.0f
 
 /* Covering-sphere radius of ONE part — the same bound math
  * physics_world_add_composite enforces on whole assemblies: a sphere's
@@ -1043,49 +1001,15 @@ static void cw_xz_extents (const mig_part *p, float *ex, float *ez) {
     *ez = fabsf (r20) * dx + fabsf (r21) * dy + fabsf (r22) * dz;
 }
 
-/* Magnet assist while carrying: snap the target to TOUCH the nearest
- * other part along the line of centers — centers exactly the sum of
- * the covering radii apart. Engages only within CW_MAGNET_ENGAGE of a
- * valid touch position, so free placement away from parts stays free;
- * ties break to the nearest part; coincident centers (no line of
- * centers) skip. The result is written through cad_set_position like
- * any move, so grid snap still rounds it — a snapped touch can sit up
- * to half a step off the exact contact — and the floor clamp (applied
- * after) can lift a would-be under-floor touch: floor wins, snap
- * honors the grid. */
-static void cw_magnet_adjust (const mig_part *carried, vector3 *target) {
-    const float r_carry = cw_cover_radius (carried);
-    float best_err = 0.0f;
-    vector3 best = {0.0f, 0.0f, 0.0f};
-    int have = 0;
-    for (int i = 0; i < cw_design.count; i++) {
-        if (i == cw_drag_part) { continue; }
-        const mig_part *n = &cw_design.parts [i];
-        const vector3 delta = vector3_subtraction (*target, n -> position);
-        const float dist = vector3_length (delta);
-        if (dist <= 1e-6f) { continue; }
-        const float want = r_carry + cw_cover_radius (n);
-        const float err = fabsf (dist - want);
-        if (err > CW_MAGNET_ENGAGE) { continue; }
-        if ((!have) || (err < best_err)) {
-            have = 1;
-            best_err = err;
-            best = vector3_addition (n -> position,
-                                     vector3_scaling (delta, want / dist));
-        }
-    }
-    if (have) { *target = best; }
-}
-
 /* The window's weld-on-drop test (the drag_weld S4c rule ported):
  * TRUE when the part's covering bound touches or overlaps ANOTHER
  * part's — centers within the sum of the covering radii, plus
  * CW_WELD_EPS touch tolerance. The engine welds a dropped body whose
  * covering sphere overlaps another AT THAT POSE; here the design is
  * already one composite, so "joined" means the release keeps the pose
- * (no settle). The magnet places at the EXACT touch distance, so
- * touch counts (the engine needs a real push-in; the magnet IS the
- * push-in). */
+ * (no settle). The magnet placed at the EXACT touch distance and RMB
+ * place still does (hit normal x extent), so touch counts (the engine
+ * needs a real push-in; a place-on-surface IS the push-in). */
 #define CW_WELD_EPS 1e-3f
 static int cw_joined (int idx) {
     const mig_part *p = &cw_design.parts [idx];
@@ -1132,10 +1056,10 @@ static float cw_rest_y_for (int idx) {
 }
 
 /* Write a position with the grid snap bypassed for THIS write (the
- * model reads snap_step per call — the G-off semantics): landings and
- * magnet touches are surface truths and must be EXACT, while the snap
- * stays honored for every other write. A drop that hovers one snap
- * step over the floor reads broken; a drag that quantizes reads as
+ * model reads snap_step per call — the G-off semantics): landings,
+ * exact touches and lifts are surface truths and must be EXACT, while
+ * the snap stays honored for every other write. A drop that hovers one
+ * snap step over the floor reads broken; a drag that quantizes reads as
  * the grid. */
 static void cw_write_exact (int idx, vector3 position) {
     const float saved = cw_design.snap_step;
@@ -1185,16 +1109,10 @@ static void cw_carry_apply_ndc (float ndc_x, float ndc_y) {
     vector3 target = vector3_addition (
         vector3_scaling (ray.direction, cw_drag_t), cw_drag_offset);
     target = vector3_addition (ray.origin, target);
-    const int magnet = cw_magnet_on;
-    if (magnet) {
-        cw_magnet_adjust (&cw_design.parts [cw_drag_part], &target);
-    }
+    /* WP4 4.6m: the magnet branches are gone with the M keybind — free
+     * placement is the rule now, and the floor clamp still wins. */
     target.y = cw_carry_clamp_y (target.y);
-    if (magnet) {
-        cw_write_exact (cw_drag_part, target);
-    } else {
-        cad_set_position (&cw_design, cw_drag_part, target);
-    }
+    cad_set_position (&cw_design, cw_drag_part, target);
 }
 
 /* The unlocked (cursor-driven) flavor: pixels -> NDC, then the same
@@ -1274,29 +1192,267 @@ static void cw_settle_tick (float dt) {
     cw_write_exact (cw_settle_part, pos);
 }
 
-/* M: the magnet placement toggle (the status line shows the state). */
-static void cw_toggle_magnet (void) {
-    cw_magnet_on = !cw_magnet_on;
+/* ---- WP4 4.6m: the from-scratch control actions ------------------------
+ * The purge replaced the old keyboard verbs with four mouse/keyboard
+ * actions over the SAME model: the direct IJKL carry nudge, the
+ * slot-safe delete, the RMB exact-touch place, the arrow resize and
+ * the G one-shot snap. */
+
+/* IJKL: the DIRECT carry nudge (the user's "ijkl moves objects around
+ * much more precisely" ruling — the camera does NOT move). I/K push
+ * the carried part farther/closer ALONG the view ray (the grab depth
+ * cw_drag_t, floored 0.05 m above the eye so the part never passes
+ * behind it); J/L slide it across the view along the camera's right
+ * (the frozen grip offset). Runs BEFORE the carry apply in the tick:
+ * the edit lands in the carry state itself, so it survives the
+ * every-frame ray recompute. Dead unless a carry is live (the latches
+ * are not lock-gated — an Esc'd carry stays nudgeable). */
+static void cw_nudge_carry (float dt) {
+    if (cw_drag_part < 0) { return; }
+    const float speed = CW_NUDGE_SPEED * dt;
+    if (cw_key_i) { cw_drag_t += speed; }
+    if (cw_key_k) {
+        cw_drag_t -= speed;
+        if (cw_drag_t < 0.05f) { cw_drag_t = 0.05f; }
+    }
+    if (cw_key_j || cw_key_l) {
+        const float side = (cw_key_l ? speed : 0.0f) -
+                           (cw_key_j ? speed : 0.0f);
+        const vector3 right = cad_view_right (&cw_camera);
+        cw_drag_offset = vector3_addition (
+            cw_drag_offset, vector3_scaling (right, side));
+    }
+}
+
+/* Delete a part by INDEX, retargeting (or cancelling) the carry and
+ * settle slots BEFORE the model shifts indices — cad_delete moves
+ * every higher part down one, and a slot pointing past the shift
+ * would edit the wrong part (the keyboard verbs' mid-motion guard,
+ * now applied to the mouse verbs too: the 4.6j MMB-mid-carry hazard
+ * closes here). Deleting the carried part cancels the carry (the LMB
+ * release then finds no carry); deleting the settling part cancels
+ * the fall. */
+static void cw_delete_index (int idx) {
+    if ((idx < 0) || (idx >= cw_design.count)) { return; }
+    if (cw_drag_part == idx) {
+        cw_drag_part = -1;
+        if (cw_mode == CW_MODE_CARRY) { cw_mode = CW_MODE_IDLE; }
+    } else if (cw_drag_part > idx) {
+        cw_drag_part--;
+    }
+    if (cw_settle_part == idx) {
+        cw_settle_part = -1;
+        if (cw_mode == CW_MODE_SETTLING) { cw_mode = CW_MODE_IDLE; }
+    } else if (cw_settle_part > idx) {
+        cw_settle_part--;
+    }
+    int rc = cad_delete (&cw_design, idx);
+    if (rc != cad_ok) {
+        char buf [128];
+        snprintf (buf, sizeof (buf), "delete refused (%s)", cw_err_name (rc));
+        cw_status_err (buf);
+    }
     cw_status_refresh ();
 }
 
-/* F: drop the selection to REST — the settle's support seek (the
- * highest supporter below it, or the floor), landed EXACTLY (the
- * snap-bypass write; gravity is a surface truth). WP4 4.6i upgraded
- * the 4.6h plain floor: a part above a stack now drops ONTO the
- * stack, like the engine's gravity. XZ stays where it was. */
-static void cw_floor_selected (void) {
+/* MMB while unlocked: destroy the SELECTION (there is no crosshair
+ * while the cursor is visible). Nothing selected: no-op (a middle
+ * click on empty space destroys nothing, like the engine's). */
+static void cw_delete_selected (void) {
     if ((cw_design.selected < 0) || (cw_design.selected >= cw_design.count)) {
-        cw_status_err ("floor: nothing selected");
+        return;
+    }
+    cw_delete_index (cw_design.selected);
+}
+
+/* MMB while locked: destroy the part UNDER THE CROSSHAIR (the user's
+ * "middle click to destroy the object" — the engine's middle-click
+ * remove, crosshair-aimed). A miss destroys nothing (the selection
+ * survives; a delete on every aiming miss would surprise). */
+static void cw_crosshair_delete (void) {
+    int w = 0;
+    int h = 0;
+    if (!cw_widget_pixels (&w, &h)) { return; }
+    const int picked = cw_pick ((double) w * 0.5, (double) h * 0.5,
+                                NULL, NULL, NULL);
+    if (picked < 0) { return; }
+    cw_delete_index (picked);
+}
+
+/* The part's supporting extent along a WORLD direction at IDENTITY
+ * orientation — the support function value: a sphere's radius; a box's
+ * |n| dotted with the half extensions; a cylinder |n.x| x the half
+ * length (the axle is LOCAL X) plus radius x the YZ magnitude. RMB
+ * place puts the new part's center this far along the hit normal, so
+ * its bound TOUCHES the hit surface exactly (the magnet's exact-touch
+ * rule, which the weld-on-drop release honors). */
+static float cw_extent_along (const mig_part *p, vector3 normal) {
+    if (p -> type == mig_part_sphere) { return p -> radius; }
+    if (p -> type == mig_part_cube) {
+        return fabsf (normal.x) * p -> half_extensions.x +
+               fabsf (normal.y) * p -> half_extensions.y +
+               fabsf (normal.z) * p -> half_extensions.z;
+    }
+    return fabsf (normal.x) * p -> cylinder_half_length +
+           p -> radius * sqrtf (normal.y * normal.y +
+                                normal.z * normal.z);
+}
+
+/* RMB: PLACE the picker shape (cw_place_type) at the aim point — the
+ * crosshair while locked, the cursor ray while unlocked. No-op while
+ * a carry is live (the carried part sits at the aim point; a place
+ * there would double-book the spot). ON a part surface the new
+ * part's center is the hit point PLUS the outward normal scaled by
+ * the new part's extent along it — it TOUCHES the surface exactly
+ * (the weld rule then holds on any later drop). On empty space it
+ * rests on the floor plane (y = 0) under the ray, or floats
+ * CW_PLACE_REACH out when the ray never meets the floor. The floor
+ * wins: a place never dips under its own rest height (the lift
+ * breaks an under-floor touch — documented, the floor is the harder
+ * truth). The standing dims (the 4.6h spawn set): sphere r 0.25,
+ * cube 0.25^3, cylinder r 0.25 / hl 0.5 — identity orientation, the
+ * spec grammar's default pose (the standing-vs-lying spawn ruling
+ * stays deferred). */
+static void cw_place_part (double px, double py) {
+    if (cw_mode == CW_MODE_CARRY) { return; }
+    int w = 0;
+    int h = 0;
+    if (!cw_widget_pixels (&w, &h)) { return; }
+    cw_camera.aspect = (float) w / (float) h;
+    const float ndc_x = (float) (2.0 * px / (double) w - 1.0);
+    const float ndc_y = 1.0f - (float) (2.0 * py / (double) h);
+    const cad_view_ray ray = cad_view_ray_from_screen (&cw_camera, ndc_x, ndc_y);
+    mig_part proto;
+    memset (&proto, 0, sizeof (proto));
+    proto.type = (mig_part_type) cw_place_type;
+    proto.orientation = (vector4) {1.0f, 0.0f, 0.0f, 0.0f};
+    if (proto.type == mig_part_sphere) {
+        proto.radius = 0.25f;
+    } else if (proto.type == mig_part_cube) {
+        proto.half_extensions = (vector3) {0.25f, 0.25f, 0.25f};
+    } else {
+        proto.radius = 0.25f;
+        proto.cylinder_half_length = 0.5f;
+    }
+    vector3 point = {0.0f, 0.0f, 0.0f};
+    vector3 normal = {0.0f, 0.0f, 0.0f};
+    const int picked = cw_pick (px, py, NULL, &point, &normal);
+    vector3 center;
+    if (picked >= 0) {
+        const float ext = cw_extent_along (&proto, normal);
+        center = vector3_addition (point, vector3_scaling (normal, ext));
+    } else {
+        const vector3 floor_point = {0.0f, 0.0f, 0.0f};
+        const vector3 floor_normal = {0.0f, 1.0f, 0.0f};
+        vector3 hit = {0.0f, 0.0f, 0.0f};
+        if (cad_view_ray_plane (ray, floor_point, floor_normal, &hit)) {
+            center = hit;
+        } else {
+            center = vector3_addition (
+                ray.origin, vector3_scaling (ray.direction, CW_PLACE_REACH));
+        }
+    }
+    const float rest = cw_down_extent (&proto);
+    if (center.y < rest) { center.y = rest; }
+    int rc = cad_bad_type;
+    if (proto.type == mig_part_sphere) {
+        rc = cad_add_sphere (&cw_design, proto.radius, center);
+    } else if (proto.type == mig_part_cube) {
+        rc = cad_add_cube (&cw_design, proto.half_extensions, center);
+    } else {
+        rc = cad_add_cylinder (&cw_design, proto.radius,
+                               proto.cylinder_half_length, center);
+    }
+    if (rc != cad_ok) {
+        char buf [128];
+        snprintf (buf, sizeof (buf), "place refused (%s)", cw_err_name (rc));
+        cw_status_err (buf);
+        return;
+    }
+    cad_select (&cw_design, cw_design.count - 1);
+    cw_status_refresh ();
+}
+
+/* Arrows: step the SELECTED part's dimension on one axis (the user's
+ * axis ruling: right/up/down = x/y/z) by CW_RESIZE_STEP in the
+ * current +/- direction (LEFT toggles it, shown in the status).
+ * Sphere: every arrow drives the one radius; cube: the matching half
+ * extension; cylinder: X is the half length (the axle is LOCAL X),
+ * Y/Z the radius. Silent with nothing selected (key repeat would
+ * spam); frozen during the settle fall (the mode guard in cw_on_key);
+ * works MID-CARRY (the carried part's floor clamp refreshes with the
+ * new extent). The floor wins after the resize (the lift is written
+ * exact). */
+static void cw_resize_selected (int axis) {
+    if ((cw_design.selected < 0) || (cw_design.selected >= cw_design.count)) {
         return;
     }
     const int idx = cw_design.selected;
-    vector3 pos = cw_design.parts [idx].position;
-    pos.y = cw_rest_y_for (idx);
-    cw_write_exact (idx, pos);
-    char buf [128];
-    snprintf (buf, sizeof (buf), "dropped to rest at y=%.3g", (double) pos.y);
-    cw_status_ok (buf);
+    const mig_part *p = &cw_design.parts [idx];
+    const float step = CW_RESIZE_STEP * (float) cw_resize_grow;
+    int rc = cad_bad_type;
+    if (p -> type == mig_part_sphere) {
+        rc = cad_set_dims_sphere (&cw_design, idx, p -> radius + step);
+    } else if (p -> type == mig_part_cube) {
+        vector3 he = p -> half_extensions;
+        if (axis == 0) { he.x += step; }
+        else if (axis == 1) { he.y += step; }
+        else { he.z += step; }
+        rc = cad_set_dims_cube (&cw_design, idx, he);
+    } else {
+        if (axis == 0) {
+            rc = cad_set_dims_cylinder (&cw_design, idx, p -> radius,
+                                        p -> cylinder_half_length + step);
+        } else {
+            rc = cad_set_dims_cylinder (&cw_design, idx, p -> radius + step,
+                                        p -> cylinder_half_length);
+        }
+    }
+    if (rc != cad_ok) {
+        char buf [128];
+        snprintf (buf, sizeof (buf), "resize refused (%s)", cw_err_name (rc));
+        cw_status_err (buf);
+        return;
+    }
+    if ((cw_mode == CW_MODE_CARRY) && (cw_drag_part == idx)) {
+        cw_drag_floor_y = cw_down_extent (&cw_design.parts [idx]);
+    } else {
+        const mig_part *q = &cw_design.parts [idx];
+        const float rest = cw_rest_y_for (idx);
+        if (q -> position.y < rest) {
+            vector3 pos = q -> position;
+            pos.y = rest;
+            cw_write_exact (idx, pos);
+        }
+    }
+    cw_status_refresh ();
+}
+
+/* G one-shot: drop the SELECTED part onto the nearest CW_SNAP_STEP
+ * grid multiple (the user's snap ruling — free placement stays the
+ * default, this is the on-demand snap). The rounding is the MODEL's
+ * (cad_set_position snaps with the design's own snap_step): the grid
+ * pitch is borrowed for this one write and restored — the design
+ * stays free. The floor wins: the snapped pose lifts to rest (the
+ * lift is written exact). */
+static void cw_snap_selected (void) {
+    if ((cw_design.selected < 0) || (cw_design.selected >= cw_design.count)) {
+        cw_status_err ("snap: nothing selected");
+        return;
+    }
+    const int idx = cw_design.selected;
+    const float saved = cw_design.snap_step;
+    cw_design.snap_step = CW_SNAP_STEP;
+    cad_set_position (&cw_design, idx, cw_design.parts [idx].position);
+    cw_design.snap_step = saved;
+    const mig_part *p = &cw_design.parts [idx];
+    const float rest = cw_rest_y_for (idx);
+    if (p -> position.y < rest) {
+        vector3 pos = p -> position;
+        pos.y = rest;
+        cw_write_exact (idx, pos);
+    }
+    cw_status_ok ("snapped to the nearest 0.25 m grid point");
 }
 
 /* ---- the engine's control scheme (WP4 4.6j) ----------------------------
@@ -1364,13 +1520,21 @@ static void cw_fly_translate (float dt) {
     cw_camera.target = t;
 }
 
-static void cw_kill_fly_latches (void) {
+/* Kill every MOVE latch — the fly keys AND the IJKL carry nudge (WP4
+ * 4.6m: the nudge rides the same latch discipline). Called on lock
+ * edges, focus loss and destroy, so a held key never outlives its
+ * context. */
+static void cw_kill_move_latches (void) {
     cw_key_w = 0;
     cw_key_a = 0;
     cw_key_s = 0;
     cw_key_d = 0;
     cw_key_up = 0;
     cw_key_down = 0;
+    cw_key_i = 0;
+    cw_key_j = 0;
+    cw_key_k = 0;
+    cw_key_l = 0;
 }
 
 /* Acquire the pointer lock (the engine's re-engage). Dead latches are
@@ -1380,7 +1544,7 @@ static void cw_look_lock (void) {
     if (cw_look_locked || !cw_gl_area) { return; }
     mouse_lock_enable (cw_gl_area);
     cw_look_locked = 1;
-    cw_kill_fly_latches ();
+    cw_kill_move_latches ();
     cw_status_refresh ();
 }
 
@@ -1390,7 +1554,7 @@ static void cw_look_unlock (void) {
     if (cw_gl_area && GTK_IS_WIDGET (cw_gl_area)) {
         mouse_lock_disable (cw_gl_area);
     }
-    cw_kill_fly_latches ();
+    cw_kill_move_latches ();
     cw_status_refresh ();
 }
 
@@ -1406,7 +1570,8 @@ static void cw_crosshair_grab (void) {
     if (!cw_widget_pixels (&w, &h)) { return; }
     float t = 0.0f;
     vector3 point = {0.0f, 0.0f, 0.0f};
-    const int picked = cw_pick ((double) w * 0.5, (double) h * 0.5, &t, &point);
+    const int picked = cw_pick ((double) w * 0.5, (double) h * 0.5, &t, &point,
+                                NULL);
     if (picked < 0) {
         cad_select (&cw_design, -1);
         cw_status_refresh ();
@@ -1418,17 +1583,6 @@ static void cw_crosshair_grab (void) {
     cw_drag_floor_y = cw_down_extent (&cw_design.parts [picked]);
     cw_drag_offset = vector3_subtraction (cw_design.parts [picked].position, point);
     cw_mode = CW_MODE_CARRY;
-    cw_status_refresh ();
-}
-
-/* Crosshair select (RMB while locked): the selector at screen center,
- * miss deselects — select_object_by_index's contract. */
-static void cw_crosshair_select (void) {
-    int w = 0;
-    int h = 0;
-    if (!cw_widget_pixels (&w, &h)) { return; }
-    cad_select (&cw_design, cw_pick ((double) w * 0.5, (double) h * 0.5,
-                                     NULL, NULL));
     cw_status_refresh ();
 }
 
@@ -1445,10 +1599,6 @@ static void cw_on_press (GtkGestureClick *gesture, gint n_press, gdouble x,
     gtk_widget_grab_focus (cw_gl_area);
     const guint button = gtk_gesture_single_get_current_button (
         GTK_GESTURE_SINGLE (gesture));
-    GdkModifierType state = 0;
-    GdkEvent *event = gtk_event_controller_get_current_event (
-        GTK_EVENT_CONTROLLER (gesture));
-    if (event) { state = gdk_event_get_modifier_state (event); }
     cw_last_x = x;
     cw_last_y = y;
     cw_cursor_x = x;
@@ -1457,25 +1607,31 @@ static void cw_on_press (GtkGestureClick *gesture, gint n_press, gdouble x,
      * its rest instantly (a part frozen mid-fall forever would be a
      * leak). */
     if (cw_settle_part >= 0) { cw_settle_finish (); }
-    /* RMB (button 3): the engine's selector — pick and select only,
-     * never a drag; empty space deselects (-1 is the model's
-     * documented deselect, matching select_object_by_index's miss
-     * contract). Under the crosshair while locked, under the cursor
-     * while unlocked. */
+    /* RMB (button 3): PLACE the picker shape at the aim point — the
+     * crosshair while locked, the cursor ray while unlocked (the
+     * no-op-mid-carry rule lives in cw_place_part). */
     if (button == 3) {
         if (cw_look_locked) {
-            cw_crosshair_select ();
+            int w = 0;
+            int h = 0;
+            if (cw_widget_pixels (&w, &h)) {
+                cw_place_part ((double) w * 0.5, (double) h * 0.5);
+            }
         } else {
-            cad_select (&cw_design, cw_pick (x, y, NULL, NULL));
-            cw_status_refresh ();
+            cw_place_part (x, y);
         }
         return;
     }
-    /* MMB (button 2): DELETE the selected part — the engine's own
-     * middle-click rule (scene_remove_object_by_index on the
-     * selection), in both pointer modes. */
+    /* MMB (button 2): DESTROY — under the crosshair while locked (the
+     * user's "middle click to destroy the object"), the selection
+     * while unlocked. Both route through cw_delete_index, which
+     * retargets the carry/settle slots BEFORE the model shifts them. */
     if (button == 2) {
-        cw_delete_selected ();
+        if (cw_look_locked) {
+            cw_crosshair_delete ();
+        } else {
+            cw_delete_selected ();
+        }
         return;
     }
     if (button != 1) { return; }
@@ -1486,32 +1642,11 @@ static void cw_on_press (GtkGestureClick *gesture, gint n_press, gdouble x,
         cw_crosshair_grab ();
         return;
     }
-    const int shift = (state & GDK_SHIFT_MASK) ? 1 : 0;
-    if (!shift) {
-        /* UNLOCKED plain LMB: the engine's re-engage — the click
-         * ACQUIRES the pointer lock and nothing else (the S4b rule:
-         * the click that acquires the lock must not also grab). The
-         * next LMB, now crosshair-aimed, grabs. */
-        cw_look_lock ();
-        return;
-    }
-    /* Shift+LMB while unlocked: the CAD precision fallback (cursor-
-     * driven, no lock) — pan on empty space, the y-locked work-plane
-     * carry on a part (the pre-4.6h drag; the grab offset freezes the
-     * grip so the part doesn't jump; NO settle on release — the
-     * precision tool places poses gravity would never hold). */
-    vector3 point = {0.0f, 0.0f, 0.0f};
-    const int picked = cw_pick (x, y, NULL, &point);
-    if (picked < 0) {
-        cw_mode = CW_MODE_PAN;
-        return;
-    }
-    cad_select (&cw_design, picked);
-    cw_drag_part = picked;
-    cw_drag_plane_y = cw_design.parts [picked].position.y;
-    cw_drag_offset = vector3_subtraction (cw_design.parts [picked].position, point);
-    cw_mode = CW_MODE_PLANE_DRAG;
-    cw_status_refresh ();
+    /* UNLOCKED LMB: the engine's re-engage — the click ACQUIRES the
+     * pointer lock and nothing else (the S4b rule: the click that
+     * acquires the lock must not also grab). The next LMB, now
+     * crosshair-aimed, grabs. */
+    cw_look_lock ();
 }
 
 static void cw_on_release (GtkGestureClick *gesture, gint n_press, gdouble x,
@@ -1522,9 +1657,7 @@ static void cw_on_release (GtkGestureClick *gesture, gint n_press, gdouble x,
     (void) y;
     (void) user_data;
     /* WP4 4.6i: a released CARRY goes through the drop rule (the S4c
-     * port — joined at the touch stays, free space falls to rest). A
-     * released PLANE_DRAG is the precision tool: the pose stays exactly
-     * where slid, no settle. */
+     * port — joined at the touch stays, free space falls to rest). */
     if (cw_mode == CW_MODE_CARRY) {
         cw_release_carry ();
         return;
@@ -1567,48 +1700,11 @@ static void cw_on_motion (GtkEventControllerMotion *controller, gdouble x,
         }
         return;
     }
-    if (cw_mode == CW_MODE_PAN) {
-        int w = 0;
-        int h = 0;
-        if (!cw_widget_pixels (&w, &h)) { return; }
-        cw_camera.aspect = (float) w / (float) h;
-        /* Grab-world pan: the scene follows the cursor, so the target
-         * moves opposite the drag, scaled by the orbit distance. */
-        const float k = cw_camera.distance * 0.0015f;
-        const vector3 right = cad_view_right (&cw_camera);
-        const vector3 up = cad_view_up (&cw_camera);
-        cw_camera.target = vector3_subtraction (cw_camera.target,
-            vector3_scaling (right, dx * k));
-        cw_camera.target = vector3_addition (cw_camera.target,
-            vector3_scaling (up, dy * k));
-        return;
-    }
     if (cw_mode == CW_MODE_CARRY) {
         /* The engine carry, recomputed for this motion AND again in
          * the tick every frame (the drag_weld_tick analog): no jump at
-         * grab, no plane lock, full 3D. */
+         * grab, full 3D. */
         cw_carry_update (x, y);
-        return;
-    }
-    if (cw_mode == CW_MODE_PLANE_DRAG) {
-        int w = 0;
-        int h = 0;
-        if (!cw_widget_pixels (&w, &h)) { return; }
-        cw_camera.aspect = (float) w / (float) h;
-        const float ndc_x = (float) (2.0 * x / (double) w - 1.0);
-        const float ndc_y = 1.0f - (float) (2.0 * y / (double) h);
-        const cad_view_ray ray = cad_view_ray_from_screen (&cw_camera, ndc_x, ndc_y);
-        const vector3 plane_point = {0.0f, cw_drag_plane_y, 0.0f};
-        const vector3 plane_normal = {0.0f, 1.0f, 0.0f};
-        vector3 hit = {0.0f, 0.0f, 0.0f};
-        if (cad_view_ray_plane (ray, plane_point, plane_normal, &hit)) {
-            cad_set_position (&cw_design, cw_drag_part,
-                              vector3_addition (hit, cw_drag_offset));
-            cw_status_refresh ();
-        }
-        /* Plane behind the ray (camera under the part plane): the
-         * view-math contract says keep the part in place. */
-        return;
     }
 }
 
@@ -1647,6 +1743,7 @@ static gboolean cw_on_key (GtkEventControllerKey *controller, guint keyval,
                            gpointer user_data) {
     (void) controller;
     (void) keycode;
+    (void) state;
     (void) user_data;
     if (keyval == GDK_KEY_Escape) {
         /* Two-stage, the engine's own convention: locked Esc FREES the
@@ -1660,74 +1757,75 @@ static gboolean cw_on_key (GtkEventControllerKey *controller, guint keyval,
         if (cw_window) { gtk_window_destroy (GTK_WINDOW (cw_window)); }
         return TRUE;
     }
-    /* The FLY latches come first: while the pointer is locked the
-     * engine's own control scheme wins (WASD + Space/Shift fly; the
-     * colliding CAD verbs D/A/S/L wait for unlock), and the latching
-     * sits BEFORE the mid-motion guard so flying coexists with a
-     * crosshair carry (the engine flies while grabbing). Non-fly keys
-     * fall through to the verbs below, which work in both modes. */
-    if (cw_look_locked && !cw_focus_in_name_entry ()) {
-        switch (keyval) {
-            case GDK_KEY_w: case GDK_KEY_W: cw_key_w = 1; return TRUE;
-            case GDK_KEY_a: case GDK_KEY_A: cw_key_a = 1; return TRUE;
-            case GDK_KEY_s: case GDK_KEY_S: cw_key_s = 1; return TRUE;
-            case GDK_KEY_d: case GDK_KEY_D: cw_key_d = 1; return TRUE;
-            case GDK_KEY_space: cw_key_up = 1; return TRUE;
-            case GDK_KEY_Shift_L:
-            case GDK_KEY_Shift_R: cw_key_down = 1; return TRUE;
-            default: break;
-        }
-    }
     if (cw_focus_in_name_entry ()) {
         return FALSE;
     }
-    /* Mid-motion the selection indices can shift under a Delete (the
-     * model shifts part indices down), which would retarget the carry
-     * or the SETTLE at the wrong part — CAD verbs are frozen until the
-     * motion ends, in BOTH carry modes and during the gravity drop.
-     * Esc still closes. */
-    if ((cw_mode == CW_MODE_CARRY) || (cw_mode == CW_MODE_PLANE_DRAG) ||
-        (cw_mode == CW_MODE_SETTLING)) {
-        return FALSE;
-    }
-    const int shift = (state & GDK_SHIFT_MASK) ? 1 : 0;
+    /* The MOVE latches (the fly keys AND the IJKL carry nudge): press
+     * sets, the tick polls, release clears (key repeat irrelevant —
+     * the engine's on_keypress pattern). Mode-free: the fly only runs
+     * while locked (the tick gates it) and the nudge only while a
+     * carry is live — a latch set in the wrong context is simply
+     * dead. */
     switch (keyval) {
-        case GDK_KEY_1: cw_add_part (mig_part_sphere); return TRUE;
-        case GDK_KEY_2: cw_add_part (mig_part_cube); return TRUE;
-        case GDK_KEY_3: cw_add_part (mig_part_cylinder); return TRUE;
-        case GDK_KEY_Delete: cw_delete_selected (); return TRUE;
-        case GDK_KEY_d:
-        case GDK_KEY_D: cw_duplicate_selected (); return TRUE;
-        case GDK_KEY_a:
-        case GDK_KEY_A: cw_array_selected (); return TRUE;
-        case GDK_KEY_x:
-        case GDK_KEY_X: cw_rotate_selected (0, shift ? -15.0f : 15.0f); return TRUE;
-        case GDK_KEY_y:
-        case GDK_KEY_Y: cw_rotate_selected (1, shift ? -15.0f : 15.0f); return TRUE;
-        case GDK_KEY_z:
-        case GDK_KEY_Z: cw_rotate_selected (2, shift ? -15.0f : 15.0f); return TRUE;
-        case GDK_KEY_g:
-        case GDK_KEY_G: cw_toggle_snap (); return TRUE;
-        case GDK_KEY_r:
-        case GDK_KEY_R: cw_toggle_rot_snap (); return TRUE;
-        case GDK_KEY_m:
-        case GDK_KEY_M: cw_toggle_magnet (); return TRUE;
-        case GDK_KEY_f:
-        case GDK_KEY_F: cw_floor_selected (); return TRUE;
-        case GDK_KEY_s:
-        case GDK_KEY_S: cw_save_design (); return TRUE;
-        case GDK_KEY_l:
-        case GDK_KEY_L: cw_load_selected (); return TRUE;
-        case GDK_KEY_p:
-        case GDK_KEY_P: cw_spawn_to_world (); return TRUE;
-        default: return FALSE;
+        case GDK_KEY_w: case GDK_KEY_W: cw_key_w = 1; return TRUE;
+        case GDK_KEY_a: case GDK_KEY_A: cw_key_a = 1; return TRUE;
+        case GDK_KEY_s: case GDK_KEY_S: cw_key_s = 1; return TRUE;
+        case GDK_KEY_d: case GDK_KEY_D: cw_key_d = 1; return TRUE;
+        case GDK_KEY_space: cw_key_up = 1; return TRUE;
+        case GDK_KEY_Shift_L:
+        case GDK_KEY_Shift_R: cw_key_down = 1; return TRUE;
+        case GDK_KEY_i: case GDK_KEY_I: cw_key_i = 1; return TRUE;
+        case GDK_KEY_j: case GDK_KEY_J: cw_key_j = 1; return TRUE;
+        case GDK_KEY_k: case GDK_KEY_K: cw_key_k = 1; return TRUE;
+        case GDK_KEY_l: case GDK_KEY_L: cw_key_l = 1; return TRUE;
+        default: break;
     }
+    /* 1/2/3 PICK the shape RMB places (the user's "keep 1/2/3 as
+     * pickers" ruling — they no longer add parts directly). */
+    switch (keyval) {
+        case GDK_KEY_1: cw_place_type = mig_part_sphere;
+                        cw_status_refresh (); return TRUE;
+        case GDK_KEY_2: cw_place_type = mig_part_cube;
+                        cw_status_refresh (); return TRUE;
+        case GDK_KEY_3: cw_place_type = mig_part_cylinder;
+                        cw_status_refresh (); return TRUE;
+        default: break;
+    }
+    /* Arrows resize the SELECTED part (the user's axis ruling:
+     * right/up/down = x/y/z, LEFT toggles the +/- direction, shown in
+     * the status). Frozen during the settle fall (the mode guard — a
+     * resize under the fall would fight the settle's own writes);
+     * silent with nothing selected. */
+    if (cw_mode != CW_MODE_SETTLING) {
+        switch (keyval) {
+            case GDK_KEY_Right: cw_resize_selected (0); return TRUE;
+            case GDK_KEY_Up: cw_resize_selected (1); return TRUE;
+            case GDK_KEY_Down: cw_resize_selected (2); return TRUE;
+            case GDK_KEY_Left:
+                cw_resize_grow = -cw_resize_grow;
+                cw_status_refresh ();
+                return TRUE;
+            default: break;
+        }
+    }
+    /* G one-shot: snap the SELECTED part to the nearest 0.25 m grid
+     * point (the user's "free placement, BUT with a keybind when a
+     * object is selected to place it in the nearest snap" — the
+     * G-as-toggle is purged). IDLE only: a carry or a settle owns the
+     * part's pose until it ends. */
+    if (cw_mode == CW_MODE_IDLE) {
+        if ((keyval == GDK_KEY_g) || (keyval == GDK_KEY_G)) {
+            cw_snap_selected ();
+            return TRUE;
+        }
+    }
+    return FALSE;
 }
 
 /* The engine's on_key_released pattern (input_control.c): a latch set
  * on press dies on release — polled latches make key repeat irrelevant
  * and a key held across a lock/unlock edge dies with the latches
- * (cw_kill_fly_latches). Returns FALSE so releases keep propagating. */
+ * (cw_kill_move_latches). Returns FALSE so releases keep propagating. */
 static gboolean cw_on_key_release (GtkEventControllerKey *controller,
                                    guint keyval, guint keycode,
                                    GdkModifierType state, gpointer user_data) {
@@ -1743,6 +1841,10 @@ static gboolean cw_on_key_release (GtkEventControllerKey *controller,
         case GDK_KEY_space: cw_key_up = 0; break;
         case GDK_KEY_Shift_L:
         case GDK_KEY_Shift_R: cw_key_down = 0; break;
+        case GDK_KEY_i: case GDK_KEY_I: cw_key_i = 0; break;
+        case GDK_KEY_j: case GDK_KEY_J: cw_key_j = 0; break;
+        case GDK_KEY_k: case GDK_KEY_K: cw_key_k = 0; break;
+        case GDK_KEY_l: case GDK_KEY_L: cw_key_l = 0; break;
         default: break;
     }
     return FALSE;
@@ -1913,6 +2015,10 @@ static gboolean cw_tick (gpointer user_data) {
         cw_fly_translate (0.016f);
     }
     if (cw_mode == CW_MODE_CARRY) {
+        /* WP4 4.6m: IJKL nudges the CARRIED part directly — BEFORE the
+         * apply, so the nudge lands in the carry state itself and
+         * survives the every-frame ray recompute below. */
+        cw_nudge_carry (0.016f);
         if (cw_look_locked) {
             cw_carry_apply_ndc (0.0f, 0.0f);
         } else {
@@ -1966,7 +2072,7 @@ static void cw_on_destroy (GtkWidget *widget, gpointer user_data) {
      * cw_look_unlock already ran above; this covers a destroy that
      * skipped it). */
     cw_look_locked = 0;
-    cw_kill_fly_latches ();
+    cw_kill_move_latches ();
 }
 
 /* The engine's on_focus_out analog (root_gtk.c's focus "leave"
@@ -2023,11 +2129,14 @@ void cad_window_toggle (void) {
         cw_camera.distance = 9.0f;
         cw_camera.fov_y_deg = 50.0f;
         cw_camera.aspect = 1.5f;
-        /* WP4 4.6h: new designs start with grid snap ON at 0.25 m —
-         * placement-in-grids is the default; G frees the placement.
-         * (The gated model's own default stays 0; this is the window's
-         * GUI preference.) */
-        cw_design.snap_step = 0.25f;
+        /* WP4 4.6m: new designs start FREE (snap 0) — with the
+         * G-as-toggle purged, the 4.6h snapped default would quantize
+         * every move and IJKL nudge against the user's "free
+         * placement, BUT with a keybind ... to place it in the nearest
+         * snap" ruling; G is that keybind now. (This supersedes the
+         * 4.6h GUI preference; the gated model's own default was
+         * always 0.) */
+        cw_design.snap_step = 0.0f;
         cw_design_ready = 1;
     }
     if (cw_window) {
@@ -2112,10 +2221,10 @@ void cad_window_toggle (void) {
     gtk_widget_add_css_class (save_btn, "suggested-action");
     g_signal_connect (save_btn, "clicked", G_CALLBACK (cw_on_save_clicked), NULL);
     gtk_box_append (GTK_BOX (bar), save_btn);
-    /* WP4 4.6e: the world hookup button (P does the same in the
-     * viewport). The spawned composite is the design's own body in the
-     * shared world — the main viewport shows it exactly where the CAD
-     * grid had it. */
+    /* WP4 4.6e: the world hookup button (the 4.6m purge removed the P
+     * keybind; the button is the only path now). The spawned composite
+     * is the design's own body in the shared world — the main viewport
+     * shows it exactly where the CAD grid had it. */
     GtkWidget *spawn_btn = gtk_button_new_with_label ("Spawn to world");
     g_signal_connect (spawn_btn, "clicked", G_CALLBACK (cw_on_spawn_clicked),
                       NULL);

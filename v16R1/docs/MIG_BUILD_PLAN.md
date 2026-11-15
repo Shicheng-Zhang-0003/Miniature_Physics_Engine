@@ -2403,6 +2403,64 @@ Ledger (new entries get a line, never an edit of a past line):
   test green (tier A PASS 44 FAIL 0 — the realpath canonicalisation
   gates now run with a real prototype; tier B skips without s2tui by
   design); suite 72/70; quick 86/86.
+- 2026-11-15 — WP4 4.6m (this commit, CAD CONTROLS FROM SCRATCH — the
+  user's ruling: "wasd and mouse to move around, just like the real
+  engine itself. right click to place a object, left click ON a object
+  to move it around, middle click to destroy the object, when the
+  object is being clicked, ikl keys determine precise movements ...
+  arrow keys resize statically the object being selected ... remove
+  ALL OTHER KEYBINDS for now we are making this from scratch"). The
+  window keeps the 4.6j ENGINE core (pointer lock, mouse-look steer,
+  WASD+Space/Shift fly, the S4b unlocked-LMB re-engage, the carry +
+  4.6i drop rule, the two-stage Esc, the typing block, the focus-leave
+  unlock, the scroll-wheel zoom — a camera control, not a keybind) and
+  REPLACES every other binding. Removed with their machinery: 1/2/3
+  direct adds (now shape PICKERS for RMB), the Delete key, D
+  duplicate, A array, X/Y/Z rotate, G-as-toggle, R rot-snap, M magnet
+  (cw_magnet_adjust + CW_MAGNET_ENGAGE + cw_magnet_on gone; the
+  exact-touch math lives on in RMB place), F floor-drop, S/L keys, P
+  key, and the unlocked Shift+LMB PAN/PLANE_DRAG modes (cw_drag_plane_y
+  gone; Shift is fly-down only); Save/Load/Spawn survive as BUTTONS.
+  New scheme: RMB PLACES the picked shape at the aim point (crosshair
+  while locked, cursor ray unlocked; no-op mid-carry) — ON a surface
+  the center is hit point + outward normal x the new part's extent
+  along it (cw_extent_along: the support function — sphere r, box |n|
+  . he, cylinder |nx|.hl + r.|n_yz|), exact touch so the weld rule
+  holds; empty space rests on the floor plane or floats CW_PLACE_REACH
+  (3 m) out; the floor clamp wins. IJKL is the DIRECT carry nudge (the
+  user's pick over the engine's IJKL fine-steer meaning): I/K push the
+  carried part along the view ray (cw_drag_t, floored 0.05 m above the
+  eye), J/L slide it across the view (grip offset along the camera's
+  right), at CW_NUDGE_SPEED 0.5 m/s — a tenth of the fly; latched like
+  the fly keys, polled in the tick BEFORE cw_carry_apply_ndc so the
+  edit survives the every-frame recompute, dead without a live carry,
+  NOT lock-gated (an Esc'd carry stays nudgeable). Arrows resize the
+  SELECTED part by CW_RESIZE_STEP 0.05 m per press in the cw_resize_grow
+  direction — the user's axis ruling: right/up/down = x/y/z, LEFT
+  toggles +/-; sphere = radius on any arrow, cube = the matching half
+  extension, cylinder X = half length (axle LOCAL X) and Y/Z = radius;
+  works MID-CARRY (cw_drag_floor_y refreshes), frozen during SETTLING,
+  silent with nothing selected; the floor wins after (exact lift).
+  MMB DESTROYS — crosshair pick while locked, selection while
+  unlocked — both through cw_delete_index, which retargets/cancels the
+  carry and settle slots BEFORE cad_delete shifts indices (the 4.6j
+  MMB-mid-carry hazard closes). G is now the ONE-SHOT snap (the user's
+  "free placement, BUT with a keybind when a object is selected to
+  place it in the nearest snap"): borrows CW_SNAP_STEP 0.25 m for a
+  single cad_set_position (the rounding stays the model's roundf
+  nearest), restores 0, then the floor lift exact; IDLE only. New
+  designs init snap_step 0 (FREE — supersedes the 4.6h snapped 0.25 m
+  default, which would quantize every move/nudge against the ruling).
+  cw_pick grew the outward-normal output param (the place's touch
+  vector); cw_kill_fly_latches is cw_kill_move_latches (adds i/j/k/l);
+  the status line dropped rotsnap/magnet for place shape + res +/-;
+  the empty-spawn hint now says "(RMB places parts)". cad_window.c is
+  an ENGINE TU (ENGINE_SRCS wildcard) — full battery: engine + build_tui
+  build with ZERO warnings (-Werror); suite 72 registered / 70
+  blocking / 0 failures; quick 86/86; mgb make + test green (tier A
+  PASS 44 FAIL 0, tier B skips sans s2tui); mfs FTC gated 5/5
+  (12 ungated diags); tui-smoke PASS (all scenes finite); make
+  everything green in background.
 
 ## §10 Definition of done for v16S (the cut checklist)
 
