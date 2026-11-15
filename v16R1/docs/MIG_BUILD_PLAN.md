@@ -2273,6 +2273,62 @@ Ledger (new entries get a line, never an edit of a past line):
   view-math/model contracts). Suite 72/70, quick 86/86, tui-smoke
   PASS, engine clean under -Werror.
 
+- 2026-11-14 — WP4 4.6j (this commit, THE ENGINE'S CONTROL SCHEME —
+  the user's ruling: "I want the CAD editor just like the controls of
+  the actual MPE engine itself BUT with cad specific keybinds and
+  capabilities and everything"). The window now runs the engine's own
+  input scheme — pointer-locked mouse-look, fly movement, crosshair
+  actions — cloned from the engine's own files with ZERO engine-core
+  changes: mouse_lock_enable/disable touch no engine state, and the
+  window NEVER sets main_inputs.is_mouse_locked (the engine's
+  per-frame delta poll is gated on that flag), so the 4.6f isolation
+  holds with the lock machinery reused as-is. The map, ported from
+  input_control.c / simulation_camera.c / mouse_lock.c:
+  (1) UNLOCKED LMB = the engine's re-engage — the click ACQUIRES the
+  pointer lock and nothing else (the S4b rule, verbatim: "the click
+  that ACQUIRES the lock must not also grab"); the 4.6h cursor carry
+  and CW_MODE_ORBIT are gone (orbit was LMB-on-empty; looking around
+  is the locked mouse-look now). (2) LOCKED: a GL_LINES crosshair
+  drawn in NDC (identity u_viewproj + u_model, depth test off, the
+  grid's mesh/draw patterns); mouse-look steers at
+  g_cfg.camera.steer_sensitivity with the signs derived once in
+  cw_apply_steer (cad_view_forward: yaw_deg+ turns LEFT, and pitch_deg
+  is the EYE elevation so look-up = pitch_deg down — both flips in one
+  place; pitch clamped +-85 per the view-math caller contract);
+  Wayland steers from the relative-pointer deltas drained once per
+  tick (the input_control_poll_locked_mouse pattern,
+  mouse_lock_take_relative_delta + relative_to_camera), X11 from the
+  motion-event deltas clamped to half the surface + reset_centre warp
+  (the on_mouse_movements pattern). LMB grabs under the crosshair (the
+  drag_weld_press port: pick selects, miss clears, grab at the hit
+  depth, drag_weld's second-press-while-held guard), LMB release runs
+  the 4.6i drop rule (weld-or-settle); RMB selects under the
+  crosshair; MMB deletes; WASD + Space/Shift FLY while latched (the
+  engine's debug-fly translate — W/S along the forward, A/D along the
+  side, Space/Shift along world Y — at move_speed x0.2 = 5 m/s, the
+  one documented deviation: the 25 m/s default is tuned for the
+  engine's 500 m arena, this scene is ~10 m; steering sensitivity
+  unscaled). You can fly WHILE carrying (the engine's grab is
+  camera-relative too): the fly latches sit BEFORE the mid-motion
+  verb guard in cw_on_key. (3) Esc two-stage: locked Esc frees the
+  pointer (the engine's Esc convention), unlocked Esc closes (the
+  4.6c ruling; the 4.6g typing-block Esc still closes). (4) The FLY
+  LATCH pattern is the engine's on_keypress/on_key_released: a new
+  key-released handler on the window's key controller clears the
+  latches (press sets, release clears; a key held across a lock edge
+  dies with the latches — cw_kill_fly_latches on both edges). (5) THE
+  CAD LAYER ("but with cad capabilities"): M/F/G/R/X/Y/Z/P/1/2/3/
+  Delete work in BOTH pointer modes; D/A/S/L collide with the fly keys
+  and run UNLOCKED only — engine controls win while locked, which is
+  the "just like the engine" half of the ruling. Shift+LMB unlocked
+  stays the cursor precision fallback (pan on empty, the y-locked
+  work-plane carry on a part, no settle). The lock releases on window
+  focus-leave (root_gtk.c's focus "leave" controller pattern — the
+  engine's on_focus_out analog) and on destroy (cw_look_unlock first).
+  Status line gains "look locked|free". No new gate (GUI-only; the
+  gated view-math/model contracts drive everything). Suite 72/70,
+  quick 86/86, tui-smoke PASS, engine clean under -Werror.
+
 ## §10 Definition of done for v16S (the cut checklist)
 
 All gates green at the final floor; policy amendment committed; release

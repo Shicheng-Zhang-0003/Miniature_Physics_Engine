@@ -17,57 +17,73 @@
  *   - cad_view_camera / ray-from-screen / pick_* / ray_plane
  *     (cad/cad_view_math.c) — the clicking and dragging.
  *
- * Interaction (WP4 4.6h + 4.6i, the user's rulings: click objects and
- * interact "just like the original engine", plus keybinds that place
- * stuff better — grids, next to other objects; then "revisit the
- * entire profile — it is still not behaving like the true engine,
- * everything static, nothing to move the objects around". The 4.6i
- * profile is ported from the ENGINE's own mouse map
- * (drag_weld.c / object_selector.c / the dispatch), not invented):
- *   - LMB on a part: the ENGINE grab — grab at the hit point, the
- *     part rides the cursor ray at the grabbed depth, recomputed
- *     EVERY frame by the tick (the drag_weld_tick analog), never
- *     dipping under the floor (oriented down-extent clamp). LMB on
- *     empty space: orbit (the mouse-look steering analog).
- *   - LMB release: the S4c DROP RULE ported — covering bounds
- *     touching/overlapping another part = the pose JOINS the
- *     composite (the engine welds on covering-sphere overlap; here it
- *     stays exactly where placed); free space = the part FALLS
- *     straight down (the engine zeroes the carried body's velocity
- *     every frame, so its release is a pure vertical fall) at the
- *     world's own gravity and lands at rest on the floor or the
- *     highest supporter below (oriented tops + XZ footprint
- *     overlap), EXACTLY (landings bypass the grid snap — gravity is a
- *     surface truth; the grid is a placement aid for drags).
- *   - RMB: the engine's selector — pick and select only, never a
- *     drag; empty space deselects (select_object_by_index's miss
- *     contract). MMB: DELETE the selected part (the engine's
- *     middle-click rule). Wheel: zoom.
- *   - Shift+LMB on empty space: pan. Shift+LMB on a part: the
- *     y-locked work-plane carry — the CAD precision override: the
- *     pose stays exactly where slid, NO settle (for floating and
- *     interpenetrating assemblies the engine would never hold).
- *   - Keys: 1/2/3 add sphere/cube/cylinder at the spawn point (the
- *     camera target's XZ at the part's identity-orientation rest
- *     height), Delete/MMB removes the selection, D duplicates it
- *     (+0.5 m X, first-cut offset), A arrays it (3 copies, 0.5 m X
- *     step — first-cut), X/Y/Z rotate the selection +-15 degrees
- *     about the ASSEMBLY axis (Shift = -15), G toggles snap (new
- *     designs start ON at 0.25 m — grids by default), R toggles
- *     rot-snap 0 <-> 15 degrees, M toggles the MAGNET (a carried part
- *     snaps to TOUCH the nearest other part along the line of centers
- *     at covering-sphere distance — the physics_world_add_composite
- *     bound math — within 0.25 m; the touch is written EXACTLY so the
- *     weld-on-drop rule holds), F drops the selection to REST (the
- *     settle's support seek — onto a stack or the floor, exact), S
- *     saves, L loads the spec selected in the dropdown, P spawns the
- *     design into the shared world (the 4.6e hookup; there is also a
- *     Spawn button), Esc closes. Typing-block ruling (WP4 4.6g):
- *     while the name entry holds focus the CAD keys are dead (typing
- *     must not spawn parts; the entry's internal GtkText leaf is what
- *     GTK reports as the focused widget) and only Esc still closes;
- *     the window opens viewport-focused and a click into the viewport
- *     returns the keys.
+ * Interaction (WP4 4.6h + 4.6i + 4.6j). 4.6h/4.6i ported the engine's
+ * MOUSE SEMANTICS (the drag_weld grab, the S4c weld-or-settle drop,
+ * the engine's MMB delete — all from drag_weld.c / object_selector.c /
+ * the dispatch, not invented). 4.6j completes it on the user's ruling:
+ * "I want the CAD editor just like the controls of the actual MPE
+ * engine itself BUT with cad specific keybinds and capabilities and
+ * everything" — the window now runs the ENGINE'S OWN CONTROL SCHEME:
+ * pointer-locked mouse-look, fly movement, crosshair actions
+ * (input_control.c / simulation_camera.c / mouse_lock.c patterns).
+ * The lock machinery is REUSED as-is (mouse_lock_enable/disable touch
+ * no engine state), and the engine's per-frame delta poll is gated on
+ * main_inputs.is_mouse_locked — which this window NEVER sets — so the
+ * 4.6f isolation holds with zero engine-core changes:
+ *   - UNLOCKED LMB: the engine's re-engage — the click ACQUIRES the
+ *     pointer lock and nothing else (the S4b rule: the click that
+ *     acquires the lock must not also grab). RMB picks under the
+ *     cursor (miss deselects); MMB deletes the selection; wheel
+ *     zooms.
+ *   - LOCKED (pointer hidden, crosshair drawn): mouse-look steers the
+ *     camera at the engine's steer_sensitivity (Wayland: the
+ *     relative-pointer deltas drained once per tick — the
+ *     input_control_poll_locked_mouse pattern; X11: motion-event
+ *     deltas + the re-centre warp — the on_mouse_movements pattern).
+ *     LMB grabs under the crosshair (the drag_weld_press port: pick
+ *     selects, miss clears, grab at the hit depth, every-frame
+ *     follow, floor clamp), LMB release runs the 4.6i DROP RULE
+ *     (covering bounds touch/overlap = the pose JOINS the composite;
+ *     free space = straight-down gravity settle to the highest
+ *     supporter or the floor, landed EXACTLY); RMB selects under the
+ *     crosshair; MMB deletes; WASD + Space/Shift FLY (the engine's
+ *     debug-fly translate — W/S along the forward, A/D along the
+ *     side, Space up / Shift down — at move_speed x0.2 = 5 m/s: the
+ *     25 m/s default is tuned for the engine's 500 m arena, this
+ *     scene is ~10 m; steering sensitivity is used unscaled); Esc
+ *     frees the pointer (the engine's Esc convention). You can fly
+ *     WHILE carrying (the engine's grab is camera-relative too).
+ *   - Esc while unlocked closes the window — the two-stage engine
+ *     convention (lock -> unlock -> close; the 4.6c close ruling
+ *     preserved on the second stage).
+ *   - CAD-SPECIFIC (the "but with cad capabilities" layer):
+ *     1/2/3 add sphere/cube/cylinder at the spawn point, Delete/MMB
+ *     delete, D duplicate (+0.5 m X), A array (3 copies, 0.5 m X), X/
+ *     Y/Z rotate the selection +-15 degrees (Shift = -15), G toggles
+ *     snap (0.25 m; new designs start ON), R toggles rot-snap
+ *     (0 <-> 15 deg), M toggles the MAGNET (a carried part snaps to
+ *     TOUCH the nearest other part along the line of centers at
+ *     covering-sphere distance, within 0.25 m; the touch is written
+ *     EXACTLY so the weld-on-drop rule holds), F drops the selection
+ *     to REST (the settle's support seek — onto a stack or the floor,
+ *     exact), S saves, L loads the spec selected in the dropdown, P
+ *     spawns the design into the shared world (the 4.6e hookup; also
+ *     the Spawn button). M/F/G/R/X/Y/Z/P/1/2/3/Delete work in BOTH
+ *     pointer modes; D/A/S/L collide with the fly keys and run
+ *     UNLOCKED only — engine controls win while the pointer is
+ *     locked, which is the "just like the engine" half of the
+ *     ruling. Shift+LMB while UNLOCKED stays the CURSOR precision
+ *     fallback: pan on empty space, the y-locked work-plane carry on
+ *     a part (the pose stays exactly where slid, NO settle —
+ *     floating and interpenetrating assemblies the engine would
+ *     never hold stay buildable on purpose).
+ *   - The lock releases when the window loses keyboard focus (the
+ *     engine's on_focus_out pattern) and on destroy. Typing-block
+ *     ruling (WP4 4.6g) unchanged: while the name entry holds focus
+ *     the CAD keys AND the fly latches are dead (typing must not
+ *     spawn parts or fly the camera), only Esc works; the window
+ *     opens viewport-focused and a click into the viewport returns
+ *     the keys.
  *
  * Persistence is the frozen spec grammar staged through the shared
  * mig_spec_store (the terminal, microvim and the 4.4 panel all read
@@ -131,16 +147,18 @@ static int cw_design_ready = 0;
 
 /* Interaction modes: one motion at a time. WP4 4.6h split the old
  * CW_MODE_DRAG: CW_MODE_CARRY is the ENGINE grab (the drag_weld
- * precedent — grab at the hit point, the part rides the cursor ray at
- * the grabbed depth, full 3D); CW_MODE_PLANE_DRAG keeps the old
- * y-locked work-plane slide for flat layout work (Shift+LMB). WP4
- * 4.6i added CW_MODE_SETTLING: the post-release gravity drop (the
- * engine's dropped-body rule — see cw_release_carry). */
+ * precedent — grab at the hit point, the part rides the ray at the
+ * grabbed depth, full 3D); CW_MODE_PLANE_DRAG keeps the old y-locked
+ * work-plane slide for flat layout work (Shift+LMB). WP4 4.6i added
+ * CW_MODE_SETTLING: the post-release gravity drop (the engine's
+ * dropped-body rule — see cw_release_carry). WP4 4.6j REMOVED
+ * CW_MODE_ORBIT: unlocked LMB now ACQUIRES the pointer lock (the
+ * engine's re-engage rule) instead of orbiting; looking around is the
+ * locked mouse-look. */
 enum {
     CW_MODE_IDLE = 0,
-    CW_MODE_ORBIT,      /* LMB on empty space */
     CW_MODE_PAN,        /* Shift+LMB on empty space */
-    CW_MODE_CARRY,      /* LMB on a part: engine-style 3D ray carry */
+    CW_MODE_CARRY,      /* LMB: engine-style ray carry (crosshair while locked) */
     CW_MODE_PLANE_DRAG, /* Shift+LMB on a part: y-locked plane move */
     CW_MODE_SETTLING    /* post-release gravity drop to rest */
 };
@@ -173,6 +191,20 @@ static int cw_settle_part = -1;
 static float cw_settle_y = 0.0f;
 static float cw_settle_v = 0.0f;
 static float cw_settle_rest_y = 0.0f;
+/* WP4 4.6j: the ENGINE'S pointer lock, held by THIS window.
+ * cw_look_locked is window-local (main_inputs.is_mouse_locked stays
+ * FALSE — that flag is the engine's own lock state and setting it
+ * would feed CAD deltas to the main camera; the engine's poll never
+ * sees this lock). The cw_key_* flags are the FLY latches (the
+ * engine's on_keypress/on_key_released pattern: press sets, release
+ * clears — polled by the tick, so key repeat never matters). */
+static int cw_look_locked = 0;
+static int cw_key_w = 0;
+static int cw_key_a = 0;
+static int cw_key_s = 0;
+static int cw_key_d = 0;
+static int cw_key_up = 0;    /* Space */
+static int cw_key_down = 0;  /* Shift */
 
 /* ---- GL state (this window's own context; rebuilt per open) ---- */
 
@@ -195,21 +227,27 @@ static int cw_count_cylinder = 0;
 static GLuint cw_vao_grid = 0;
 static GLuint cw_vbo_grid = 0;
 static int cw_count_grid = 0;
+static GLuint cw_vao_crosshair = 0;
+static GLuint cw_vbo_crosshair = 0;
+static int cw_count_crosshair = 0;
 
 /* Vertex format: {pos3, normal3} interleaved (6 floats). The unit
  * meshes are built once per open into these static buffers:
  *   sphere: 12 rings x 16 sectors x 2 tris x 3 verts x 6 floats
  *   cube:   6 faces x 2 tris x 3 verts x 6 floats
  *   cyl:    24 segs x (2 side + 2 caps) tris x 3 verts x 6 floats
- *   grid:   21 lines x 2 axes x 2 verts x 6 floats */
+ *   grid:   21 lines x 2 axes x 2 verts x 6 floats
+ *   cross:  2 lines x 2 verts x 6 floats (NDC, 4.6j) */
 #define CW_SPHERE_FLOATS (12 * 16 * 2 * 3 * 6)
 #define CW_CUBE_FLOATS (6 * 2 * 3 * 6)
 #define CW_CYLINDER_FLOATS (24 * 4 * 3 * 6)
 #define CW_GRID_FLOATS (21 * 2 * 2 * 6)
+#define CW_CROSSHAIR_FLOATS (2 * 2 * 6)
 static float cw_mesh_sphere [CW_SPHERE_FLOATS];
 static float cw_mesh_cube [CW_CUBE_FLOATS];
 static float cw_mesh_cylinder [CW_CYLINDER_FLOATS];
 static float cw_mesh_grid [CW_GRID_FLOATS];
+static float cw_mesh_crosshair [CW_CROSSHAIR_FLOATS];
 
 /* ---- shaders (inline string literals: no file dependencies, the
  * window's own program — the main renderer's shader files are
@@ -363,6 +401,26 @@ static int cw_fill_grid (float *out) {
         n = cw_vert (out, n, c, nrm);
         n = cw_vert (out, n, d, nrm);
     }
+    return n / 6;
+}
+
+/* The crosshair shown while the pointer is LOCKED (4.6j): two short
+ * NDC lines through (0, 0) — with identity u_viewproj + u_model the
+ * positions pass straight through as clip coords, so the crosshair is
+ * always exactly at the screen center no matter the camera. Normals
+ * unused (drawn unlit). */
+static int cw_fill_crosshair (float *out) {
+    const float nrm [3] = {0.0f, 0.0f, 1.0f};
+    const float h = 0.045f;
+    const float a [3] = {-h, 0.0f, 0.0f};
+    const float b [3] = {h, 0.0f, 0.0f};
+    const float c [3] = {0.0f, -h, 0.0f};
+    const float d [3] = {0.0f, h, 0.0f};
+    int n = 0;
+    n = cw_vert (out, n, a, nrm);
+    n = cw_vert (out, n, b, nrm);
+    n = cw_vert (out, n, c, nrm);
+    n = cw_vert (out, n, d, nrm);
     return n / 6;
 }
 
@@ -593,10 +651,11 @@ static void cw_status_refresh (void) {
     }
     char buf [256];
     snprintf (buf, sizeof (buf),
-              "parts %d/%d | sel %s | snap %.3g m | rotsnap %.3g deg | magnet %s | %s",
+              "parts %d/%d | sel %s | snap %.3g m | rotsnap %.3g deg | magnet %s | look %s | %s",
               cw_design.count, cw_design.max_parts, sel,
               (double) cw_design.snap_step, (double) cw_design.rot_snap_deg,
-              cw_magnet_on ? "on" : "off", cw_design.name);
+              cw_magnet_on ? "on" : "off",
+              cw_look_locked ? "locked" : "free", cw_design.name);
     gtk_label_set_text (GTK_LABEL (cw_status_label), buf);
 }
 
@@ -1110,21 +1169,18 @@ static float cw_carry_clamp_y (float raw_y) {
     return y;
 }
 
-/* The carry target from a cursor position: the part rides the cursor
- * ray at the grabbed depth (t along the UNIT direction) plus the
- * frozen grip offset — the drag_weld_tick math ported to a visible
- * cursor. Magnet-adjusted targets are written EXACT (the touch must
- * survive the model's snap rounding for the weld-on-drop rule to hold
- * at release); plain carries honor the grid. Called from the motion
- * handler AND the tick — the every-frame follow (zoom mid-carry keeps
- * the part glued). */
-static void cw_carry_update (double x, double y) {
+/* The carry target from a SCREEN-CENTER ray in NDC (0, 0) while the
+ * pointer is locked: the part rides the crosshair ray at the grabbed
+ * depth (t along the UNIT direction) plus the frozen grip offset —
+ * the drag_weld_tick math ported to the crosshair. Magnet-adjusted
+ * targets are written EXACT (the touch must survive the model's snap
+ * rounding for the weld-on-drop rule to hold at release); plain
+ * carries honor the grid. */
+static void cw_carry_apply_ndc (float ndc_x, float ndc_y) {
     int w = 0;
     int h = 0;
     if (!cw_widget_pixels (&w, &h)) { return; }
     cw_camera.aspect = (float) w / (float) h;
-    const float ndc_x = (float) (2.0 * x / (double) w - 1.0);
-    const float ndc_y = 1.0f - (float) (2.0 * y / (double) h);
     const cad_view_ray ray = cad_view_ray_from_screen (&cw_camera, ndc_x, ndc_y);
     vector3 target = vector3_addition (
         vector3_scaling (ray.direction, cw_drag_t), cw_drag_offset);
@@ -1139,6 +1195,18 @@ static void cw_carry_update (double x, double y) {
     } else {
         cad_set_position (&cw_design, cw_drag_part, target);
     }
+}
+
+/* The unlocked (cursor-driven) flavor: pixels -> NDC, then the same
+ * apply. Called from the motion handler AND the tick — the
+ * every-frame follow (zoom mid-carry keeps the part glued). */
+static void cw_carry_update (double x, double y) {
+    int w = 0;
+    int h = 0;
+    if (!cw_widget_pixels (&w, &h)) { return; }
+    const float ndc_x = (float) (2.0 * x / (double) w - 1.0);
+    const float ndc_y = 1.0f - (float) (2.0 * y / (double) h);
+    cw_carry_apply_ndc (ndc_x, ndc_y);
 }
 
 /* Land a settling part: write the rest height EXACTLY, report, clear
@@ -1231,6 +1299,139 @@ static void cw_floor_selected (void) {
     cw_status_ok (buf);
 }
 
+/* ---- the engine's control scheme (WP4 4.6j) ----------------------------
+ * Pointer lock, mouse-look steering and fly movement, cloned from the
+ * engine's own input path (input_control.c + simulation_camera.c +
+ * mouse_lock.c) with ZERO engine-core changes: mouse_lock_enable/
+ * disable touch no engine state, and this window never sets
+ * main_inputs.is_mouse_locked, so the engine's delta poll (gated on
+ * that flag) never sees CAD deltas — the 4.6f isolation holds. */
+
+/* Steering applied in the ENGINE'S delta convention (dx right+,
+ * dy up+). The CAD camera is the orbit camera: cad_view_forward's
+ * forward_x = -sin(yaw)*cos(pitch), so yaw_deg+ turns LEFT (the eye
+ * swings +x while looking at the target) — mouse-right must turn
+ * right, hence the yaw negation; and pitch_deg is the EYE's elevation
+ * above the target, so looking UP lowers it — the pitch negation.
+ * Both flips live HERE and nowhere else. Sensitivity is the engine's
+ * own config (camera.steer_sensitivity, default 0.12). The pitch
+ * clamp is the view-math contract's caller-side clamp (±85, the same
+ * bound the 4.6c orbit already used). */
+static void cw_apply_steer (float dx_right, float dy_up) {
+    const float s = g_cfg.camera.steer_sensitivity;
+    cw_camera.yaw_deg -= dx_right * s;
+    cw_camera.pitch_deg -= dy_up * s;
+    if (cw_camera.pitch_deg > 85.0f) { cw_camera.pitch_deg = 85.0f; }
+    if (cw_camera.pitch_deg < -85.0f) { cw_camera.pitch_deg = -85.0f; }
+}
+
+/* Wayland path: drain the relative-pointer deltas ONCE per tick (the
+ * input_control_poll_locked_mouse pattern — the compositor stops
+ * wl_pointer.motion while the lock is live, so per-event draining
+ * starves). mouse_lock_relative_to_camera is the single source of the
+ * sign convention (+x right, +y negated to up). X11 has no relative
+ * protocol: steering happens per motion event in cw_on_motion. */
+static void cw_look_steer (void) {
+    if (!mouse_lock_relative_active ()) { return; }
+    double rdx = 0.0;
+    double rdy = 0.0;
+    if (!mouse_lock_take_relative_delta (&rdx, &rdy)) { return; }
+    float sx = 0.0f;
+    float sy = 0.0f;
+    (void) mouse_lock_relative_to_camera (rdx, rdy, &sx, &sy);
+    cw_apply_steer (sx, sy);
+}
+
+/* Fly translation: the engine's debug-fly block verbatim
+ * (simulation_camera.c) — W/S along the forward, A/D along the side,
+ * Space up / Shift down along world Y — at move_speed x0.2. The
+ * scale is the one deliberate deviation, documented: the engine's
+ * 25 m/s default is tuned for its 500 m arena and crosses this ~10 m
+ * scene in half a second; 5 m/s flies it like the engine flies its
+ * world. Moving the TARGET moves the eye with it (the eye is
+ * target - forward*distance), so this IS first-person flight. */
+static void cw_fly_translate (float dt) {
+    const float speed = g_cfg.camera.move_speed * 0.2f * dt;
+    const vector3 fwd = cad_view_forward (&cw_camera);
+    const vector3 right = cad_view_right (&cw_camera);
+    vector3 t = cw_camera.target;
+    if (cw_key_w) { t = vector3_addition (t, vector3_scaling (fwd, speed)); }
+    if (cw_key_s) { t = vector3_subtraction (t, vector3_scaling (fwd, speed)); }
+    if (cw_key_a) { t = vector3_subtraction (t, vector3_scaling (right, speed)); }
+    if (cw_key_d) { t = vector3_addition (t, vector3_scaling (right, speed)); }
+    if (cw_key_up) { t.y += speed; }
+    if (cw_key_down) { t.y -= speed; }
+    cw_camera.target = t;
+}
+
+static void cw_kill_fly_latches (void) {
+    cw_key_w = 0;
+    cw_key_a = 0;
+    cw_key_s = 0;
+    cw_key_d = 0;
+    cw_key_up = 0;
+    cw_key_down = 0;
+}
+
+/* Acquire the pointer lock (the engine's re-engage). Dead latches are
+ * cleared on BOTH edges so a key held across a lock edge never flies
+ * the camera uninvited. */
+static void cw_look_lock (void) {
+    if (cw_look_locked || !cw_gl_area) { return; }
+    mouse_lock_enable (cw_gl_area);
+    cw_look_locked = 1;
+    cw_kill_fly_latches ();
+    cw_status_refresh ();
+}
+
+static void cw_look_unlock (void) {
+    if (!cw_look_locked) { return; }
+    cw_look_locked = 0;
+    if (cw_gl_area && GTK_IS_WIDGET (cw_gl_area)) {
+        mouse_lock_disable (cw_gl_area);
+    }
+    cw_kill_fly_latches ();
+    cw_status_refresh ();
+}
+
+/* Crosshair grab — the drag_weld_press port with the ray pinned to
+ * the screen center: the pick IS the selector (miss clears the
+ * selection — the selector's own contract), then grab at the hit
+ * depth and carry on the crosshair ray. Only valid while locked (the
+ * crosshair exists then). */
+static void cw_crosshair_grab (void) {
+    if (cw_mode == CW_MODE_CARRY) { return; } /* second press while held: ignore (drag_weld's guard) */
+    int w = 0;
+    int h = 0;
+    if (!cw_widget_pixels (&w, &h)) { return; }
+    float t = 0.0f;
+    vector3 point = {0.0f, 0.0f, 0.0f};
+    const int picked = cw_pick ((double) w * 0.5, (double) h * 0.5, &t, &point);
+    if (picked < 0) {
+        cad_select (&cw_design, -1);
+        cw_status_refresh ();
+        return;
+    }
+    cad_select (&cw_design, picked);
+    cw_drag_part = picked;
+    cw_drag_t = t;
+    cw_drag_floor_y = cw_down_extent (&cw_design.parts [picked]);
+    cw_drag_offset = vector3_subtraction (cw_design.parts [picked].position, point);
+    cw_mode = CW_MODE_CARRY;
+    cw_status_refresh ();
+}
+
+/* Crosshair select (RMB while locked): the selector at screen center,
+ * miss deselects — select_object_by_index's contract. */
+static void cw_crosshair_select (void) {
+    int w = 0;
+    int h = 0;
+    if (!cw_widget_pixels (&w, &h)) { return; }
+    cad_select (&cw_design, cw_pick ((double) w * 0.5, (double) h * 0.5,
+                                     NULL, NULL));
+    cw_status_refresh ();
+}
+
 /* ---- input handlers ---------------------------------------------------- */
 
 static void cw_on_press (GtkGestureClick *gesture, gint n_press, gdouble x,
@@ -1256,60 +1457,60 @@ static void cw_on_press (GtkGestureClick *gesture, gint n_press, gdouble x,
      * its rest instantly (a part frozen mid-fall forever would be a
      * leak). */
     if (cw_settle_part >= 0) { cw_settle_finish (); }
-    /* RMB (button 3): the engine's RMB selector — pick and select
-     * only, never a drag; empty space deselects (-1 is the model's
+    /* RMB (button 3): the engine's selector — pick and select only,
+     * never a drag; empty space deselects (-1 is the model's
      * documented deselect, matching select_object_by_index's miss
-     * contract). */
+     * contract). Under the crosshair while locked, under the cursor
+     * while unlocked. */
     if (button == 3) {
-        cad_select (&cw_design, cw_pick (x, y, NULL, NULL));
-        cw_status_refresh ();
+        if (cw_look_locked) {
+            cw_crosshair_select ();
+        } else {
+            cad_select (&cw_design, cw_pick (x, y, NULL, NULL));
+            cw_status_refresh ();
+        }
         return;
     }
     /* MMB (button 2): DELETE the selected part — the engine's own
      * middle-click rule (scene_remove_object_by_index on the
-     * selection). The 4.6h pan moved to Shift+LMB on empty space
-     * only. */
+     * selection), in both pointer modes. */
     if (button == 2) {
         cw_delete_selected ();
         return;
     }
     if (button != 1) { return; }
+    if (cw_look_locked) {
+        /* LOCKED LMB: the engine's grab under the crosshair
+         * (drag_weld_press: pick selects, miss clears, grab at the
+         * hit depth; release runs the drop rule). */
+        cw_crosshair_grab ();
+        return;
+    }
     const int shift = (state & GDK_SHIFT_MASK) ? 1 : 0;
-    float t = 0.0f;
+    if (!shift) {
+        /* UNLOCKED plain LMB: the engine's re-engage — the click
+         * ACQUIRES the pointer lock and nothing else (the S4b rule:
+         * the click that acquires the lock must not also grab). The
+         * next LMB, now crosshair-aimed, grabs. */
+        cw_look_lock ();
+        return;
+    }
+    /* Shift+LMB while unlocked: the CAD precision fallback (cursor-
+     * driven, no lock) — pan on empty space, the y-locked work-plane
+     * carry on a part (the pre-4.6h drag; the grab offset freezes the
+     * grip so the part doesn't jump; NO settle on release — the
+     * precision tool places poses gravity would never hold). */
     vector3 point = {0.0f, 0.0f, 0.0f};
-    const int picked = cw_pick (x, y, &t, &point);
-    if (shift) {
-        /* Shift+LMB: the flat-layout pair — pan on empty space, the
-         * y-locked work-plane carry on a part (the pre-4.6h drag; the
-         * grab offset freezes the grip so the part doesn't jump). */
-        if (picked < 0) {
-            cw_mode = CW_MODE_PAN;
-            return;
-        }
-        cad_select (&cw_design, picked);
-        cw_drag_part = picked;
-        cw_drag_plane_y = cw_design.parts [picked].position.y;
-        cw_drag_offset = vector3_subtraction (cw_design.parts [picked].position, point);
-        cw_mode = CW_MODE_PLANE_DRAG;
-        cw_status_refresh ();
-        return;
-    }
+    const int picked = cw_pick (x, y, NULL, &point);
     if (picked < 0) {
-        cw_mode = CW_MODE_ORBIT;
+        cw_mode = CW_MODE_PAN;
         return;
     }
-    /* Plain LMB on a part: the ENGINE grab (drag_weld's semantics) —
-     * grab at the hit point and carry the part along the cursor ray at
-     * the grabbed depth (full 3D) until release. The grab offset
-     * freezes the grip point; the floor clamp freezes at the part's
-     * oriented down-extent so a carry can never dip it under the
-     * floor. */
     cad_select (&cw_design, picked);
     cw_drag_part = picked;
-    cw_drag_t = t;
-    cw_drag_floor_y = cw_down_extent (&cw_design.parts [picked]);
+    cw_drag_plane_y = cw_design.parts [picked].position.y;
     cw_drag_offset = vector3_subtraction (cw_design.parts [picked].position, point);
-    cw_mode = CW_MODE_CARRY;
+    cw_mode = CW_MODE_PLANE_DRAG;
     cw_status_refresh ();
 }
 
@@ -1342,14 +1543,28 @@ static void cw_on_motion (GtkEventControllerMotion *controller, gdouble x,
     cw_last_y = y;
     cw_cursor_x = x;
     cw_cursor_y = y;
-    if (cw_mode == CW_MODE_ORBIT) {
-        /* Turntable: drag right orbits the camera right around the
-         * target; drag down lifts the eye. Pitch clamped HERE (the
-         * caller's job per the view-math contract). */
-        cw_camera.yaw_deg += dx * 0.4f;
-        cw_camera.pitch_deg += dy * 0.4f;
-        if (cw_camera.pitch_deg > 85.0f) { cw_camera.pitch_deg = 85.0f; }
-        if (cw_camera.pitch_deg < -85.0f) { cw_camera.pitch_deg = -85.0f; }
+    if (cw_look_locked) {
+        /* The pointer is the camera now. With a live relative-pointer
+         * lock the absolute coordinates are meaningless (the engine's
+         * contract: ignore them entirely) — the tick drains the
+         * relative deltas. Without one (X11, or a compositor without
+         * the protocol): steer from the absolute deltas and re-centre
+         * the warped cursor, the engine's on_mouse_movements pattern
+         * (deltas clamped to half the surface like there). */
+        if (!mouse_lock_relative_active ()) {
+            int w = 0;
+            int h = 0;
+            float cdx = dx;
+            float cdy = dy;
+            if (cw_widget_pixels (&w, &h)) {
+                if (cdx > (float) w / 2.0f) { cdx = (float) w / 2.0f; }
+                if (cdx < (float) -w / 2.0f) { cdx = (float) -w / 2.0f; }
+                if (cdy > (float) h / 2.0f) { cdy = (float) h / 2.0f; }
+                if (cdy < (float) -h / 2.0f) { cdy = (float) -h / 2.0f; }
+            }
+            cw_apply_steer (cdx, -cdy);
+            mouse_lock_reset_centre (cw_gl_area);
+        }
         return;
     }
     if (cw_mode == CW_MODE_PAN) {
@@ -1434,8 +1649,34 @@ static gboolean cw_on_key (GtkEventControllerKey *controller, guint keyval,
     (void) keycode;
     (void) user_data;
     if (keyval == GDK_KEY_Escape) {
+        /* Two-stage, the engine's own convention: locked Esc FREES the
+         * pointer (the engine's Esc rule); unlocked Esc closes the
+         * window (the 4.6c ruling — and while typing only Esc still
+         * works, the 4.6g ruling). */
+        if (cw_look_locked) {
+            cw_look_unlock ();
+            return TRUE;
+        }
         if (cw_window) { gtk_window_destroy (GTK_WINDOW (cw_window)); }
         return TRUE;
+    }
+    /* The FLY latches come first: while the pointer is locked the
+     * engine's own control scheme wins (WASD + Space/Shift fly; the
+     * colliding CAD verbs D/A/S/L wait for unlock), and the latching
+     * sits BEFORE the mid-motion guard so flying coexists with a
+     * crosshair carry (the engine flies while grabbing). Non-fly keys
+     * fall through to the verbs below, which work in both modes. */
+    if (cw_look_locked && !cw_focus_in_name_entry ()) {
+        switch (keyval) {
+            case GDK_KEY_w: case GDK_KEY_W: cw_key_w = 1; return TRUE;
+            case GDK_KEY_a: case GDK_KEY_A: cw_key_a = 1; return TRUE;
+            case GDK_KEY_s: case GDK_KEY_S: cw_key_s = 1; return TRUE;
+            case GDK_KEY_d: case GDK_KEY_D: cw_key_d = 1; return TRUE;
+            case GDK_KEY_space: cw_key_up = 1; return TRUE;
+            case GDK_KEY_Shift_L:
+            case GDK_KEY_Shift_R: cw_key_down = 1; return TRUE;
+            default: break;
+        }
     }
     if (cw_focus_in_name_entry ()) {
         return FALSE;
@@ -1483,6 +1724,30 @@ static gboolean cw_on_key (GtkEventControllerKey *controller, guint keyval,
     }
 }
 
+/* The engine's on_key_released pattern (input_control.c): a latch set
+ * on press dies on release — polled latches make key repeat irrelevant
+ * and a key held across a lock/unlock edge dies with the latches
+ * (cw_kill_fly_latches). Returns FALSE so releases keep propagating. */
+static gboolean cw_on_key_release (GtkEventControllerKey *controller,
+                                   guint keyval, guint keycode,
+                                   GdkModifierType state, gpointer user_data) {
+    (void) controller;
+    (void) keycode;
+    (void) state;
+    (void) user_data;
+    switch (keyval) {
+        case GDK_KEY_w: case GDK_KEY_W: cw_key_w = 0; break;
+        case GDK_KEY_a: case GDK_KEY_A: cw_key_a = 0; break;
+        case GDK_KEY_s: case GDK_KEY_S: cw_key_s = 0; break;
+        case GDK_KEY_d: case GDK_KEY_D: cw_key_d = 0; break;
+        case GDK_KEY_space: cw_key_up = 0; break;
+        case GDK_KEY_Shift_L:
+        case GDK_KEY_Shift_R: cw_key_down = 0; break;
+        default: break;
+    }
+    return FALSE;
+}
+
 /* ---- GL callbacks ------------------------------------------------------ */
 
 static void cw_on_realize (GtkGLArea *area, gpointer user_data) {
@@ -1505,6 +1770,7 @@ static void cw_on_realize (GtkGLArea *area, gpointer user_data) {
     cw_count_cube = cw_fill_cube (cw_mesh_cube);
     cw_count_cylinder = cw_fill_cylinder (cw_mesh_cylinder);
     cw_count_grid = cw_fill_grid (cw_mesh_grid);
+    cw_count_crosshair = cw_fill_crosshair (cw_mesh_crosshair);
     cw_make_vao (cw_mesh_sphere, CW_SPHERE_FLOATS, &cw_vao_sphere,
                  &cw_vbo_sphere, &cw_count_sphere);
     cw_make_vao (cw_mesh_cube, CW_CUBE_FLOATS, &cw_vao_cube, &cw_vbo_cube,
@@ -1513,6 +1779,8 @@ static void cw_on_realize (GtkGLArea *area, gpointer user_data) {
                  &cw_vbo_cylinder, &cw_count_cylinder);
     cw_make_vao (cw_mesh_grid, CW_GRID_FLOATS, &cw_vao_grid, &cw_vbo_grid,
                  &cw_count_grid);
+    cw_make_vao (cw_mesh_crosshair, CW_CROSSHAIR_FLOATS, &cw_vao_crosshair,
+                 &cw_vbo_crosshair, &cw_count_crosshair);
 }
 
 static void cw_gl_release (void) {
@@ -1521,12 +1789,14 @@ static void cw_gl_release (void) {
         gtk_gl_area_make_current (GTK_GL_AREA (cw_gl_area));
         if (gtk_gl_area_get_error (GTK_GL_AREA (cw_gl_area)) == NULL) {
             if (cw_program) { glDeleteProgram (cw_program); }
-            const GLuint vaos [4] = {cw_vao_sphere, cw_vao_cube,
-                                     cw_vao_cylinder, cw_vao_grid};
-            const GLuint vbos [4] = {cw_vbo_sphere, cw_vbo_cube,
-                                     cw_vbo_cylinder, cw_vbo_grid};
-            glDeleteVertexArrays (4, vaos);
-            glDeleteBuffers (4, vbos);
+            const GLuint vaos [5] = {cw_vao_sphere, cw_vao_cube,
+                                     cw_vao_cylinder, cw_vao_grid,
+                                     cw_vao_crosshair};
+            const GLuint vbos [5] = {cw_vbo_sphere, cw_vbo_cube,
+                                     cw_vbo_cylinder, cw_vbo_grid,
+                                     cw_vbo_crosshair};
+            glDeleteVertexArrays (5, vaos);
+            glDeleteBuffers (5, vbos);
         }
     }
     cw_program = 0;
@@ -1534,6 +1804,7 @@ static void cw_gl_release (void) {
     cw_vao_cube = 0; cw_vbo_cube = 0; cw_count_cube = 0;
     cw_vao_cylinder = 0; cw_vbo_cylinder = 0; cw_count_cylinder = 0;
     cw_vao_grid = 0; cw_vbo_grid = 0; cw_count_grid = 0;
+    cw_vao_crosshair = 0; cw_vbo_crosshair = 0; cw_count_crosshair = 0;
 }
 
 static gboolean cw_on_render (GtkGLArea *area, GdkGLContext *context,
@@ -1604,19 +1875,49 @@ static gboolean cw_on_render (GtkGLArea *area, GdkGLContext *context,
         glBindVertexArray (vao);
         glDrawArrays (GL_TRIANGLES, 0, (GLint) count);
     }
+    /* WP4 4.6j: the CROSSHAIR while the pointer is locked — the cursor
+     * is gone, so the aim point must be drawn. Identity viewproj +
+     * model pass the NDC lines straight through (always the exact
+     * screen center), depth test off so it reads over anything. */
+    if (cw_look_locked) {
+        glDisable (GL_DEPTH_TEST);
+        glUniformMatrix4fv (cw_u_viewproj, 1, GL_FALSE, identity);
+        glUniformMatrix4fv (cw_u_model, 1, GL_FALSE, identity);
+        glUniform3fv (cw_u_inv_scale, 1, grid_inv);
+        const float cross_col [3] = {0.85f, 0.90f, 0.98f};
+        glUniform3fv (cw_u_color, 1, cross_col);
+        glUniform1f (cw_u_selected, 0.0f);
+        glUniform1f (cw_u_unlit, 1.0f);
+        glBindVertexArray (cw_vao_crosshair);
+        glDrawArrays (GL_LINES, 0, (GLint) cw_count_crosshair);
+        glEnable (GL_DEPTH_TEST);
+    }
     glBindVertexArray (0);
     return TRUE;
 }
 
 static gboolean cw_tick (gpointer user_data) {
     (void) user_data;
-    /* WP4 4.6i: the every-frame interaction tick — the drag_weld_tick
-     * analog driven by the window's frame loop instead of the engine
-     * dispatch. The carried part follows the stored cursor EVERY
-     * frame (zoom mid-carry keeps it glued); a settling part falls at
-     * the world's own gravity. dt is the tick period (16 ms). */
+    /* The window's frame loop (16 ms) now runs the ENGINE control
+     * scheme (4.6j) AND the 4.6i interaction follow:
+     *   - steering: the Wayland relative deltas drain ONCE here (the
+     *     input_control_poll_locked_mouse analog; X11 steers per
+     *     motion event instead);
+     *   - fly: the latched WASD/Space/Shift translate;
+     *   - the carried part follows EVERY frame — the crosshair ray
+     *     while locked, the stored cursor otherwise (zoom mid-carry
+     *     keeps it glued); a settling part falls at the world's own
+     *     gravity. dt is the tick period (16 ms). */
+    if (cw_look_locked) {
+        cw_look_steer ();
+        cw_fly_translate (0.016f);
+    }
     if (cw_mode == CW_MODE_CARRY) {
-        cw_carry_update (cw_cursor_x, cw_cursor_y);
+        if (cw_look_locked) {
+            cw_carry_apply_ndc (0.0f, 0.0f);
+        } else {
+            cw_carry_update (cw_cursor_x, cw_cursor_y);
+        }
     } else if (cw_mode == CW_MODE_SETTLING) {
         cw_settle_tick (0.016f);
     }
@@ -1640,6 +1941,10 @@ static gboolean cw_focus_viewport_idle (gpointer user_data) {
 static void cw_on_destroy (GtkWidget *widget, gpointer user_data) {
     (void) widget;
     (void) user_data;
+    /* WP4 4.6j: free the pointer FIRST — the lock is live GL/GDK
+     * state tied to this window's surface and the handlers below
+     * null it. */
+    cw_look_unlock ();
     if (cw_timeout_id) {
         g_source_remove (cw_timeout_id);
         cw_timeout_id = 0;
@@ -1657,6 +1962,22 @@ static void cw_on_destroy (GtkWidget *widget, gpointer user_data) {
      * resume falling on reopen). */
     cw_settle_part = -1;
     cw_settle_v = 0.0f;
+    /* WP4 4.6j: the look state dies with the window (idempotent —
+     * cw_look_unlock already ran above; this covers a destroy that
+     * skipped it). */
+    cw_look_locked = 0;
+    cw_kill_fly_latches ();
+}
+
+/* The engine's on_focus_out analog (root_gtk.c's focus "leave"
+ * controller): losing the window frees the pointer and kills the fly
+ * latches — a held W must not fly a window the user has already
+ * left. */
+static void cw_on_focus_leave (GtkEventControllerFocus *ctrl,
+                               gpointer user_data) {
+    (void) ctrl;
+    (void) user_data;
+    cw_look_unlock ();
 }
 
 static gboolean cw_on_close_request (GtkWidget *widget, gpointer user_data) {
@@ -1745,6 +2066,16 @@ void cad_window_toggle (void) {
     gtk_event_controller_set_propagation_phase (keys, GTK_PHASE_CAPTURE);
     gtk_widget_add_controller (cw_window, keys);
     g_signal_connect (keys, "key-pressed", G_CALLBACK (cw_on_key), NULL);
+    /* WP4 4.6j: the engine's latch pattern needs the release edge too
+     * (root_gtk.c wires the same pair on the main window). */
+    g_signal_connect (keys, "key-released", G_CALLBACK (cw_on_key_release),
+                      NULL);
+    /* The engine's focus-out release (root_gtk.c:118 pattern): losing
+     * the window frees the pointer and the fly latches. */
+    GtkEventController *focus_ctrl = gtk_event_controller_focus_new ();
+    g_signal_connect (focus_ctrl, "leave", G_CALLBACK (cw_on_focus_leave),
+                      NULL);
+    gtk_widget_add_controller (cw_window, focus_ctrl);
 
     static bool css_installed = false;
     if (!css_installed) {
