@@ -200,6 +200,17 @@ typedef struct {
     int hull_kind;
     float hull_size_s;
     float hull_size_h;
+    /* MIG WP4 4.6q: analytic-ellipsoid marker. The ell kind is no
+     * longer read as its inscribed 86-vertex pool mesh: hull_analytic
+     * = 1 switches every hull consumer (the four detectors, boundary
+     * extrema, CCD supports) to the exact O(1) closed forms driven by
+     * hull_semi_axes (a = b = s/2 equatorial, c = h/2 polar on body z
+     * — the 2.6.3 (s, h) diameters). The pool slice STAYS allocated
+     * (the 2.6.5 gates and the mesh-kind walk still read it); mesh
+     * kinds keep hull_analytic = 0. Zeroed at every initializer like
+     * the slices and stamps. */
+    vector3 hull_semi_axes;
+    int hull_analytic;
 } rigidbody;
 void rigidbody_update_axes (rigidbody *rigid_body);
 void rigidbody_initialisation_sphere (rigidbody *rigid_body, float radius, float mass, vector3 position_input);

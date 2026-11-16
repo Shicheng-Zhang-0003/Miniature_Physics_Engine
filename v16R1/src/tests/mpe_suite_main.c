@@ -131,6 +131,7 @@ int mpe_t_mig_hull_sat_hulls (void);
 int mpe_t_mig_hull_spawn (void);
 int mpe_t_mig_hull_ellipsoid (void);
 int mpe_t_mig_hull_render_stamp (void);
+int mpe_t_mig_hull_analytic_ell (void);
 int mpe_t_cad_editor_model (void);
 int mpe_t_cad_view_math (void);
 typedef struct {
@@ -302,6 +303,11 @@ static const mpe_entry_t mpe_registry [] = {
      * builds scale onto the stored collision verts exactly, and add_hull
      * stamps (kind, s, h) for the renderer's per-kind unit mesh. */
     {"mig_hull_render_stamp", mpe_t_mig_hull_render_stamp, 0},
+    /* MIG WP4 4.6q: the analytic ellipsoid — the ell kind's exact O(1)
+     * closed forms through the four new mig_hull SAT references, the
+     * engine floor detector on a 45°-posed prolate ell, and the
+     * add_hull (hull_analytic, hull_semi_axes) stamp. */
+    {"mig_hull_analytic_ell", mpe_t_mig_hull_analytic_ell, 0},
     /* MIG WP4 4.6: the miniature CAD editor's DESIGN MODEL (cad/cad_editor.c)
      * — typed adds + full refusal battery (write-on-success, memcmp
      * witness), snap/rotate/dup/array transforms with the left-composition

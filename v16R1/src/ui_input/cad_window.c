@@ -770,15 +770,20 @@ static void cw_refresh_dropdown (void) {
  * panel pattern): emit canonical text -> write -> parse back -> stage
  * into the shared store. Write-on-success everywhere. */
 static void cw_save_design (void) {
-    if (cw_design.name [0] == '\0') {
-        /* Belt-and-braces for the grammar's one refused state (the
-         * init names the design and cad_set_name guards renames, so
-         * this is unreachable in practice — but the dead end must not
-         * exist): an empty name auto-fills and the save proceeds. */
-        cad_set_name (&cw_design, "untitled");
-        if (cw_name_entry) {
-            gtk_editable_set_text (GTK_EDITABLE (cw_name_entry),
-                                   cw_design.name);
+    /* WP4 4.6q: the name syncs FROM the entry before the save — the
+     * stored design used to keep its build-time name when the user
+     * typed a new one without pressing Enter first, so the main
+     * engine's spawner showed the stale name for the fresh spec.
+     * cad_set_name validates (A-Z a-z 0-9 _ -); a bad name REFUSES the
+     * save — never a silent save under a stale name — with the fix in
+     * the status line. Renames via the entry's activate signal (and
+     * load, which re-fills the entry) keep working unchanged. */
+    if (cw_name_entry) {
+        const char *text = gtk_editable_get_text (GTK_EDITABLE (cw_name_entry));
+        int rnc = cad_set_name (&cw_design, text);
+        if (rnc != cad_ok) {
+            cw_status_err ("save refused (bad-name: use A-Z a-z 0-9 _ -)");
+            return;
         }
     }
     mig_spec spec;

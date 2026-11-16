@@ -97,6 +97,35 @@ static int boundary_hull_extrema_along_axis (const physics_world *world, const r
     if (!isfinite (axis.x) || !isfinite (axis.y) || !isfinite (axis.z)) { return 0; }
     const vector4 q = rigid_body -> orientation;
     if (!isfinite (q.w) || !isfinite (q.x) || !isfinite (q.y) || !isfinite (q.z)) { return 0; }
+    if (rigid_body -> hull_analytic) {
+        /* MIG WP4 4.6q: analytic ellipsoid — the exact extrema
+         * ±||S·Rᵀaxis|| about the centre along the axis (the inscribed
+         * pool mesh would understate both). Same scale convention as
+         * the mesh walk below: the axis enters the dots as given. */
+        const vector3 ex = {1.0f, 0.0f, 0.0f}, ey = {0.0f, 1.0f, 0.0f}, ez = {0.0f, 0.0f, 1.0f};
+        const vector3 c0 = vector4_rotate_to_vector3 (q, ex);
+        const vector3 c1 = vector4_rotate_to_vector3 (q, ey);
+        const vector3 c2 = vector4_rotate_to_vector3 (q, ez);
+        const double semi [3] = {(double) rigid_body -> hull_semi_axes.x,
+                                 (double) rigid_body -> hull_semi_axes.y,
+                                 (double) rigid_body -> hull_semi_axes.z};
+        const double col [3][3] = {{c0.x, c0.y, c0.z}, {c1.x, c1.y, c1.z}, {c2.x, c2.y, c2.z}};
+        const double d [3] = {(double) axis.x, (double) axis.y, (double) axis.z};
+        double h = 0.0;
+        for (int i = 0; i < 3; i++) {
+            const double w = col [i][0] * d [0] + col [i][1] * d [1] + col [i][2] * d [2];
+            h += semi [i] * semi [i] * w * w;
+        }
+        h = sqrt (h);
+        if (!isfinite (h)) { return 0; }
+        const float along = vector3_dot (rigid_body -> position, axis);
+        const float lo = along - (float) h;
+        const float hi = along + (float) h;
+        if ((!isfinite (lo)) || (!isfinite (hi))) { return 0; }
+        *min_out = lo;
+        *max_out = hi;
+        return 1;
+    }
     const vector4 inv = {q.w, -q.x, -q.y, -q.z};
     const vector3 axis_local = vector4_rotate_to_vector3 (inv, axis);
     float s_plus = -INFINITY;  /* max dot(v, +axis_local) */

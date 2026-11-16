@@ -615,6 +615,11 @@ void rigidbody_initialisation_sphere (rigidbody *rigid_body, float radius, float
     rigid_body -> hull_kind = 0;
     rigid_body -> hull_size_s = 0.0f;
     rigid_body -> hull_size_h = 0.0f;
+    /* WP4 4.6q: analytic marker zeroed with the stamps (same
+     * determinism lesson — heap garbage here would flip a mesh kind
+     * into the analytic path on an uninitialized read). */
+    rigid_body -> hull_semi_axes = (vector3) {0.0f, 0.0f, 0.0f};
+    rigid_body -> hull_analytic = 0;
     rigid_body -> ext_force_this_tick = 0;
     rigid_body -> no_collide = false;
     /* DETERMINISM: the body pool is malloc'd, so this _Bool would otherwise
@@ -1212,6 +1217,11 @@ void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_inpu
     rigid_body -> hull_kind = 0;
     rigid_body -> hull_size_s = 0.0f;
     rigid_body -> hull_size_h = 0.0f;
+    /* WP4 4.6q: analytic marker zeroed with the stamps (same
+     * determinism lesson — heap garbage here would flip a mesh kind
+     * into the analytic path on an uninitialized read). */
+    rigid_body -> hull_semi_axes = (vector3) {0.0f, 0.0f, 0.0f};
+    rigid_body -> hull_analytic = 0;
     rigid_body -> ext_force_this_tick = 0;
     rigid_body -> no_collide = false;
     /* DETERMINISM: the body pool is malloc'd, so this _Bool would otherwise
@@ -1464,6 +1474,11 @@ void rigidbody_initialisation_cylinder (rigidbody *rigid_body, float radius, flo
     rigid_body -> hull_kind = 0;
     rigid_body -> hull_size_s = 0.0f;
     rigid_body -> hull_size_h = 0.0f;
+    /* WP4 4.6q: analytic marker zeroed with the stamps (same
+     * determinism lesson — heap garbage here would flip a mesh kind
+     * into the analytic path on an uninitialized read). */
+    rigid_body -> hull_semi_axes = (vector3) {0.0f, 0.0f, 0.0f};
+    rigid_body -> hull_analytic = 0;
     rigid_body -> ext_force_this_tick = 0;
     rigid_body -> no_collide = false;
     /* DETERMINISM: the body pool is malloc'd, so this _Bool would otherwise

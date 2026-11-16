@@ -64,8 +64,8 @@ void spawner_launch_hull (mpe_hull_shape_kind kind, const char *name, float laun
      * in add_hull, but a flag-0 world makes NO hull contacts, so refuse
      * loudly instead of quietly spawning an invisible ghost. Reach =
      * max(s, h) + 1 so tall shapes clear the player. Renderer note:
-     * hulls are skipped by the draw loop (the 2.6.5 stopgap) — the body
-     * simulates and the renderer's one-time skip note fires. */
+     * hulls draw from their per-kind catalog unit meshes (2.6.6) — the
+     * body simulates and draws like every other kind. */
     if (!g_cfg.composite.hull) {
         event_log_push (2, "spawn refused: %s needs composite.hull=1 — Spawner Menu > 5: Hull Settings > 4: Hull Contacts",
                         name);

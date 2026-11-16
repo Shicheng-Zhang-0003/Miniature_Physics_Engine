@@ -4869,3 +4869,246 @@ int mpe_t_mig_hull_render_stamp (void) {
     mpe_test_end (&t);
     return t.failures;
 }
+
+/* ---- MIG WP4 4.6q: the analytic ellipsoid (73rd) ----
+ * The ell hull kind is no longer read as its inscribed 86-vertex pool
+ * mesh: add_hull stamps (hull_analytic, hull_semi_axes) and every
+ * consumer (the four detectors, boundary extrema, CCD supports) runs
+ * the exact O(1) closed forms through the four new mig_hull SAT
+ * references. Gate: hand-verified SAT depths/axes for the ell pair
+ * (identity + z-90-rotated + separated), ell-vs-mesh, ell-vs-sphere,
+ * ell-vs-box (posed A included), the refusal battery, the ENGINE
+ * floor detector on a 45°-posed prolate ell (exact lowest point and
+ * contact), the ENGINE hull-hull pair in BOTH analytic branches
+ * (A-analytic and the role-swapped B-analytic), and the add_hull
+ * stamp itself. */
+int mpe_t_mig_hull_analytic_ell (void) {
+    mpe_test_t t;
+    mpe_test_begin (&t, "mig_hull_analytic_ell");
+    mpe_clamp_counters_reset ();
+    /* ---- 1. SAT reference pairs (hand-verified oracle values) ---- */
+    {
+        mig_hull_sat_result r;
+        const double sa [3] = {2.0, 1.0, 1.0};
+        const double ident [9] = {1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0};
+        const double z90 [9] = {0.0, 1.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 1.0};
+        const double sb [3] = {2.0, 1.0, 1.0};
+        /* Twin prolate ells (2, 1, 1) 3 m apart on x: depth exactly 1. */
+        const double cb1 [3] = {3.0, 0.0, 0.0};
+        MPE_CHECK (&t, mig_hull_sat_ellipsoid_pair (sa, cb1, ident, sb, &r) == mig_hull_ok);
+        MPE_CHECK (&t, r.overlap == 1);
+        MPE_CHECK_NEAR (&t, (float) r.depth, 1.0f, 1e-9f, "ell pair depth 1");
+        MPE_CHECK_NEAR (&t, (float) r.axis [0], 1.0f, 1e-9f, "ell pair axis +x");
+        MPE_CHECK_NEAR (&t, (float) r.axis [1], 0.0f, 1e-9f, "ell pair axis y 0");
+        MPE_CHECK_NEAR (&t, (float) r.axis [2], 0.0f, 1e-9f, "ell pair axis z 0");
+        /* B z-rotated 90° at 2.5 m: its long axis stands along y, so the
+         * x-depth is 2 + 1 − 2.5 = 0.5 (exact: the tilt second-order
+         * grows, 0.5 is the true MTD). */
+        const double cb2 [3] = {2.5, 0.0, 0.0};
+        MPE_CHECK (&t, mig_hull_sat_ellipsoid_pair (sa, cb2, z90, sb, &r) == mig_hull_ok);
+        MPE_CHECK (&t, r.overlap == 1);
+        MPE_CHECK_NEAR (&t, (float) r.depth, 0.5f, 1e-9f, "rotated pair depth 0.5");
+        MPE_CHECK_NEAR (&t, (float) r.axis [0], 1.0f, 1e-9f, "rotated pair axis +x");
+        /* Separated at 5.1 m: overlap 0. The recorded axis is the LAST
+         * separating feed — the 2.5.4 machinery's convention (consumers
+         * never read it at overlap 0) — and every separating direction
+         * on this +x-offset config points from A toward B. */
+        const double cb3 [3] = {5.1, 0.0, 0.0};
+        MPE_CHECK (&t, mig_hull_sat_ellipsoid_pair (sa, cb3, ident, sb, &r) == mig_hull_ok);
+        MPE_CHECK (&t, r.overlap == 0);
+        MPE_CHECK (&t, r.axis [0] > 0.0); /* toward B */
+        /* Ell (1,1,1) vs its own unit catalog MESH offset 1.05: the mesh
+         * vertex (1, 0, 0) makes the x-extent exactly 1 → depth 0.95. */
+        mig_hull_point mscratch [MIG_HULL_MAX_VERTS], mlocal [MIG_HULL_MAX_VERTS];
+        mig_hull_point_set mset;
+        MPE_CHECK (&t, mig_hull_point_set_init (&mset, mscratch, MIG_HULL_MAX_VERTS) == mig_hull_ok);
+        MPE_CHECK (&t, mig_hull_build_ellipsoid (1.0, 1.0, 1.0, &mset) == mig_hull_ok);
+        for (int i = 0; i < mset.count; i++) {
+            mlocal [i].x = mset.points [i].x + 1.05;
+            mlocal [i].y = mset.points [i].y;
+            mlocal [i].z = mset.points [i].z;
+        }
+        const double unit_semi [3] = {1.0, 1.0, 1.0};
+        MPE_CHECK (&t, mig_hull_sat_ellipsoid_mesh (unit_semi, mlocal, mset.count,
+                                                    mig_hull_ell_faces, MIG_HULL_ELL_FACES, &r) == mig_hull_ok);
+        MPE_CHECK (&t, r.overlap == 1);
+        MPE_CHECK_NEAR (&t, (float) r.depth, 0.95f, 1e-9f, "ell-mesh depth 0.95");
+        MPE_CHECK_NEAR (&t, (float) r.axis [0], 1.0f, 1e-9f, "ell-mesh axis +x");
+        for (int i = 0; i < mset.count; i++) { mlocal [i].x = mset.points [i].x + 2.05; }
+        MPE_CHECK (&t, mig_hull_sat_ellipsoid_mesh (unit_semi, mlocal, mset.count,
+                                                    mig_hull_ell_faces, MIG_HULL_ELL_FACES, &r) == mig_hull_ok);
+        MPE_CHECK (&t, r.overlap == 0);
+        MPE_CHECK_NEAR (&t, (float) r.axis [0], 1.0f, 1e-9f, "ell-mesh separated axis +x");
+        /* Prolate ell (2,1,1) vs sphere r=1 at 2.5 m: depth 0.5. */
+        const double sc [3] = {2.5, 0.0, 0.0};
+        MPE_CHECK (&t, mig_hull_sat_ellipsoid_sphere (sa, sc, 1.0, &r) == mig_hull_ok);
+        MPE_CHECK (&t, r.overlap == 1);
+        MPE_CHECK_NEAR (&t, (float) r.depth, 0.5f, 1e-9f, "ell-sphere depth 0.5");
+        MPE_CHECK_NEAR (&t, (float) r.axis [0], 1.0f, 1e-9f, "ell-sphere axis +x");
+        const double sc2 [3] = {3.1, 0.0, 0.0};
+        MPE_CHECK (&t, mig_hull_sat_ellipsoid_sphere (sa, sc2, 1.0, &r) == mig_hull_ok);
+        MPE_CHECK (&t, r.overlap == 0);
+        /* Ell (2,1,1) at the origin (identity pose) vs box half (1,1,1)
+         * at 2.5 m: depth 0.5; with A z-rotated 90° the x-extent is 1 →
+         * the box at 1.5 m still gives exactly 0.5. */
+        const double ca0 [3] = {0.0, 0.0, 0.0};
+        const double bc1 [3] = {2.5, 0.0, 0.0};
+        const double bh [3] = {1.0, 1.0, 1.0};
+        MPE_CHECK (&t, mig_hull_sat_ellipsoid_box (sa, ca0, ident, bc1, bh, &r) == mig_hull_ok);
+        MPE_CHECK (&t, r.overlap == 1);
+        MPE_CHECK_NEAR (&t, (float) r.depth, 0.5f, 1e-9f, "ell-box depth 0.5");
+        MPE_CHECK_NEAR (&t, (float) r.axis [0], 1.0f, 1e-9f, "ell-box axis +x");
+        const double bc2 [3] = {1.5, 0.0, 0.0};
+        MPE_CHECK (&t, mig_hull_sat_ellipsoid_box (sa, ca0, z90, bc2, bh, &r) == mig_hull_ok);
+        MPE_CHECK (&t, r.overlap == 1);
+        MPE_CHECK_NEAR (&t, (float) r.depth, 0.5f, 1e-9f, "rotated ell-box depth 0.5");
+        MPE_CHECK_NEAR (&t, (float) r.axis [0], 1.0f, 1e-9f, "rotated ell-box axis +x");
+        const double bc3 [3] = {2.5, 0.0, 0.0};
+        MPE_CHECK (&t, mig_hull_sat_ellipsoid_box (sa, ca0, z90, bc3, bh, &r) == mig_hull_ok);
+        MPE_CHECK (&t, r.overlap == 0);
+        MPE_CHECK_NEAR (&t, (float) r.axis [0], 1.0f, 1e-9f, "separated ell-box axis +x");
+        /* ---- refusal battery (order: nulls, then bad geometry) ---- */
+        const double bad_semi [3] = {0.0, 1.0, 1.0};
+        const double nan_semi [3] = {0.0 / 0.0, 1.0, 1.0};
+        const double bad_rot [9] = {0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0};
+        const double nan_rot [9] = {0.0 / 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0};
+        const double nan_c [3] = {1.5, 0.0 / 0.0, 0.0};
+        const double zero_half [3] = {0.0, 1.0, 1.0};
+        MPE_CHECK (&t, mig_hull_sat_ellipsoid_pair (NULL, cb1, ident, sb, &r) == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_sat_ellipsoid_pair (sa, NULL, ident, sb, &r) == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_sat_ellipsoid_pair (sa, cb1, NULL, sb, &r) == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_sat_ellipsoid_pair (sa, cb1, ident, NULL, &r) == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_sat_ellipsoid_pair (sa, cb1, ident, sb, NULL) == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_sat_ellipsoid_pair (bad_semi, cb1, ident, sb, &r) == mig_hull_bad_mesh);
+        MPE_CHECK (&t, mig_hull_sat_ellipsoid_pair (sa, cb1, ident, nan_semi, &r) == mig_hull_bad_mesh);
+        MPE_CHECK (&t, mig_hull_sat_ellipsoid_pair (sa, cb1, bad_rot, sb, &r) == mig_hull_bad_mesh);
+        MPE_CHECK (&t, mig_hull_sat_ellipsoid_pair (sa, cb1, nan_rot, sb, &r) == mig_hull_bad_mesh);
+        MPE_CHECK (&t, mig_hull_sat_ellipsoid_mesh (NULL, mlocal, mset.count, mig_hull_ell_faces,
+                                                    MIG_HULL_ELL_FACES, &r) == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_sat_ellipsoid_mesh (unit_semi, NULL, mset.count, mig_hull_ell_faces,
+                                                    MIG_HULL_ELL_FACES, &r) == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_sat_ellipsoid_mesh (unit_semi, mlocal, mset.count, NULL,
+                                                    MIG_HULL_ELL_FACES, &r) == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_sat_ellipsoid_mesh (unit_semi, mlocal, mset.count, mig_hull_ell_faces,
+                                                    MIG_HULL_ELL_FACES, NULL) == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_sat_ellipsoid_mesh (bad_semi, mlocal, mset.count, mig_hull_ell_faces,
+                                                    MIG_HULL_ELL_FACES, &r) == mig_hull_bad_mesh);
+        MPE_CHECK (&t, mig_hull_sat_ellipsoid_sphere (NULL, sc, 1.0, &r) == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_sat_ellipsoid_sphere (sa, NULL, 1.0, &r) == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_sat_ellipsoid_sphere (sa, sc, 1.0, NULL) == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_sat_ellipsoid_sphere (sa, sc, 0.0, &r) == mig_hull_bad_mesh);
+        MPE_CHECK (&t, mig_hull_sat_ellipsoid_sphere (sa, sc, 0.0 / 0.0, &r) == mig_hull_bad_mesh);
+        MPE_CHECK (&t, mig_hull_sat_ellipsoid_sphere (sa, nan_c, 1.0, &r) == mig_hull_bad_mesh);
+        MPE_CHECK (&t, mig_hull_sat_ellipsoid_box (NULL, ca0, ident, bc1, bh, &r) == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_sat_ellipsoid_box (sa, NULL, ident, bc1, bh, &r) == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_sat_ellipsoid_box (sa, ca0, NULL, bc1, bh, &r) == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_sat_ellipsoid_box (sa, ca0, ident, NULL, bh, &r) == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_sat_ellipsoid_box (sa, ca0, ident, bc1, NULL, &r) == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_sat_ellipsoid_box (sa, ca0, ident, bc1, bh, NULL) == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_sat_ellipsoid_box (sa, ca0, bad_rot, bc1, bh, &r) == mig_hull_bad_mesh);
+        MPE_CHECK (&t, mig_hull_sat_ellipsoid_box (sa, ca0, ident, bc1, zero_half, &r) == mig_hull_bad_mesh);
+    }
+    /* ---- 2. Engine: add_hull stamps + exact floor manifold + hull-hull ---- */
+    {
+        physics_world w8;
+        mpe_world_begin (&w8);
+        mpe_config_t c8 = g_cfg;
+        c8.composite.hull = 1;
+        physics_world_set_config (&w8, &c8);
+        const int e8 = physics_world_add_hull (&w8, mpe_hull_shape_ellipsoid, 2.0, 4.0, 1.0f,
+                                               (vector3) {0.0f, 2.5f, 0.0f});
+        MPE_CHECK (&t, e8 >= 0);
+        rigidbody *el8 = &w8.bodies [e8];
+        MPE_CHECK (&t, el8 -> hull_analytic == 1);
+        MPE_CHECK_NEAR (&t, el8 -> hull_semi_axes.x, 1.0f, 1e-6f, "ell semi a = s/2");
+        MPE_CHECK_NEAR (&t, el8 -> hull_semi_axes.y, 1.0f, 1e-6f, "ell semi b = s/2");
+        MPE_CHECK_NEAR (&t, el8 -> hull_semi_axes.z, 2.0f, 1e-6f, "ell semi c = h/2");
+        MPE_CHECK (&t, el8 -> hull_vert_count == MIG_HULL_ELL_VERTS); /* slice stays */
+        const int p8 = physics_world_add_hull (&w8, mpe_hull_shape_prism, 2.0, 2.0, 1.0f,
+                                               (vector3) {5.0f, 2.5f, 0.0f});
+        MPE_CHECK (&t, p8 >= 0);
+        MPE_CHECK (&t, w8.bodies [p8].hull_analytic == 0);
+        MPE_CHECK_NEAR (&t, w8.bodies [p8].hull_semi_axes.x, 0.0f, 1e-6f, "prism semi zeroed");
+        /* 45° about +x on the prolate (1, 1, 2) ell at y = 2.5: the
+         * exact lowest surface point is 2.5 − √2.5 = 0.9188612 with the
+         * support-point lever arm z = 0.9486833 (hand-verified closed
+         * form); the floor plane at 1.0 sees pen = 0.0811388. */
+        el8 -> orientation = (vector4) {0.92387953251128675613f, 0.38268343236508977173f, 0.0f, 0.0f};
+        collision_data fl8 = {0};
+        MPE_CHECK (&t, physics_world_hull_floor_detect (&w8, el8, 1.0f, &fl8));
+        MPE_CHECK (&t, fl8.contact_count == 1);
+        MPE_CHECK (&t, fl8.object_a == el8 && fl8.object_b == &w8.static_plane_body);
+        MPE_CHECK_NEAR (&t, fl8.normal_vector.y, -1.0f, 1e-6f, "floor normal down");
+        MPE_CHECK_NEAR (&t, fl8.contacts [0].position.x, 0.0f, 1e-5f, "cp x centred");
+        MPE_CHECK_NEAR (&t, fl8.contacts [0].position.y, 0.9188611699158102f, 1e-5f, "cp y = 2.5 − √2.5");
+        MPE_CHECK_NEAR (&t, fl8.contacts [0].position.z, 0.9486832980505138f, 1e-5f, "cp z lever arm");
+        MPE_CHECK_NEAR (&t, fl8.contacts [0].penetration, 0.0811388300841898f, 1e-5f, "pen vs plane 1.0");
+        MPE_CHECK (&t, !physics_world_hull_floor_detect (&w8, el8, 0.5f, &fl8)); /* well above */
+        /* Hull-hull, BOTH analytic branches. Twin ells (2,1,1) 3 m
+         * apart: depth exactly 1, axis +x, contact = the midpoint of
+         * the two exact supports (2,9,0) and (1,9,0). First with A
+         * analytic, then the role swap: a's marker forced to 0 makes a
+         * the mesh body, so the SAT runs with the ELLIPSOID as its A
+         * and the axis is negated into a→b — same oracle values. */
+        const int a9 = physics_world_add_hull (&w8, mpe_hull_shape_ellipsoid, 4.0, 2.0, 1.0f,
+                                               (vector3) {0.0f, 9.0f, 0.0f});
+        const int b9 = physics_world_add_hull (&w8, mpe_hull_shape_ellipsoid, 4.0, 2.0, 1.0f,
+                                               (vector3) {3.0f, 9.0f, 0.0f});
+        MPE_CHECK (&t, (a9 >= 0) && (b9 >= 0));
+        collision_data hh = {0};
+        MPE_CHECK (&t, mpe_hull_collide_hull (&w8.bodies [a9], &w8.bodies [b9], &hh, &w8));
+        MPE_CHECK (&t, hh.contact_count == 1);
+        MPE_CHECK_NEAR (&t, hh.normal_vector.x, 1.0f, 1e-6f, "hull-hull normal +x");
+        MPE_CHECK_NEAR (&t, hh.contacts [0].position.x, 1.5f, 1e-5f, "contact midpoint x");
+        MPE_CHECK_NEAR (&t, hh.contacts [0].position.y, 9.0f, 1e-5f, "contact midpoint y");
+        MPE_CHECK_NEAR (&t, hh.contacts [0].penetration, 1.0f, 1e-6f, "hull-hull depth 1");
+        /* Role swap, METAMORPHIC: with a's marker forced to 0 the pair
+         * runs ellipsoid(b) vs a's inscribed mesh — the mesh is
+         * strictly smaller, so the depth/axis legitimately differ from
+         * the exact-pair case above (the mesh's tilted facet axes win).
+         * What must hold EXACTLY is the symmetry: the detector run as
+         * (a, b) and as (b, a) transforms a's mesh identically (same
+         * float pipeline, identity rotations here), so the depths are
+         * bit-equal, the normals are exact negatives (the negate +
+         * re-rotate mapping — a missing negate would make them EQUAL),
+         * and the contacts coincide (the mesh walk and the closed-form
+         * support see the same directions both ways). Plus honest
+         * bounds: overlap, positive depth, at most the exact pair's
+         * 1.0 — the inscribed mesh can only shrink the pair. */
+        w8.bodies [a9].hull_analytic = 0; /* force the role-swapped branch */
+        collision_data hh2 = {0};
+        MPE_CHECK (&t, mpe_hull_collide_hull (&w8.bodies [a9], &w8.bodies [b9], &hh2, &w8));
+        MPE_CHECK (&t, hh2.contact_count == 1);
+        MPE_CHECK (&t, hh2.contacts [0].penetration > 0.0f);
+        MPE_CHECK (&t, hh2.contacts [0].penetration <= 1.0f + 1e-6f);
+        collision_data hh3 = {0};
+        MPE_CHECK (&t, mpe_hull_collide_hull (&w8.bodies [b9], &w8.bodies [a9], &hh3, &w8));
+        MPE_CHECK (&t, hh3.contact_count == 1);
+        MPE_CHECK_NEAR (&t, hh3.contacts [0].penetration, hh2.contacts [0].penetration, 1e-9f,
+                        "role-swap depth invariant");
+        MPE_CHECK_NEAR (&t, hh3.normal_vector.x, -hh2.normal_vector.x, 1e-6f,
+                        "role-swap normal x negates");
+        MPE_CHECK_NEAR (&t, hh3.normal_vector.y, -hh2.normal_vector.y, 1e-6f,
+                        "role-swap normal y negates");
+        MPE_CHECK_NEAR (&t, hh3.normal_vector.z, -hh2.normal_vector.z, 1e-6f,
+                        "role-swap normal z negates");
+        MPE_CHECK_NEAR (&t, hh3.contacts [0].position.x, hh2.contacts [0].position.x, 1e-6f,
+                        "role-swap contact x invariant");
+        MPE_CHECK_NEAR (&t, hh3.contacts [0].position.y, hh2.contacts [0].position.y, 1e-6f,
+                        "role-swap contact y invariant");
+        MPE_CHECK_NEAR (&t, hh3.contacts [0].position.z, hh2.contacts [0].position.z, 1e-6f,
+                        "role-swap contact z invariant");
+        physics_world_cleanup (&w8);
+    }
+    if (t.failures == 0) {
+        printf ("[PASS] mig WP4 4.6q: analytic ell — exact O(1) SAT closed forms + engine floor/hull-hull + stamps\n");
+        MPE_INFO ("ell pair (2,1,1)+(2,1,1) @3m depth 1, z-90 @2.5m depth 0.5, separated @5.1m;"
+                  " ell-mesh offset 1.05 → 0.95; ell-sphere @2.5 → 0.5; ell-box @2.5 → 0.5"
+                  " (posed A @1.5 → 0.5); 45° floor lowest = 2.5−√2.5, cp z = 0.9486833;"
+                  " hull-hull both-analytic pair depth 1 contact (1.5, 9, 0) + role-swap"
+                  " metamorphic symmetry (depth invariant, normals negate, contact invariant);"
+                  " add_hull stamps hull_analytic + semi (s/2, s/2, h/2), mesh kinds 0");
+    }
+    mpe_test_end (&t);
+    return t.failures;
+}

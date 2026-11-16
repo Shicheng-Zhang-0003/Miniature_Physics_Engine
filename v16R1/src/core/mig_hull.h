@@ -255,4 +255,54 @@ mig_hull_err mig_hull_build_ellipsoid (double a, double b, double c,
                                        mig_hull_point_set *out);
 extern const int mig_hull_ell_faces [MIG_HULL_ELL_FACES * 3];
 
+/* ---- WP4 4.6q: analytic ellipsoid SAT ----
+ * The engine's ell hull kind is an ANALYTIC ellipsoid (semi-axes
+ * (a, b, c) on its body frame), not its inscribed 86-vertex catalog
+ * mesh. These four reference pairs answer the same mig_hull_sat_result
+ * contract as the 2.5.4 mesh SATs: axis FROM the ellipsoid (A) TOWARD
+ * the other shape (B), depth = the translational MTD along it —
+ * "translating A by −axis·depth separates". The ellipsoid A is always
+ * taken in its OWN COM frame, axis-aligned at the origin (the caller
+ * transforms the other body's pose into that frame — rotations
+ * preserve distances, so the SAT depth is frame-independent, the same
+ * argument the 2.5.4 box reference documents). rot[9] is COLUMN-major:
+ * column j (rot[3j], rot[3j+1], rot[3j+2]) is that body's local j-axis
+ * expressed in the frame the pair runs in.
+ *
+ * Axis set (the LEAN smooth-body set — exact for axis-aligned and
+ * face/edge-aligned configs, documented approximate for arbitrarily
+ * rotated resting piles): both bodies' principal triads, the centres
+ * line where one exists, and the fixed 26 directions (6 axes, 8 cube
+ * diagonals /√3, 12 edge midpoints /√2); the mesh pair adds the
+ * mesh's own face normals and vertex/edge-midpoint directions (the
+ * classical radial-body set). Interval feeds go through the same
+ * internal SAT machinery as the mesh pairs, so the separation verdict
+ * is exact and all conventions hold.
+ *
+ * All semi-axis triples, centres, radii and half-extents must be
+ * finite (semis, radius, halves strictly > 0); rotations need finite
+ * columns with sane norms. Refusals mirror the 2.5.4 entries:
+ * mig_hull_null / mig_hull_bad_mesh / mig_hull_bad_count. Results are
+ * written only on success. */
+mig_hull_err mig_hull_sat_ellipsoid_pair (const double semi_a [3],
+                                          const double center_b [3],
+                                          const double rot_b9 [9],
+                                          const double semi_b [3],
+                                          mig_hull_sat_result *out);
+mig_hull_err mig_hull_sat_ellipsoid_mesh (const double semi_a [3],
+                                          const mig_hull_point *verts,
+                                          int vert_count, const int *faces,
+                                          int face_count,
+                                          mig_hull_sat_result *out);
+mig_hull_err mig_hull_sat_ellipsoid_sphere (const double semi_a [3],
+                                            const double center [3],
+                                            double radius,
+                                            mig_hull_sat_result *out);
+mig_hull_err mig_hull_sat_ellipsoid_box (const double semi_a [3],
+                                         const double center_a [3],
+                                         const double rot_a9 [9],
+                                         const double box_center [3],
+                                         const double box_half [3],
+                                         mig_hull_sat_result *out);
+
 #endif /* mig_hull_h */

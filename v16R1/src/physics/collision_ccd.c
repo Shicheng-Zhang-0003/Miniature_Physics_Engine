@@ -56,6 +56,32 @@ static float ccd_min_thickness (const rigidbody *body) {
  * gets when its part walk fails. */
 static bool ccd_hull_support_point (const physics_world *world, const rigidbody *body, vector3 *out) {
     if ((!world) || (!body) || (!out) || (body -> type != object_hull)) { return false; }
+    if (body -> hull_analytic) {
+        /* MIG WP4 4.6q: the analytic ellipsoid's exact lowest surface
+         * point along −ŷ (COM-relative, like the mesh walk below — the
+         * caller adds the body position). The pool is not read. */
+        const vector4 q = body -> orientation;
+        if (!isfinite (q.w) || !isfinite (q.x) || !isfinite (q.y) || !isfinite (q.z)) { return false; }
+        const vector3 ex = {1.0f, 0.0f, 0.0f}, ey = {0.0f, 1.0f, 0.0f}, ez = {0.0f, 0.0f, 1.0f};
+        const vector3 c0 = vector4_rotate_to_vector3 (q, ex);
+        const vector3 c1 = vector4_rotate_to_vector3 (q, ey);
+        const vector3 c2 = vector4_rotate_to_vector3 (q, ez);
+        const double semi [3] = {(double) body -> hull_semi_axes.x, (double) body -> hull_semi_axes.y,
+                                 (double) body -> hull_semi_axes.z};
+        const double col [3][3] = {{c0.x, c0.y, c0.z}, {c1.x, c1.y, c1.z}, {c2.x, c2.y, c2.z}};
+        double denom = 0.0, t [3];
+        for (int i = 0; i < 3; i++) {
+            const double w = -col [i][1]; /* (−ŷ)·column_i */
+            t [i] = semi [i] * semi [i] * w;
+            denom += semi [i] * semi [i] * w * w;
+        }
+        denom = sqrt (denom);
+        if (!isfinite (denom) || denom <= 0.0) { return false; }
+        out -> x = (float) ((t [0] * col [0][0] + t [1] * col [1][0] + t [2] * col [2][0]) / denom);
+        out -> y = (float) ((t [0] * col [0][1] + t [1] * col [1][1] + t [2] * col [2][1]) / denom);
+        out -> z = (float) ((t [0] * col [0][2] + t [1] * col [1][2] + t [2] * col [2][2]) / denom);
+        return true;
+    }
     if ((body -> hull_vert_base < 0) || (body -> hull_vert_count <= 0)) { return false; }
     if ((long) body -> hull_vert_base + (long) body -> hull_vert_count > (long) world -> hull_vert_count) { return false; }
     const vector4 q = body -> orientation;
@@ -79,6 +105,16 @@ static bool ccd_hull_support_point (const physics_world *world, const rigidbody 
     /* Smallest COM-local AABB extent: an honest lower size bound for the
      * catalog shapes (prism: its height axis; pyramids: similar). */
     if ((!world) || (!body) || (body -> type != object_hull)) { return 0.0f; }
+    if (body -> hull_analytic) {
+        /* MIG WP4 4.6q: the ellipsoid's COM-local AABB is
+         * (2a, 2b, 2c) — the same smallest-extent semantics as the mesh
+         * walk below, no pool read. */
+        const float ax = 2.0f * body -> hull_semi_axes.x;
+        const float ay = 2.0f * body -> hull_semi_axes.y;
+        const float az = 2.0f * body -> hull_semi_axes.z;
+        if ((!isfinite (ax)) || (!isfinite (ay)) || (!isfinite (az))) { return 0.0f; }
+        return fminf (ax, fminf (ay, az));
+    }
     if ((body -> hull_vert_base < 0) || (body -> hull_vert_count <= 0)) { return 0.0f; }
     if ((long) body -> hull_vert_base + (long) body -> hull_vert_count > (long) world -> hull_vert_count) { return 0.0f; }
     float minx = FLT_MAX, maxx = -FLT_MAX;

@@ -2592,6 +2592,56 @@ Ledger (new entries get a line, never an edit of a past line):
   registered / 70 blocking / 0 failures; quick 86/86; mgb PASS 44
   FAIL 0 (tier B skips sans s2tui); mfs FTC gated 5/5 (12 ungated
   diags); tui-smoke PASS; make everything green in background.
+- 2026-11-15 — WP4 4.6q (this commit, ANALYTIC ELLIPSOID +
+  SAVE-NAME-SYNC — two user reports on 4.6p, one cosmetic one real).
+  (1) SAVE-NAME-SYNC (cosmetic: "saved CAD objects show as untitled
+  in the main engine's spawner"): cw_save_design now syncs the name
+  FROM the entry FIRST — cad_set_name validates the entry text
+  verbatim (A-Z a-z 0-9 _ -) and a bad name REFUSES the save with
+  the fix in the status line ("save refused (bad-name: use A-Z a-z
+  0-9 _ -)"), never a silent save under the stale build-time name;
+  the old unreachable empty-name auto-fill block is replaced by the
+  sync (the entry's activate signal and load re-fill keep working
+  unchanged). (2) ANALYTIC ELLIPSOID (real: "the ell spawn type
+  lags the engine when spam-spawned and is a faceted 86-vertex
+  polyhedron"): the ell kind's collision truth is now the EXACT
+  O(1) closed-form ellipsoid — rigidbody gains hull_semi_axes
+  (a = b = s/2 equatorial, c = h/2 polar on body z — the 2.6.3
+  (s, h) diameters) + hull_analytic (zeroed at every initializer,
+  stamped by add_hull; the pool slice STAYS for the 2.6.5 gates and
+  the mesh-kind walks), and every consumer reads it: the floor
+  detector (the exact lowest point — a smooth body rests on ONE
+  contact), sphere / cube / hull-hull through FOUR NEW mig_hull SAT
+  references mig_hull_sat_ellipsoid_pair/mesh/sphere/box with the
+  lean axis set (both bodies' principal triads + the centres line
+  + the fixed 26 directions + the mesh's face-normal /
+  vertex / edge-midpoint radial set) feeding the existing interval
+  machinery, hull-hull four-branch (both-analytic pair / A-analytic
+  vs mesh / role-swapped B-analytic with negate+re-rotate / 2.6.4
+  mesh pair), boundary extrema ±||S·Rᵀaxis||, and CCD supports
+  (exact −ŷ lowest point COM-relative, 2·min-semi thickness). The
+  86-vertex pool walk is gone from every ell contact path — no
+  spawn-lag source survives. Inertia stays mesh-props-derived
+  (documented, not gated). Render: the ell kind draws a SMOOTH
+  32×16 parametric unit mesh (482 verts, 960 faces, per-vertex
+  normals = the unit-sphere direction — the main shader's
+  A3_PATCH_29 de-skew handles the instance scale), not the faceted
+  12×8 build. Engine coordinates stay trig-free (hull_meshing.c
+  exempt per header). Suite gate mig_hull_analytic_ell (73rd):
+  hand-verified SAT oracles (pair depth 1 @3 m, z-90 @2.5 m 0.5;
+  ell-mesh 0.95; ell-sphere 0.5; ell-box 0.5 incl. posed A;
+  refusals), the 45°-posed prolate floor manifold (lowest =
+  2.5−√2.5 exactly, cp z = 0.9486833), hull-hull both-analytic
+  pair depth 1 contact (1.5, 9, 0) + role-swap metamorphic
+  symmetry (depth invariant, normals negate, contact invariant),
+  and the add_hull stamp. cad_window.c + rigidbody.* + mig_hull.*
+  + physics_world.c + boundary.c + collision_ccd.c +
+  hull_meshing.c + object_spawner.c (comment) + suite — full
+  battery: engine + build_tui with ZERO warnings (-Werror); suite
+  73 registered / 71 blocking / 0 failures; quick 87/87; mgb PASS
+  44 FAIL 0 (tier B skips sans s2tui); mfs FTC gated 5/5 (12
+  ungated diags); tui-smoke PASS; make everything green in
+  background.
 
 ## §10 Definition of done for v16S (the cut checklist)
 

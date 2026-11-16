@@ -915,3 +915,315 @@ mig_hull_err mig_hull_build_ellipsoid (double a, double b, double c,
     if (e != mig_hull_ok) { return e; }
     return mig_hull_point_set_add (out, 0.0, 0.0, -c);
 }
+
+/* ---- APPENDED WP4 4.6q: analytic ellipsoid SAT ----
+ * See mig_hull.h for the contract. The ellipsoid A is axis-aligned at
+ * the origin of its own frame; support math is the exact O(1) closed
+ * form: along the unit frame direction u the extent is ||S·Rᵀu|| (for
+ * axis-aligned A, ||S u||) and the support point is R·S²·Rᵀu /
+ * ||S·Rᵀu||. Candidate axes feed the SAME interval machinery as the
+ * 2.5.4 mesh pairs, so the axis convention (A toward B) and the exact
+ * early-exit separation come for free. Fixed literals only — the
+ * lean directions reuse the catalog's √2/√3 (no trig, no pow). */
+
+/* The fixed lean directions: 6 axes, 8 cube diagonals /√3, 12 edge
+ * midpoints /√2. */
+static const double mig_hull_lean_dirs [26][3] = {
+    {1.0, 0.0, 0.0}, {-1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, -1.0, 0.0},
+    {0.0, 0.0, 1.0}, {0.0, 0.0, -1.0},
+    { MIG_HULL_SQRT3 / 3.0,  MIG_HULL_SQRT3 / 3.0,  MIG_HULL_SQRT3 / 3.0},
+    { MIG_HULL_SQRT3 / 3.0,  MIG_HULL_SQRT3 / 3.0, -MIG_HULL_SQRT3 / 3.0},
+    { MIG_HULL_SQRT3 / 3.0, -MIG_HULL_SQRT3 / 3.0,  MIG_HULL_SQRT3 / 3.0},
+    { MIG_HULL_SQRT3 / 3.0, -MIG_HULL_SQRT3 / 3.0, -MIG_HULL_SQRT3 / 3.0},
+    {-MIG_HULL_SQRT3 / 3.0,  MIG_HULL_SQRT3 / 3.0,  MIG_HULL_SQRT3 / 3.0},
+    {-MIG_HULL_SQRT3 / 3.0,  MIG_HULL_SQRT3 / 3.0, -MIG_HULL_SQRT3 / 3.0},
+    {-MIG_HULL_SQRT3 / 3.0, -MIG_HULL_SQRT3 / 3.0,  MIG_HULL_SQRT3 / 3.0},
+    {-MIG_HULL_SQRT3 / 3.0, -MIG_HULL_SQRT3 / 3.0, -MIG_HULL_SQRT3 / 3.0},
+    { MIG_HULL_SQRT2 / 2.0,  MIG_HULL_SQRT2 / 2.0, 0.0},
+    { MIG_HULL_SQRT2 / 2.0, -MIG_HULL_SQRT2 / 2.0, 0.0},
+    {-MIG_HULL_SQRT2 / 2.0,  MIG_HULL_SQRT2 / 2.0, 0.0},
+    {-MIG_HULL_SQRT2 / 2.0, -MIG_HULL_SQRT2 / 2.0, 0.0},
+    { MIG_HULL_SQRT2 / 2.0, 0.0,  MIG_HULL_SQRT2 / 2.0},
+    { MIG_HULL_SQRT2 / 2.0, 0.0, -MIG_HULL_SQRT2 / 2.0},
+    {-MIG_HULL_SQRT2 / 2.0, 0.0,  MIG_HULL_SQRT2 / 2.0},
+    {-MIG_HULL_SQRT2 / 2.0, 0.0, -MIG_HULL_SQRT2 / 2.0},
+    {0.0,  MIG_HULL_SQRT2 / 2.0,  MIG_HULL_SQRT2 / 2.0},
+    {0.0,  MIG_HULL_SQRT2 / 2.0, -MIG_HULL_SQRT2 / 2.0},
+    {0.0, -MIG_HULL_SQRT2 / 2.0,  MIG_HULL_SQRT2 / 2.0},
+    {0.0, -MIG_HULL_SQRT2 / 2.0, -MIG_HULL_SQRT2 / 2.0},
+};
+
+static int mig_hull_ell_semi_ok (const double semi [3]) {
+    if (!semi) { return 0; }
+    for (int i = 0; i < 3; i++) {
+        if (!isfinite (semi [i]) || semi [i] <= 0.0) { return 0; }
+    }
+    return 1;
+}
+
+/* rot[9] sanity: finite columns with sane norms (the engine hands us
+ * proper rotations; this only refuses garbage that would poison the
+ * closed forms — a zero column would zero the extent denominator). */
+static int mig_hull_rot_ok (const double rot [9]) {
+    if (!rot) { return 0; }
+    for (int j = 0; j < 3; j++) {
+        double n2 = 0.0;
+        for (int i = 0; i < 3; i++) {
+            const double e = rot [3 * j + i];
+            if (!isfinite (e)) { return 0; }
+            n2 += e * e;
+        }
+        if (n2 < 0.25 || n2 > 4.0) { return 0; } /* column norm ∉ [0.5, 2] */
+    }
+    return 1;
+}
+
+/* Extent (half the support width) of the axis-aligned ellipsoid along
+ * the body-frame direction w: || S w ||. */
+static double mig_hull_ell_ext (const double semi [3], const double w [3]) {
+    double s = 0.0;
+    for (int i = 0; i < 3; i++) { s += semi [i] * semi [i] * w [i] * w [i]; }
+    return sqrt (s);
+}
+
+/* Extent along the frame direction u for a body posed by the
+ * column-major rot[9]: w = Rᵀu = the dot of u with each stored column. */
+static double mig_hull_ell_ext_rot (const double semi [3], const double rot [9],
+                                    const double u [3]) {
+    double w [3];
+    for (int i = 0; i < 3; i++) {
+        w [i] = rot [3 * i + 0] * u [0] + rot [3 * i + 1] * u [1] + rot [3 * i + 2] * u [2];
+    }
+    return mig_hull_ell_ext (semi, w);
+}
+
+static void mig_hull_ell_state_init (mig_hull_sat_state *st) {
+    st -> separated = 0;
+    st -> depth = HUGE_VAL;
+    st -> axis [0] = st -> axis [1] = st -> axis [2] = 0.0;
+}
+
+static mig_hull_err mig_hull_ell_state_finish (const mig_hull_sat_state *st,
+                                               mig_hull_sat_result *out) {
+    if (st -> separated) {
+        out -> overlap = 0;
+        out -> depth = 0.0;
+        out -> axis [0] = st -> axis [0];
+        out -> axis [1] = st -> axis [1];
+        out -> axis [2] = st -> axis [2];
+        return mig_hull_ok;
+    }
+    if (!isfinite (st -> depth)) { return mig_hull_bad_mesh; /* no usable axis */ }
+    out -> overlap = 1;
+    out -> depth = st -> depth;
+    out -> axis [0] = st -> axis [0];
+    out -> axis [1] = st -> axis [1];
+    out -> axis [2] = st -> axis [2];
+    return mig_hull_ok;
+}
+
+/* One lean axis against the AXIS-ALIGNED ellipsoid A at the origin
+ * (semi semi_a) and B's interval [lo_b, hi_b] along the unit u. */
+static void mig_hull_ell_feed (mig_hull_sat_state *st, const double semi_a [3],
+                               const double u [3], double lo_b, double hi_b) {
+    const double h = mig_hull_ell_ext (semi_a, u);
+    mig_hull_sat_feed (st, u, -h, h, lo_b, hi_b);
+}
+
+/* One lean axis against the POSED ellipsoid A (centre ca, rot ra9) and
+ * the axis-aligned box B (centre cb, half bh): intervals along unit u. */
+static void mig_hull_ell_feed_box (mig_hull_sat_state *st, const double semi_a [3],
+                                   const double center_a [3], const double rot_a9 [9],
+                                   const double box_center [3], const double box_half [3],
+                                   const double u [3]) {
+    const double h_a = mig_hull_ell_ext_rot (semi_a, rot_a9, u);
+    const double da = center_a [0] * u [0] + center_a [1] * u [1] + center_a [2] * u [2];
+    const double db = box_center [0] * u [0] + box_center [1] * u [1] + box_center [2] * u [2];
+    const double hb = box_half [0] * fabs (u [0]) + box_half [1] * fabs (u [1]) +
+                      box_half [2] * fabs (u [2]);
+    mig_hull_sat_feed (st, u, da - h_a, da + h_a, db - hb, db + hb);
+}
+
+mig_hull_err mig_hull_sat_ellipsoid_pair (const double semi_a [3], const double center_b [3],
+                                          const double rot_b9 [9], const double semi_b [3],
+                                          mig_hull_sat_result *out) {
+    if ((!semi_a) || (!center_b) || (!rot_b9) || (!semi_b) || (!out)) { return mig_hull_null; }
+    if (!mig_hull_ell_semi_ok (semi_a) || !mig_hull_ell_semi_ok (semi_b)) { return mig_hull_bad_mesh; }
+    if (!mig_hull_rot_ok (rot_b9)) { return mig_hull_bad_mesh; }
+    for (int i = 0; i < 3; i++) {
+        if (!isfinite (center_b [i])) { return mig_hull_bad_mesh; }
+    }
+    mig_hull_sat_state st;
+    mig_hull_ell_state_init (&st);
+    double u [3];
+    const double cbu [3] = {center_b [0], center_b [1], center_b [2]};
+    /* A's principal triad (A is axis-aligned at the origin). */
+    for (int k = 0; k < 3; k++) {
+        u [0] = u [1] = u [2] = 0.0;
+        u [k] = 1.0;
+        const double h_a = mig_hull_ell_ext (semi_a, u);
+        const double h_b = mig_hull_ell_ext_rot (semi_b, rot_b9, u);
+        const double d = cbu [0] * u [0] + cbu [1] * u [1] + cbu [2] * u [2];
+        mig_hull_sat_feed (&st, u, -h_a, h_a, d - h_b, d + h_b);
+    }
+    /* B's principal triad (its stored columns). */
+    for (int k = 0; k < 3; k++) {
+        u [0] = rot_b9 [3 * k + 0];
+        u [1] = rot_b9 [3 * k + 1];
+        u [2] = rot_b9 [3 * k + 2];
+        const double h_a = mig_hull_ell_ext (semi_a, u);
+        const double h_b = mig_hull_ell_ext_rot (semi_b, rot_b9, u);
+        const double d = cbu [0] * u [0] + cbu [1] * u [1] + cbu [2] * u [2];
+        mig_hull_sat_feed (&st, u, -h_a, h_a, d - h_b, d + h_b);
+    }
+    /* The centres line. */
+    const double m2 = cbu [0] * cbu [0] + cbu [1] * cbu [1] + cbu [2] * cbu [2];
+    if (m2 > MIG_HULL_AXIS_EPS * MIG_HULL_AXIS_EPS) {
+        const double m = sqrt (m2);
+        u [0] = cbu [0] / m; u [1] = cbu [1] / m; u [2] = cbu [2] / m;
+        const double h_a = mig_hull_ell_ext (semi_a, u);
+        const double h_b = mig_hull_ell_ext_rot (semi_b, rot_b9, u);
+        mig_hull_sat_feed (&st, u, -h_a, h_a, m - h_b, m + h_b);
+    }
+    /* The fixed 26. */
+    for (int k = 0; k < 26; k++) {
+        const double *fu = mig_hull_lean_dirs [k];
+        const double h_a = mig_hull_ell_ext (semi_a, fu);
+        const double h_b = mig_hull_ell_ext_rot (semi_b, rot_b9, fu);
+        const double d = cbu [0] * fu [0] + cbu [1] * fu [1] + cbu [2] * fu [2];
+        mig_hull_sat_feed (&st, fu, -h_a, h_a, d - h_b, d + h_b);
+    }
+    return mig_hull_ell_state_finish (&st, out);
+}
+
+mig_hull_err mig_hull_sat_ellipsoid_mesh (const double semi_a [3], const mig_hull_point *verts,
+                                          int vert_count, const int *faces, int face_count,
+                                          mig_hull_sat_result *out) {
+    if ((!semi_a) || (!verts) || (!faces) || (!out)) { return mig_hull_null; }
+    if (!mig_hull_ell_semi_ok (semi_a)) { return mig_hull_bad_mesh; }
+    const mig_hull_err e = mig_hull_sat_validate (verts, vert_count, faces, face_count);
+    if (e != mig_hull_ok) { return e; }
+    mig_hull_sat_state st;
+    mig_hull_ell_state_init (&st);
+    double u [3], lo, hi;
+    /* A's principal triad. */
+    for (int k = 0; k < 3; k++) {
+        u [0] = u [1] = u [2] = 0.0;
+        u [k] = 1.0;
+        mig_hull_support_range (verts, vert_count, u, &lo, &hi);
+        mig_hull_ell_feed (&st, semi_a, u, lo, hi);
+    }
+    /* The mesh's own face normals (its SAT-mandated family). */
+    for (int f = 0; f < face_count; f++) {
+        const mig_hull_point *a = &verts [faces [3 * f + 0]];
+        const mig_hull_point *b = &verts [faces [3 * f + 1]];
+        const mig_hull_point *c = &verts [faces [3 * f + 2]];
+        const double e1 [3] = {b -> x - a -> x, b -> y - a -> y, b -> z - a -> z};
+        const double e2 [3] = {c -> x - a -> x, c -> y - a -> y, c -> z - a -> z};
+        double n [3];
+        if (!mig_hull_cross_unit (e1, e2, n)) { continue; }
+        mig_hull_support_range (verts, vert_count, n, &lo, &hi);
+        mig_hull_ell_feed (&st, semi_a, n, lo, hi);
+    }
+    /* Vertex and edge-midpoint directions (the radial-body set). */
+    for (int i = 0; i < vert_count; i++) {
+        const double v [3] = {verts [i].x, verts [i].y, verts [i].z};
+        if (!mig_hull_axis_unit (v, u)) { continue; }
+        mig_hull_support_range (verts, vert_count, u, &lo, &hi);
+        mig_hull_ell_feed (&st, semi_a, u, lo, hi);
+    }
+    for (int f = 0; f < face_count; f++) {
+        for (int e = 0; e < 3; e++) {
+            const int i0 = faces [3 * f + e], i1 = faces [3 * f + (e + 1) % 3];
+            const double m [3] = {(verts [i0].x + verts [i1].x) * 0.5,
+                                  (verts [i0].y + verts [i1].y) * 0.5,
+                                  (verts [i0].z + verts [i1].z) * 0.5};
+            if (!mig_hull_axis_unit (m, u)) { continue; }
+            mig_hull_support_range (verts, vert_count, u, &lo, &hi);
+            mig_hull_ell_feed (&st, semi_a, u, lo, hi);
+        }
+    }
+    /* The fixed 26. */
+    for (int k = 0; k < 26; k++) {
+        mig_hull_support_range (verts, vert_count, mig_hull_lean_dirs [k], &lo, &hi);
+        mig_hull_ell_feed (&st, semi_a, mig_hull_lean_dirs [k], lo, hi);
+    }
+    return mig_hull_ell_state_finish (&st, out);
+}
+
+mig_hull_err mig_hull_sat_ellipsoid_sphere (const double semi_a [3], const double center [3],
+                                            double radius, mig_hull_sat_result *out) {
+    if ((!semi_a) || (!center) || (!out)) { return mig_hull_null; }
+    if (!mig_hull_ell_semi_ok (semi_a)) { return mig_hull_bad_mesh; }
+    if (!isfinite (radius) || radius <= 0.0) { return mig_hull_bad_mesh; }
+    for (int i = 0; i < 3; i++) {
+        if (!isfinite (center [i])) { return mig_hull_bad_mesh; }
+    }
+    mig_hull_sat_state st;
+    mig_hull_ell_state_init (&st);
+    double u [3];
+    /* The sphere is rotation-invariant: A's triad + the centres line +
+     * the fixed 26 are the whole lean set (its interval along any u is
+     * c·u ∓ radius). */
+    for (int k = 0; k < 3; k++) {
+        u [0] = u [1] = u [2] = 0.0;
+        u [k] = 1.0;
+        const double d = center [0] * u [0] + center [1] * u [1] + center [2] * u [2];
+        mig_hull_ell_feed (&st, semi_a, u, d - radius, d + radius);
+    }
+    const double m2 = center [0] * center [0] + center [1] * center [1] + center [2] * center [2];
+    if (m2 > MIG_HULL_AXIS_EPS * MIG_HULL_AXIS_EPS) {
+        const double m = sqrt (m2);
+        u [0] = center [0] / m; u [1] = center [1] / m; u [2] = center [2] / m;
+        mig_hull_ell_feed (&st, semi_a, u, m - radius, m + radius);
+    }
+    for (int k = 0; k < 26; k++) {
+        const double *fu = mig_hull_lean_dirs [k];
+        const double d = center [0] * fu [0] + center [1] * fu [1] + center [2] * fu [2];
+        mig_hull_ell_feed (&st, semi_a, fu, d - radius, d + radius);
+    }
+    return mig_hull_ell_state_finish (&st, out);
+}
+
+mig_hull_err mig_hull_sat_ellipsoid_box (const double semi_a [3], const double center_a [3],
+                                         const double rot_a9 [9], const double box_center [3],
+                                         const double box_half [3], mig_hull_sat_result *out) {
+    if ((!semi_a) || (!center_a) || (!rot_a9) || (!box_center) || (!box_half) || (!out)) {
+        return mig_hull_null;
+    }
+    if (!mig_hull_ell_semi_ok (semi_a)) { return mig_hull_bad_mesh; }
+    if (!mig_hull_rot_ok (rot_a9)) { return mig_hull_bad_mesh; }
+    for (int i = 0; i < 3; i++) {
+        if (!isfinite (center_a [i]) || !isfinite (box_center [i]) ||
+            !isfinite (box_half [i]) || box_half [i] <= 0.0) {
+            return mig_hull_bad_mesh;
+        }
+    }
+    mig_hull_sat_state st;
+    mig_hull_ell_state_init (&st);
+    double u [3];
+    /* A's principal triad (its stored columns) + the box's face
+     * normals — the two SAT-mandated families. */
+    for (int k = 0; k < 3; k++) {
+        u [0] = rot_a9 [3 * k + 0]; u [1] = rot_a9 [3 * k + 1]; u [2] = rot_a9 [3 * k + 2];
+        mig_hull_ell_feed_box (&st, semi_a, center_a, rot_a9, box_center, box_half, u);
+        u [0] = u [1] = u [2] = 0.0;
+        u [k] = 1.0;
+        mig_hull_ell_feed_box (&st, semi_a, center_a, rot_a9, box_center, box_half, u);
+    }
+    /* The centres line (box centre − ellipsoid centre). */
+    const double dv [3] = {box_center [0] - center_a [0], box_center [1] - center_a [1],
+                           box_center [2] - center_a [2]};
+    const double m2 = dv [0] * dv [0] + dv [1] * dv [1] + dv [2] * dv [2];
+    if (m2 > MIG_HULL_AXIS_EPS * MIG_HULL_AXIS_EPS) {
+        const double m = sqrt (m2);
+        u [0] = dv [0] / m; u [1] = dv [1] / m; u [2] = dv [2] / m;
+        mig_hull_ell_feed_box (&st, semi_a, center_a, rot_a9, box_center, box_half, u);
+    }
+    /* The fixed 26. */
+    for (int k = 0; k < 26; k++) {
+        mig_hull_ell_feed_box (&st, semi_a, center_a, rot_a9, box_center, box_half,
+                               mig_hull_lean_dirs [k]);
+    }
+    return mig_hull_ell_state_finish (&st, out);
+}

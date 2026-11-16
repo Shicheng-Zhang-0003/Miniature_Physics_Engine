@@ -1999,6 +1999,14 @@ int physics_world_add_hull (physics_world *world, mpe_hull_shape_kind kind,
     rb -> hull_kind = (int) kind;
     rb -> hull_size_s = (float) s;
     rb -> hull_size_h = (float) h;
+    /* MIG WP4 4.6q: the ell kind is ANALYTIC — stamp the marker and the
+     * exact semi-axes (a = b = s/2, c = h/2, poles on body z). The pool
+     * slices above stay (the 2.6.5 gates and non-analytic fallbacks
+     * read them); mesh kinds keep the marker 0 and the mesh walk. */
+    rb -> hull_analytic = (kind == mpe_hull_shape_ellipsoid) ? 1 : 0;
+    rb -> hull_semi_axes = (kind == mpe_hull_shape_ellipsoid)
+        ? (vector3) {(float) (s / 2.0), (float) (s / 2.0), (float) (h / 2.0)}
+        : (vector3) {0.0f, 0.0f, 0.0f};
     if (world -> next_object_id == 0 || world -> next_object_id == 0xFFFFFFFFu) { world -> next_object_id = 1; }
     rb -> object_id = world -> next_object_id++;
     if (world -> next_object_id == 0 || world -> next_object_id == 0xFFFFFFFFu) { world -> next_object_id = 1; }
@@ -2025,6 +2033,85 @@ static bool mpe_hull_slice_ok (const physics_world *world, const rigidbody *rb) 
     if ((long) rb -> hull_face_base + (long) rb -> hull_face_count > (long) world -> hull_face_count) { return false; }
     return true;
 }
+
+/* ---- MIG WP4 4.6q: analytic-ellipsoid pose helpers ----
+ * The ell kind's collision truth is the ANALYTIC ellipsoid (semi-axes
+ * (a, b, c) on the body frame; a = b = s/2, c = h/2), not its
+ * inscribed pool mesh. mpe_ell_body_axes stamps the WORLD-from-body
+ * rotation COLUMN-major (column j = rot[3j..3j+2] is the body j-axis
+ * in world coords — the convention mig_hull_sat_ellipsoid_*
+ * consumes). mpe_ell_support_point is the exact O(1) closed form
+ * along a UNIT world direction u: pos + R·S²·Rᵀu / ||S·Rᵀu||, where
+ * the denominator ||S·Rᵀu|| is also the support extent (S = diag(semi))
+ * — hand-verified and pinned by the 4.6q gate. */
+static void mpe_ell_body_axes (const rigidbody *body, double rot [9]) {
+    const vector3 ex = {1.0f, 0.0f, 0.0f};
+    const vector3 ey = {0.0f, 1.0f, 0.0f};
+    const vector3 ez = {0.0f, 0.0f, 1.0f};
+    const vector3 c0 = vector4_rotate_to_vector3 (body -> orientation, ex);
+    const vector3 c1 = vector4_rotate_to_vector3 (body -> orientation, ey);
+    const vector3 c2 = vector4_rotate_to_vector3 (body -> orientation, ez);
+    rot [0] = (double) c0.x; rot [1] = (double) c0.y; rot [2] = (double) c0.z;
+    rot [3] = (double) c1.x; rot [4] = (double) c1.y; rot [5] = (double) c1.z;
+    rot [6] = (double) c2.x; rot [7] = (double) c2.y; rot [8] = (double) c2.z;
+}
+
+static void mpe_hull_semi3 (const rigidbody *body, double semi [3]) {
+    semi [0] = (double) body -> hull_semi_axes.x;
+    semi [1] = (double) body -> hull_semi_axes.y;
+    semi [2] = (double) body -> hull_semi_axes.z;
+}
+
+static vector3 mpe_ell_support_point (const rigidbody *body, const double rot [9], vector3 dir) {
+    const double u [3] = {(double) dir.x, (double) dir.y, (double) dir.z};
+    const double semi [3] = {(double) body -> hull_semi_axes.x, (double) body -> hull_semi_axes.y,
+                             (double) body -> hull_semi_axes.z};
+    double w [3], t [3];
+    for (int i = 0; i < 3; i++) {
+        w [i] = rot [3 * i] * u [0] + rot [3 * i + 1] * u [1] + rot [3 * i + 2] * u [2];
+        t [i] = semi [i] * semi [i] * w [i];
+    }
+    double denom = 0.0;
+    for (int i = 0; i < 3; i++) { denom += semi [i] * semi [i] * w [i] * w [i]; }
+    denom = sqrt (denom);
+    vector3 out = body -> position;
+    if (denom > 0.0) {
+        out.x += (float) ((t [0] * rot [0] + t [1] * rot [3] + t [2] * rot [6]) / denom);
+        out.y += (float) ((t [0] * rot [1] + t [1] * rot [4] + t [2] * rot [7]) / denom);
+        out.z += (float) ((t [0] * rot [2] + t [1] * rot [5] + t [2] * rot [8]) / denom);
+    }
+    return out;
+}
+
+/* Support point of a hull body along the unit world direction dir:
+ * analytic ellipsoids use the exact closed form, mesh kinds walk the
+ * pool slice (world verts, max p·dir) — the shared contact-point
+ * construction for the hull-hull detector. */
+static bool mpe_hull_support_along (const physics_world *world, const rigidbody *body,
+                                    const double rot [9], vector3 dir, vector3 *out) {
+    if ((!body) || (!out)) { return false; }
+    if (body -> hull_analytic) {
+        if (!rot) { return false; }
+        *out = mpe_ell_support_point (body, rot, dir);
+        return true;
+    }
+    if (!world) { return false; }
+    if (!mpe_hull_slice_ok (world, body)) { return false; }
+    bool found = false;
+    float best = -FLT_MAX;
+    vector3 best_p = body -> position;
+    for (int i = 0; i < body -> hull_vert_count; i++) {
+        const mig_hull_point *v = &world -> hull_verts [body -> hull_vert_base + i];
+        vector3 p = vector4_rotate_to_vector3 (body -> orientation,
+                                               (vector3) {(float) v -> x, (float) v -> y, (float) v -> z});
+        p = simd_add (p, body -> position);
+        const float d = vector3_dot (p, dir);
+        if ((!found) || (d > best)) { best = d; best_p = p; found = true; }
+    }
+    if (!found) { return false; }
+    *out = best_p;
+    return true;
+}
 bool physics_world_hull_floor_detect (physics_world *world, rigidbody *hull,
                                       float plane_y, collision_data *out) {
     if ((!world) || (!hull) || (!out) || (!world -> bodies)) { return false; }
@@ -2039,18 +2126,36 @@ bool physics_world_hull_floor_detect (physics_world *world, rigidbody *hull,
     vector3 candidate_positions [MIG_HULL_MAX_VERTS];
     float candidate_penetrations [MIG_HULL_MAX_VERTS];
     int candidate_count = 0;
-    for (int i = 0; i < hull -> hull_vert_count; i++) {
-        const mig_hull_point *v = &world -> hull_verts [hull -> hull_vert_base + i];
-        vector3 p = vector4_rotate_to_vector3 (q, (vector3) {(float) v -> x, (float) v -> y, (float) v -> z});
-        p = simd_add (p, hull -> position);
+    if (hull -> hull_analytic) {
+        /* WP4 4.6q: the analytic ellipsoid's exact lowest surface
+         * point — a smooth body rests on ONE contact, and the
+         * inscribed mesh would understate the depth and misplace it. */
+        double rot [9];
+        mpe_ell_body_axes (hull, rot);
+        const vector3 down = {0.0f, -1.0f, 0.0f};
+        const vector3 p = mpe_ell_support_point (hull, rot, down);
         if ((!isfinite (p.x)) || (!isfinite (p.y)) || (!isfinite (p.z))) { return false; }
         const float penetration = plane_y - p.y;
-        /* Slop-gated like collision_static_plane_cube: admit within slop
-         * as zero-depth for persistent friction, no bounce. */
+        /* Slop-gated like the mesh walk below. */
         if (penetration > -cfg -> solver.penetration_slop) {
-            candidate_positions [candidate_count] = p;
-            candidate_penetrations [candidate_count] = (penetration > 0.0f) ? penetration : 0.0f;
-            candidate_count++;
+            candidate_positions [0] = p;
+            candidate_penetrations [0] = (penetration > 0.0f) ? penetration : 0.0f;
+            candidate_count = 1;
+        }
+    } else {
+        for (int i = 0; i < hull -> hull_vert_count; i++) {
+            const mig_hull_point *v = &world -> hull_verts [hull -> hull_vert_base + i];
+            vector3 p = vector4_rotate_to_vector3 (q, (vector3) {(float) v -> x, (float) v -> y, (float) v -> z});
+            p = simd_add (p, hull -> position);
+            if ((!isfinite (p.x)) || (!isfinite (p.y)) || (!isfinite (p.z))) { return false; }
+            const float penetration = plane_y - p.y;
+            /* Slop-gated like collision_static_plane_cube: admit within slop
+             * as zero-depth for persistent friction, no bounce. */
+            if (penetration > -cfg -> solver.penetration_slop) {
+                candidate_positions [candidate_count] = p;
+                candidate_penetrations [candidate_count] = (penetration > 0.0f) ? penetration : 0.0f;
+                candidate_count++;
+            }
         }
     }
     if (candidate_count == 0) { return false; }
@@ -2095,11 +2200,21 @@ bool mpe_hull_collide_sphere (rigidbody *hull, rigidbody *sphere, void *out_p, m
     if ((!isfinite (c_local.x)) || (!isfinite (c_local.y)) || (!isfinite (c_local.z))) { return false; }
     mig_hull_sat_result r;
     const double center [3] = {(double) c_local.x, (double) c_local.y, (double) c_local.z};
-    const mig_hull_err e = mig_hull_sat_hull_sphere (&world -> hull_verts [hull -> hull_vert_base],
-                                                     hull -> hull_vert_count,
-                                                     &world -> hull_faces [hull -> hull_face_base],
-                                                     hull -> hull_face_count,
-                                                     center, (double) sphere -> radius, &r);
+    mig_hull_err e;
+    if (hull -> hull_analytic) {
+        /* WP4 4.6q: analytic ellipsoid vs sphere — the sphere centre is
+         * already in the hull's COM-local frame, where the ellipsoid is
+         * axis-aligned at the origin. */
+        double semi [3];
+        mpe_hull_semi3 (hull, semi);
+        e = mig_hull_sat_ellipsoid_sphere (semi, center, (double) sphere -> radius, &r);
+    } else {
+        e = mig_hull_sat_hull_sphere (&world -> hull_verts [hull -> hull_vert_base],
+                                      hull -> hull_vert_count,
+                                      &world -> hull_faces [hull -> hull_face_base],
+                                      hull -> hull_face_count,
+                                      center, (double) sphere -> radius, &r);
+    }
     if (e != mig_hull_ok) { return false; }
     if (!r.overlap) { return false; }
     /* Axis: hull-local, FROM the hull TOWARD the sphere → world. */
@@ -2133,24 +2248,49 @@ bool mpe_hull_collide_cube (rigidbody *hull, rigidbody *cube, void *out_p, mpe_w
     const vector4 qc = cube -> orientation;
     const vector4 qc_conj = {qc.w, -qc.x, -qc.y, -qc.z};
     const vector4 qh = hull -> orientation;
-    mig_hull_point local [MIG_HULL_MAX_VERTS];
-    for (int i = 0; i < hull -> hull_vert_count; i++) {
-        const mig_hull_point *v = &world -> hull_verts [hull -> hull_vert_base + i];
-        vector3 p = vector4_rotate_to_vector3 (qh, (vector3) {(float) v -> x, (float) v -> y, (float) v -> z});
-        p = simd_add (p, hull -> position);
-        p = simd_sub (p, cube -> position);
-        p = vector4_rotate_to_vector3 (qc_conj, p);
-        if ((!isfinite (p.x)) || (!isfinite (p.y)) || (!isfinite (p.z))) { return false; }
-        local [i].x = (double) p.x;
-        local [i].y = (double) p.y;
-        local [i].z = (double) p.z;
-    }
     mig_hull_sat_result r;
-    const double center [3] = {0.0, 0.0, 0.0};
-    const double half [3] = {(double) he.x, (double) he.y, (double) he.z};
-    const mig_hull_err e = mig_hull_sat_hull_box (local, hull -> hull_vert_count,
-                                                  &world -> hull_faces [hull -> hull_face_base],
-                                                  hull -> hull_face_count, center, half, &r);
+    mig_hull_err e;
+    if (hull -> hull_analytic) {
+        /* WP4 4.6q: analytic ellipsoid vs box — pose the ellipsoid in
+         * the cube's COM-local frame (there the box is axis-aligned at
+         * the origin) and run the 4.6q reference. Rotations preserve
+         * distances, so the SAT depth is frame-independent. */
+        double semi [3];
+        mpe_hull_semi3 (hull, semi);
+        const vector3 c_local = vector4_rotate_to_vector3 (qc_conj, simd_sub (hull -> position, cube -> position));
+        if ((!isfinite (c_local.x)) || (!isfinite (c_local.y)) || (!isfinite (c_local.z))) { return false; }
+        double rot_a [9];
+        mpe_ell_body_axes (hull, rot_a);
+        for (int k = 0; k < 3; k++) { /* each body column through qc_conj */
+            const vector3 col = vector4_rotate_to_vector3 (qc_conj,
+                                                           (vector3) {(float) rot_a [3 * k], (float) rot_a [3 * k + 1], (float) rot_a [3 * k + 2]});
+            rot_a [3 * k] = (double) col.x;
+            rot_a [3 * k + 1] = (double) col.y;
+            rot_a [3 * k + 2] = (double) col.z;
+        }
+        const double ca [3] = {(double) c_local.x, (double) c_local.y, (double) c_local.z};
+        const double bc [3] = {0.0, 0.0, 0.0};
+        const double bh [3] = {(double) he.x, (double) he.y, (double) he.z};
+        e = mig_hull_sat_ellipsoid_box (semi, ca, rot_a, bc, bh, &r);
+    } else {
+        mig_hull_point local [MIG_HULL_MAX_VERTS];
+        for (int i = 0; i < hull -> hull_vert_count; i++) {
+            const mig_hull_point *v = &world -> hull_verts [hull -> hull_vert_base + i];
+            vector3 p = vector4_rotate_to_vector3 (qh, (vector3) {(float) v -> x, (float) v -> y, (float) v -> z});
+            p = simd_add (p, hull -> position);
+            p = simd_sub (p, cube -> position);
+            p = vector4_rotate_to_vector3 (qc_conj, p);
+            if ((!isfinite (p.x)) || (!isfinite (p.y)) || (!isfinite (p.z))) { return false; }
+            local [i].x = (double) p.x;
+            local [i].y = (double) p.y;
+            local [i].z = (double) p.z;
+        }
+        const double center [3] = {0.0, 0.0, 0.0};
+        const double half [3] = {(double) he.x, (double) he.y, (double) he.z};
+        e = mig_hull_sat_hull_box (local, hull -> hull_vert_count,
+                                   &world -> hull_faces [hull -> hull_face_base],
+                                   hull -> hull_face_count, center, half, &r);
+    }
     if (e != mig_hull_ok) { return false; }
     if (!r.overlap) { return false; }
     /* Axis: cube-local, FROM the hull TOWARD the box → world. */
@@ -2181,56 +2321,132 @@ bool mpe_hull_collide_hull (rigidbody *a, rigidbody *b, void *out_p, mpe_world_t
     if ((a -> type != object_hull) || (b -> type != object_hull)) { return false; }
     if (!mpe_world_cfg (world) -> composite.hull) { world -> hull_flag_skips++; return false; }
     if ((!mpe_hull_slice_ok (world, a)) || (!mpe_hull_slice_ok (world, b))) { return false; }
-    /* B's vertices into A's COM-local frame; A's stored slice is already
-     * local, so the 2.6.4 generic pair applies unchanged. */
+    /* Four pair shapes: BOTH analytic (the exact ellipsoid-pair
+     * reference — two exact ellipsoids must not degenerate to one of
+     * them vs the other's smaller inscribed mesh), A analytic (B is a
+     * mesh kind: B's mesh into A's COM-local frame), B analytic (the
+     * reference runs with the ELLIPSOID as its A — axis-aligned at the
+     * origin — and A's mesh transformed into B's frame), or the 2.6.4
+     * mesh pair unchanged. Rotations preserve distances, so the SAT
+     * depth is frame-independent in every branch. */
     const vector4 qa = a -> orientation;
     const vector4 qa_conj = {qa.w, -qa.x, -qa.y, -qa.z};
     const vector4 qb = b -> orientation;
-    mig_hull_point localb [MIG_HULL_MAX_VERTS];
-    for (int i = 0; i < b -> hull_vert_count; i++) {
-        const mig_hull_point *v = &world -> hull_verts [b -> hull_vert_base + i];
-        vector3 p = vector4_rotate_to_vector3 (qb, (vector3) {(float) v -> x, (float) v -> y, (float) v -> z});
-        p = simd_add (p, b -> position);
-        p = simd_sub (p, a -> position);
-        p = vector4_rotate_to_vector3 (qa_conj, p);
-        if ((!isfinite (p.x)) || (!isfinite (p.y)) || (!isfinite (p.z))) { return false; }
-        localb [i].x = (double) p.x;
-        localb [i].y = (double) p.y;
-        localb [i].z = (double) p.z;
-    }
     mig_hull_sat_result r;
-    const mig_hull_err e = mig_hull_sat_hull_hull (&world -> hull_verts [a -> hull_vert_base], a -> hull_vert_count,
-                                                   &world -> hull_faces [a -> hull_face_base], a -> hull_face_count,
-                                                   localb, b -> hull_vert_count,
-                                                   &world -> hull_faces [b -> hull_face_base], b -> hull_face_count,
-                                                   &r);
+    mig_hull_err e;
+    if ((a -> hull_analytic) && (b -> hull_analytic)) {
+        /* WP4 4.6q: both exact — the ellipsoid-pair reference. B is
+         * posed in A's COM-local frame: centre through qa_conj, each
+         * stored column re-rotated by qa_conj (columns stay columns). */
+        double semi_a [3], semi_b3 [3];
+        mpe_hull_semi3 (a, semi_a);
+        mpe_hull_semi3 (b, semi_b3);
+        const vector3 c_b_local = vector4_rotate_to_vector3 (qa_conj, simd_sub (b -> position, a -> position));
+        if ((!isfinite (c_b_local.x)) || (!isfinite (c_b_local.y)) || (!isfinite (c_b_local.z))) { return false; }
+        double rot_b_local [9];
+        mpe_ell_body_axes (b, rot_b_local);
+        for (int k = 0; k < 3; k++) {
+            const vector3 col = vector4_rotate_to_vector3 (qa_conj,
+                                                           (vector3) {(float) rot_b_local [3 * k], (float) rot_b_local [3 * k + 1], (float) rot_b_local [3 * k + 2]});
+            rot_b_local [3 * k] = (double) col.x;
+            rot_b_local [3 * k + 1] = (double) col.y;
+            rot_b_local [3 * k + 2] = (double) col.z;
+        }
+        const double cb [3] = {(double) c_b_local.x, (double) c_b_local.y, (double) c_b_local.z};
+        e = mig_hull_sat_ellipsoid_pair (semi_a, cb, rot_b_local, semi_b3, &r);
+    } else if (a -> hull_analytic) {
+        /* WP4 4.6q: A analytic, B a mesh kind — B's mesh into A's
+         * frame, where the ellipsoid is axis-aligned at the origin. */
+        double semi_a [3];
+        mpe_hull_semi3 (a, semi_a);
+        mig_hull_point localb [MIG_HULL_MAX_VERTS];
+        for (int i = 0; i < b -> hull_vert_count; i++) {
+            const mig_hull_point *v = &world -> hull_verts [b -> hull_vert_base + i];
+            vector3 p = vector4_rotate_to_vector3 (qb, (vector3) {(float) v -> x, (float) v -> y, (float) v -> z});
+            p = simd_add (p, b -> position);
+            p = simd_sub (p, a -> position);
+            p = vector4_rotate_to_vector3 (qa_conj, p);
+            if ((!isfinite (p.x)) || (!isfinite (p.y)) || (!isfinite (p.z))) { return false; }
+            localb [i].x = (double) p.x;
+            localb [i].y = (double) p.y;
+            localb [i].z = (double) p.z;
+        }
+        e = mig_hull_sat_ellipsoid_mesh (semi_a, localb, b -> hull_vert_count,
+                                         &world -> hull_faces [b -> hull_face_base],
+                                         b -> hull_face_count, &r);
+    } else if (b -> hull_analytic) {
+        /* WP4 4.6q: B analytic, A a mesh kind — the reference's A is
+         * the ellipsoid (b, axis-aligned at ITS origin); A's mesh is
+         * transformed into b's frame. The result axis points FROM the
+         * ellipsoid (b) TOWARD the mesh (a) in b-local — negated and
+         * re-expressed a-local in the shared consumption below. */
+        double semi_b3 [3];
+        mpe_hull_semi3 (b, semi_b3);
+        const vector4 qb_conj = {qb.w, -qb.x, -qb.y, -qb.z};
+        mig_hull_point locala [MIG_HULL_MAX_VERTS];
+        for (int i = 0; i < a -> hull_vert_count; i++) {
+            const mig_hull_point *v = &world -> hull_verts [a -> hull_vert_base + i];
+            vector3 p = vector4_rotate_to_vector3 (qa, (vector3) {(float) v -> x, (float) v -> y, (float) v -> z});
+            p = simd_add (p, a -> position);
+            p = simd_sub (p, b -> position);
+            p = vector4_rotate_to_vector3 (qb_conj, p);
+            if ((!isfinite (p.x)) || (!isfinite (p.y)) || (!isfinite (p.z))) { return false; }
+            locala [i].x = (double) p.x;
+            locala [i].y = (double) p.y;
+            locala [i].z = (double) p.z;
+        }
+        e = mig_hull_sat_ellipsoid_mesh (semi_b3, locala, a -> hull_vert_count,
+                                         &world -> hull_faces [a -> hull_face_base],
+                                         a -> hull_face_count, &r);
+    } else {
+        /* B's vertices into A's COM-local frame; A's stored slice is
+         * already local, so the 2.6.4 generic pair applies unchanged. */
+        mig_hull_point localb [MIG_HULL_MAX_VERTS];
+        for (int i = 0; i < b -> hull_vert_count; i++) {
+            const mig_hull_point *v = &world -> hull_verts [b -> hull_vert_base + i];
+            vector3 p = vector4_rotate_to_vector3 (qb, (vector3) {(float) v -> x, (float) v -> y, (float) v -> z});
+            p = simd_add (p, b -> position);
+            p = simd_sub (p, a -> position);
+            p = vector4_rotate_to_vector3 (qa_conj, p);
+            if ((!isfinite (p.x)) || (!isfinite (p.y)) || (!isfinite (p.z))) { return false; }
+            localb [i].x = (double) p.x;
+            localb [i].y = (double) p.y;
+            localb [i].z = (double) p.z;
+        }
+        e = mig_hull_sat_hull_hull (&world -> hull_verts [a -> hull_vert_base], a -> hull_vert_count,
+                                    &world -> hull_faces [a -> hull_face_base], a -> hull_face_count,
+                                    localb, b -> hull_vert_count,
+                                    &world -> hull_faces [b -> hull_face_base], b -> hull_face_count,
+                                    &r);
+    }
     if (e != mig_hull_ok) { return false; }
     if (!r.overlap) { return false; }
-    /* Axis: A-local, FROM A TOWARD B → world. */
-    const vector3 n_local = {(float) r.axis [0], (float) r.axis [1], (float) r.axis [2]};
+    /* Axis: A-local, FROM A TOWARD B → world. For the b-analytic
+     * branch the SAT ran with the ellipsoid as its A (axis from b
+     * toward a, b-local): negate to a→b, then express a-local. */
+    vector3 n_local;
+    if ((b -> hull_analytic) && (!a -> hull_analytic)) {
+        const vector3 nl_b = {(float) r.axis [0], (float) r.axis [1], (float) r.axis [2]};
+        const vector3 nl_ba_world = vector4_rotate_to_vector3 (qb, nl_b);
+        n_local = vector4_rotate_to_vector3 (qa_conj, vector3_scaling (nl_ba_world, -1.0f));
+    } else {
+        n_local = (vector3) {(float) r.axis [0], (float) r.axis [1], (float) r.axis [2]};
+    }
     const vector3 n = vector4_rotate_to_vector3 (qa, n_local);
     if ((!isfinite (n.x)) || (!isfinite (n.y)) || (!isfinite (n.z))) { return false; }
     float depth = (float) r.depth;
     if (depth < 0.0f) { depth = 0.0f; }
     /* Contact: midpoint of the two SAT support points along ±n (the
-     * standard single-point SAT contact approximation). */
-    float best_a = -FLT_MAX;
-    float best_b = FLT_MAX;
-    vector3 pa = a -> position, pb = b -> position;
-    for (int i = 0; i < a -> hull_vert_count; i++) {
-        const mig_hull_point *v = &world -> hull_verts [a -> hull_vert_base + i];
-        vector3 p = vector4_rotate_to_vector3 (qa, (vector3) {(float) v -> x, (float) v -> y, (float) v -> z});
-        p = simd_add (p, a -> position);
-        const float d = vector3_dot (p, n);
-        if (d > best_a) { best_a = d; pa = p; }
-    }
-    for (int i = 0; i < b -> hull_vert_count; i++) {
-        const mig_hull_point *v = &world -> hull_verts [b -> hull_vert_base + i];
-        vector3 p = vector4_rotate_to_vector3 (qb, (vector3) {(float) v -> x, (float) v -> y, (float) v -> z});
-        p = simd_add (p, b -> position);
-        const float d = vector3_dot (p, n);
-        if (d < best_b) { best_b = d; pb = p; }
-    }
+     * standard single-point SAT contact approximation). Analytic
+     * bodies use the exact closed-form support, mesh kinds walk the
+     * pool slice. */
+    double rot_a [9], rot_b [9];
+    if (a -> hull_analytic) { mpe_ell_body_axes (a, rot_a); }
+    if (b -> hull_analytic) { mpe_ell_body_axes (b, rot_b); }
+    vector3 pa, pb;
+    if (!mpe_hull_support_along (world, a, a -> hull_analytic ? rot_a : NULL, n, &pa)) { return false; }
+    if (!mpe_hull_support_along (world, b, b -> hull_analytic ? rot_b : NULL,
+                                 vector3_scaling (n, -1.0f), &pb)) { return false; }
     out -> object_a = a;
     out -> object_b = b;
     out -> normal_vector = n;
