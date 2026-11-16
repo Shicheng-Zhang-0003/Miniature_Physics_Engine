@@ -2642,6 +2642,44 @@ Ledger (new entries get a line, never an edit of a past line):
   44 FAIL 0 (tier B skips sans s2tui); mfs FTC gated 5/5 (12
   ungated diags); tui-smoke PASS; make everything green in
   background.
+- 2026-11-15 — WP4 4.6r (this commit, ELL RENDER UPLOAD FIX — the
+  4.6q flood: "[render] WARNING: glGetError=0x502 in
+  render_scene_current" on every frame, nothing renders, the objs
+  count still climbs). ROOT CAUSE, pinned with a gdb data
+  watchpoint on sphere_mesh (old 6144 → new 1065353216 mid-loop,
+  backtrace hull_mesh_upload ← hull_mesh_upload_ell ← init):
+  hull_mesh_upload_ell passed fc — the INDEX count (2880) — as
+  hull_mesh_upload's face_count (should be 960 faces); the
+  validation then read faces[2880..] PAST the static face table
+  into the neighbouring (double) vert table whose low words decode
+  as index 0 — 0 < 482 PASSES — so the per-vertex expansion kept
+  writing past the exact-capacity scratch pools, which in BSS abut
+  cylinder_mesh (wiped to 0/0) then sphere_mesh (VAO = 0x3F000000
+  = 0.5f non-gen, index_count = 0x3F800000 ≈ 1.07e9); the startup
+  body packs as a sphere instance, so the sphere draw ran EVERY
+  frame on a non-gen name (glBindBuffer + glBindVertexArray +
+  glDrawElementsInstanced → 878 floods in a 15 s idle MESA_DEBUG
+  run) and spawned ell kinds stayed invisible (the failed upload
+  left ell_mesh.index_count 0). The overflow's VICTIMS are
+  BSS-layout-dependent (nm-verified adjacency hull_scratch_verts →
+  cylinder_mesh → sphere_mesh) — the bug is 4.6q's uploader call
+  and fires on every launch. FIX, three layers: (1) the uploader
+  gets fc / 3 (faces, not indices); (2) hull_mesh_upload
+  bounds-checks the scratch pools per face (tri_vert_count + 3 >
+  hull_render_max_tri_verts → "[hull_meshing] scratch vertex pool
+  exhausted — mesh not built") so no future face_count bug can
+  write past a pool into a mesh struct; (3) the sphere/cube/
+  cylinder instanced draws get the 2.6.6-style double guard
+  (inst_count > 0 && mesh.index_count > 0) the five hull blocks
+  already had — a mesh that never uploads can never bind non-gen
+  names. Verified: MESA_DEBUG idle 0 floods / 0 Mesa errors / no
+  hull_meshing failure line; the 482-vert smooth ell uploads clean
+  (2880 tri verts, 1440 wire edges = V + F − 2) and ell kinds
+  render. hull_meshing.c + new_render.c — full battery: engine +
+  build_tui with ZERO warnings (-Werror); suite 73 registered /
+  71 blocking / 0 failures; quick 87/87; mgb PASS 44 FAIL 0 (tier
+  B skips sans s2tui); mfs FTC gated 5/5 (12 ungated diags);
+  tui-smoke PASS; make everything green in background.
 
 ## §10 Definition of done for v16S (the cut checklist)
 

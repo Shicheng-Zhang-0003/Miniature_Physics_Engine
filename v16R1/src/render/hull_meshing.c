@@ -52,6 +52,14 @@ static void hull_mesh_upload (mesh *mesh_object, const mig_hull_point *points, i
             fprintf (stderr, "[hull_meshing] face index outside the vertex array — mesh not built\n");
             return;
         }
+        /* WP4 4.6r: the scratch pools are exact-capacity for the largest
+         * catalog mesh — a face_count bug (or a larger mesh) must fail
+         * the build loudly, never write past the pools into the
+         * neighbouring mesh structs. */
+        if (tri_vert_count + 3 > hull_render_max_tri_verts) {
+            fprintf (stderr, "[hull_meshing] scratch vertex pool exhausted — mesh not built\n");
+            return;
+        }
         const double ax = points [ia].x - com [0], ay = points [ia].y - com [1],
                      az = points [ia].z - com [2];
         const double bx = points [ib].x - com [0], by = points [ib].y - com [1],
@@ -200,7 +208,15 @@ static void hull_mesh_upload_ell (mesh *mesh_object) {
     #undef HULL_ELL_RING_V
     /* The build is symmetric about the origin: COM = (0, 0, 0). */
     const double com [3] = {0.0, 0.0, 0.0};
-    hull_mesh_upload (mesh_object, verts, vc, faces, fc, com, (const double (*) [3]) normals);
+    /* WP4 4.6r fix: face_count is the FACE count — fc counts INDICES
+     * (3 per face). Passing fc sent the uploader past the face table;
+     * the out-of-bounds reads landed in the (double) vert table whose
+     * low words decode as index 0, so validation PASSED and the
+     * expansion wrote past the scratch pools into the neighbouring
+     * mesh structs (sphere_mesh's VAO/index_count became float
+     * garbage — the glBindBuffer/glBindVertexArray/
+     * glDrawElementsInstanced error flood on every frame). */
+    hull_mesh_upload (mesh_object, verts, vc, faces, fc / 3, com, (const double (*) [3]) normals);
 }
 
 void hull_meshing_init (void) {

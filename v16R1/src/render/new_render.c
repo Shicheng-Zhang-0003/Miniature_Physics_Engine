@@ -572,19 +572,19 @@ void render_scene_current (int widget_width, int widget_height) {
     glUniform1f (instanced_uniforms.ambient_strength_location, g_cfg.render.ambient_strength);
     glUniform1f (instanced_uniforms.specular_coeff_location, g_cfg.render.specular_coeff);
     glUniform1f (instanced_uniforms.specular_exponent_location, g_cfg.render.specular_exponent);
-    if (sphere_inst_count > 0) {
+    if (sphere_inst_count > 0 && sphere_mesh.index_count > 0) {
         glBindBuffer (GL_ARRAY_BUFFER, sphere_mesh.instance_vbo);
         glBufferSubData (GL_ARRAY_BUFFER, 0, sphere_inst_count * 19 * sizeof (float), sphere_instances);
         glBindVertexArray (sphere_mesh.vertex_array_object);
         glDrawElementsInstanced (GL_TRIANGLES, sphere_mesh.index_count, GL_UNSIGNED_INT, 0, sphere_inst_count);
     }
-    if (cube_inst_count > 0) {
+    if (cube_inst_count > 0 && cube_mesh.index_count > 0) {
         glBindBuffer (GL_ARRAY_BUFFER, cube_mesh.instance_vbo);
         glBufferSubData (GL_ARRAY_BUFFER, 0, cube_inst_count * 19 * sizeof (float), cube_instances);
         glBindVertexArray (cube_mesh.vertex_array_object);
         glDrawElementsInstanced (GL_TRIANGLES, cube_mesh.index_count, GL_UNSIGNED_INT, 0, cube_inst_count);
     }
-    if (cylinder_inst_count > 0) {
+    if (cylinder_inst_count > 0 && cylinder_mesh.index_count > 0) {
         glBindBuffer (GL_ARRAY_BUFFER, cylinder_mesh.instance_vbo);
         glBufferSubData (GL_ARRAY_BUFFER, 0, cylinder_inst_count * 19 * sizeof (float), cylinder_instances);
         glBindVertexArray (cylinder_mesh.vertex_array_object);
