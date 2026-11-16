@@ -712,6 +712,15 @@ void mig_editor_toggle (void) {
     gtk_window_present (GTK_WINDOW (editor_window));
 }
 
+/* MIG WP4 4.6p: any store writer (the CAD window's save) calls this so
+ * an OPEN editor's dropdown shows the new/changed spec immediately —
+ * no reopen needed. No-op when the editor is closed (it refreshes on
+ * open anyway). */
+void mig_editor_notify_store_changed (void) {
+    if (!editor_window) { return; }
+    editor_refresh_dropdown ();
+}
+
 void mig_editor_sync (void) {
     if (!editor_window) { return; }
 }

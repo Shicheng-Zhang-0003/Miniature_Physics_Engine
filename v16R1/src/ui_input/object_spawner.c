@@ -1,9 +1,14 @@
 #include "../mpe_engine.h"
 #include "object_spawner.h"
+#include "../cad/cad_editor.h" /* MIG WP4 4.6p: spec -> design -> parts */
+#include "term_priv.h"        /* MIG WP4 4.6p: the shared spec store */
 /* MIG WP2.6 2.6.6a: hull-spawn refusals (flag-0 + window/pool). The
  * event log is terminal-only, so the GUI HUD carries this count —
  * non-zero means Enter fired a hull type and nothing spawned. */
 unsigned long spawner_hull_refusal_count = 0;
+/* MIG WP4 4.6p: spec-spawn refusals, the same discipline as the hull
+ * counter (the GUI HUD chips it as SpecRef). */
+unsigned long spawner_spec_refusal_count = 0;
 static vector3 get_viewpoint_velocity (void) {
     vector3 player_velocity = vector3_zero ();
     if (!main_inputs.is_debug_mode_active) {
@@ -106,10 +111,86 @@ void spawner_launch_hull (mpe_hull_shape_kind kind, const char *name, float laun
                   0.4f + 0.6f * ((float) ((newly_spawned_object_index + 1) % 3) / 2.0f),
                   0.4f + 0.6f * ((float) ((newly_spawned_object_index + 2) % 3) / 2.0f)};
 }
+/* MIG WP4 4.6p: spawn a SAVED MIG/CAD spec as a composite body. The
+ * user's ruling: "as soon as a new object type is saved that the
+ * object can be spawned in the main engine" — the store IS the spawn
+ * pool, so a CAD save is selectable in the gun's cycle immediately.
+ * Path: the store spec -> the gated build seam (cad_design_from_spec
+ * + cad_build: the compose refusal battery + totals, the same truth
+ * the CAD window's own Spawn button uses) -> the RAW assembly-frame
+ * parts translated so the assembly's COM lands at the gun's reach
+ * (3 m out on the view ray, the CAD place's empty-space reach) ->
+ * physics_world_add_composite composes and re-anchors internally ->
+ * the body rides the gun's launch velocity (the sphere path: forward
+ * x spawner.speed + the viewpoint velocity). Refusals log to the
+ * event log and bump spawner_spec_refusal_count (the HUD chip). */
+void spawner_launch_spec (int store_index) {
+    const mig_spec *src = mig_spec_store_spec_at (store_index);
+    if (!src) {
+        spawner_spec_refusal_count++;
+        event_log_push (2, "spec spawn failed: store slot %d gone", store_index);
+        return;
+    }
+    cad_design loaded;
+    if (cad_design_from_spec (src, CAD_MAX_PARTS, &loaded) != cad_ok) {
+        spawner_spec_refusal_count++;
+        event_log_push (2, "spec spawn failed: %s rejected by the model", src -> name);
+        return;
+    }
+    if (loaded.count == 0) {
+        spawner_spec_refusal_count++;
+        event_log_push (2, "spec spawn failed: %s has no parts", src -> name);
+        return;
+    }
+    mig_part bridge_parts [CAD_MAX_PARTS];
+    mig_bridge bridge;
+    if (cad_build (&loaded, bridge_parts, &bridge) != cad_ok) {
+        spawner_spec_refusal_count++;
+        event_log_push (2, "spec spawn failed: %s refused by the build seam", src -> name);
+        return;
+    }
+    /* Translate the parts so the ASSEMBLY's COM lands at the spawn
+     * point: the authored relative layout is preserved exactly (the
+     * same principle the CAD window's spawn states — the assembly
+     * frame IS the world frame, rebased once here). */
+    const vector3 target = vector3_addition (
+        main_camera_fov.position,
+        vector3_scaling (main_camera_fov.forward_vector, 3.0f));
+    const vector3 delta = vector3_subtraction (target, bridge.totals.com);
+    for (int i = 0; i < loaded.count; i++) {
+        loaded.parts [i].position =
+            vector3_addition (loaded.parts [i].position, delta);
+    }
+    physics_world *world = physics_world_get_primary ();
+    const int body_index = physics_world_add_composite (world,
+                                                        loaded.parts,
+                                                        loaded.count);
+    if (body_index < 0) {
+        spawner_spec_refusal_count++;
+        event_log_push (2, "spec spawn failed: %s (mass/bound window or part cap)",
+                        src -> name);
+        return;
+    }
+    (world -> bodies) [body_index].velocity = vector3_addition (
+        vector3_scaling (main_camera_fov.forward_vector, g_cfg.spawner.speed),
+        get_viewpoint_velocity ());
+    event_log_push (2, "spec spawn: %s (%d parts, %.4g kg) -> body #%d",
+                    src -> name, loaded.count,
+                    (double) bridge.totals.mass, body_index);
+}
 void spawner_launch_current_type (void) {
     /* Single dispatch for the spawn gun (was duplicated inline at both
      * hold and repeat sites). Type 0..7: sphere, cube, cylinder, then
-     * the five catalog hulls on the shared hull dials. */
+     * the five catalog hulls on the shared hull dials. Type 8+ (MIG
+     * WP4 4.6p): the SAVED MIG/CAD specs, in spec-store order — a
+     * CAD-editor save is spawnable on the very next cycle press. */
+    if (main_inputs.current_spawn_type >= 8) {
+        const int idx = main_inputs.current_spawn_type - 8;
+        if (idx < mig_spec_store_count ()) {
+            spawner_launch_spec (idx);
+        }
+        return;
+    }
     switch (main_inputs.current_spawn_type) {
         case 0:
         spawner_launch_sphere (g_cfg.spawner.radius, g_cfg.spawner.mass, g_cfg.spawner.speed);

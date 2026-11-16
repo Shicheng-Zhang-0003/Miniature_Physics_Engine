@@ -29,6 +29,11 @@
  *  - Principal-axis display: named TODO, not v16S scope */
 void mig_editor_toggle (void);
 void mig_editor_sync (void);
+/* MIG WP4 4.6p: any store writer (the CAD window's save) calls this so
+ * an OPEN editor's dropdown shows the new/changed spec immediately —
+ * no reopen needed. No-op when the editor is closed (it refreshes on
+ * open anyway). */
+void mig_editor_notify_store_changed (void);
 bool mig_editor_is_active (void);
 /* Returns true and writes the COM of the currently edited spec into *out
  * when a spec is loaded and valid. False when no spec is loaded or the

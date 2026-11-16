@@ -46,6 +46,12 @@ static void overlay_append_overflow_text (char *buffer, size_t buffer_size) {
         if (l < buffer_size)
             snprintf (buffer + l, buffer_size - l, " | HullRef:%lu", spawner_hull_refusal_count);
     }
+    /* MIG WP4 4.6p: spec-spawn refusals, the same discipline. */
+    if (spawner_spec_refusal_count > 0) {
+        size_t l = strlen (buffer);
+        if (l < buffer_size)
+            snprintf (buffer + l, buffer_size - l, " | SpecRef:%lu", spawner_spec_refusal_count);
+    }
     if ((node_overflow_count > 0) || (pair_overflow_count > 0)) {
         size_t l = strlen (buffer);
         if (l < buffer_size)

@@ -53,25 +53,22 @@
  *     straight-down gravity settle to the highest supporter or the
  *     floor, landed EXACTLY). An Esc mid-carry unlocks and the carry
  *     follows the cursor until the release.
- *   - IJKL (WP4 4.6o — the user's ruling: "ijkl is the OBJECT
- *     movement, not the camera movement anymore" — this supersedes
- *     the 4.6n free-steer meaning; the camera NEVER moves from IJKL,
- *     the mouse is the only look). While CARRYING it is the 4.6m
- *     DIRECT nudge — the user's "just like the mouse can move the
- *     objects around, ijkl moves objects around much more
- *     precisely": the camera does NOT move; I/K push the carried
- *     part farther/closer ALONG the view ray (cw_drag_t, floored
- *     above the eye) and J/L slide it left/right ACROSS the view
- *     (the grip offset along the camera's right) at CW_NUDGE_SPEED
- *     (0.5 m/s — a tenth of the fly). While FREE it is the SAME
- *     view-relative nudge applied to the SELECTED part
- *     (cw_nudge_selected: silent with nothing selected, frozen
- *     during the settle fall like the arrows; the delta writes
- *     EXACT — snap bypassed, a direct move is a surface truth — and
- *     the floor wins after, the resize lift rule). Latched like the
- *     fly keys (press sets, release clears, the tick polls), in
- *     BOTH pointer modes, not lock-gated (an Esc'd carry stays
- *     nudgeable).
+ *   - IJKL (WP4 4.6p — the user's ruling: "make ijkl like the arrows
+ *     keys (ikl toggles x y z motion, j toggles increase or
+ *     decrease)" — supersedes BOTH earlier meanings; IJKL never
+ *     moves the camera): I/K/L = x/y/z MOTION, J toggles the +/-
+ *     direction (the arrows' Left), one CW_NUDGE_STEP (0.05 m — the
+ *     resize pitch) per press in the toggled direction, shown as
+ *     "mov +/-" in the status. Presses are event-driven like the
+ *     arrows (key repeat fires repeated steps), NOT lock-gated,
+ *     frozen during the settle fall (the arrows' own guard). WHILE
+ *     CARRYING the axis step folds into the grip offset
+ *     (cw_drag_offset — a world-space vector), so it survives the
+ *     every-frame ray recompute and the floor clamp still wins.
+ *     WHILE FREE it moves the SELECTED part: the step writes EXACT
+ *     (cw_write_exact — snap bypassed, a direct move is a surface
+ *     truth) and the floor wins after (the resize lift rule).
+ *     Silent with nothing selected and not carrying.
  *   - RMB: PLACE the picker shape at the aim point — the crosshair
  *     while locked, the cursor ray while unlocked; no-op while a
  *     carry is live (the carried part sits at the crosshair; a place
@@ -165,6 +162,7 @@
 #include "../cad/cad_editor.h"
 #include "../cad/cad_view_math.h"
 #include "term_priv.h"
+#include "mig_editor.h" /* WP4 4.6p: the save notifies the 4.4 panel */
 #include "mouse_lock.h"
 #include <gtk/gtk.h>
 #include <stdio.h>
@@ -214,18 +212,16 @@ static vector3 cw_drag_offset = {0.0f, 0.0f, 0.0f}; /* part - grab point */
  * carry never dips it under the floor). */
 static float cw_drag_t = 0.0f;
 static float cw_drag_floor_y = 0.0f;
-/* WP4 4.6m, the from-scratch control purge: IJKL is the DIRECT carry
- * nudge (not camera steer — the engine's IJKL meaning does not apply
- * inside this window; the user picked "Direct object nudge"), so the
- * nudge latches ride with the fly latches. cw_place_type is the shape
- * RMB places (1/2/3 pick it; default cube); cw_resize_grow is the
- * arrow-key resize DIRECTION the Left arrow toggles (+1 grow, -1
- * shrink; the user's axis ruling: right/up/down = x/y/z, left = the
- * toggle). */
-static int cw_key_i = 0;
-static int cw_key_j = 0;
-static int cw_key_k = 0;
-static int cw_key_l = 0;
+/* WP4 4.6p, the user's ruling "make ijkl like the arrows keys": IJKL
+ * is per-press axis motion (I/K/L = x/y/z, J = the +/- toggle), so
+ * the nudge rides the ARROWS' event-driven discipline — no IJKL
+ * latches exist (the fly latches remain). cw_nudge_dir is that
+ * toggle (+1 increase, -1 decrease, shown as "mov +/-"). cw_place_type
+ * is the shape RMB places (1/2/3 pick it; default cube);
+ * cw_resize_grow is the arrow-key resize DIRECTION the Left arrow
+ * toggles (+1 grow, -1 shrink; the user's axis ruling: right/up/down
+ * = x/y/z, left = the toggle). */
+static int cw_nudge_dir = 1;
 static int cw_place_type = mig_part_cube;
 static int cw_resize_grow = 1;
 /* WP4 4.6i: the tick-driven carry recomputes the target EVERY frame
@@ -460,10 +456,12 @@ static int cw_fill_grid (float *out) {
  * NDC lines through (0, 0) — with identity u_viewproj + u_model the
  * positions pass straight through as clip coords, so the crosshair is
  * always exactly at the screen center no matter the camera. Normals
- * unused (drawn unlit). */
+ * unused (drawn unlit). WP4 4.6p: the user called 0.045 "quite large"
+ * — it is now 0.015 (a third of the arm length, ~3% of the viewport
+ * height across, comparable to the main engine's "+" label). */
 static int cw_fill_crosshair (float *out) {
     const float nrm [3] = {0.0f, 0.0f, 1.0f};
-    const float h = 0.045f;
+    const float h = 0.015f;
     const float a [3] = {-h, 0.0f, 0.0f};
     const float b [3] = {h, 0.0f, 0.0f};
     const float c [3] = {0.0f, -h, 0.0f};
@@ -712,10 +710,12 @@ static void cw_status_refresh (void) {
     }
     char buf [256];
     snprintf (buf, sizeof (buf),
-              "parts %d/%d | sel %s | place %s | res %s | snap %.3g m | look %s | %s",
+              "parts %d/%d | sel %s | place %s | res %s | mov %s | "
+              "snap %.3g m | look %s | %s",
               cw_design.count, cw_design.max_parts, sel,
               cw_type_name (cw_place_type),
               (cw_resize_grow > 0) ? "+" : "-",
+              (cw_nudge_dir > 0) ? "+" : "-",
               (double) cw_design.snap_step,
               cw_look_locked ? "locked" : "free", cw_design.name);
     gtk_label_set_text (GTK_LABEL (cw_status_label), buf);
@@ -818,6 +818,13 @@ static void cw_save_design (void) {
         return;
     }
     cw_refresh_dropdown ();
+    /* WP4 4.6p: the user's ruling — "as soon as a new object type is
+     * saved that the object can be spawned in the main engine". The
+     * store IS the main engine's spawn pool (the spawn gun cycles
+     * 8 + store-count types and names them live), so a save is
+     * spawnable on the very next cycle press; this notify also
+     * refreshes the 4.4 MIG editor's dropdown if it is open. */
+    mig_editor_notify_store_changed ();
     char buf [192];
     snprintf (buf, sizeof (buf), "saved %s (%d parts) -> spec store",
               parsed.name, parsed.count);
@@ -926,9 +933,10 @@ static void cw_spawn_to_world (void) {
 /* ---- placement helpers (WP4 4.6h; the constants are WP4 4.6m — the
  * from-scratch control purge retuned the scheme around them) ---- */
 
-/* IJKL carry-nudge speed (m/s) — a tenth of the fly's 5 m/s: the user's
- * "much more precisely" (the direct-nudge ruling). */
-#define CW_NUDGE_SPEED 0.5f
+/* IJKL motion step (m per keypress, in the toggled +/- direction —
+ * WP4 4.6p: IJKL is the arrows' motion twin, so it shares the resize
+ * pitch 0.05 m; the 4.6m continuous 0.5 m/s nudge is gone). */
+#define CW_NUDGE_STEP 0.05f
 /* Arrow-key resize step (m per keypress, in the toggled +/- direction). */
 #define CW_RESIZE_STEP 0.05f
 /* The G one-shot's grid pitch: snap the SELECTED part to the nearest
@@ -1236,66 +1244,36 @@ static void cw_settle_tick (float dt) {
  * slot-safe delete, the RMB exact-touch place, the arrow resize and
  * the G one-shot snap. */
 
-/* IJKL: the DIRECT carry nudge (the user's "ijkl moves objects around
- * much more precisely" ruling — the camera does NOT move). I/K push
- * the carried part farther/closer ALONG the view ray (the grab depth
- * cw_drag_t, floored 0.05 m above the eye so the part never passes
- * behind it); J/L slide it across the view along the camera's right
- * (the frozen grip offset). Runs BEFORE the carry apply in the tick:
- * the edit lands in the carry state itself, so it survives the
- * every-frame ray recompute. Dead unless a carry is live (the latches
- * are not lock-gated — an Esc'd carry stays nudgeable). */
-static void cw_nudge_carry (float dt) {
-    if (cw_drag_part < 0) { return; }
-    const float speed = CW_NUDGE_SPEED * dt;
-    if (cw_key_i) { cw_drag_t += speed; }
-    if (cw_key_k) {
-        cw_drag_t -= speed;
-        if (cw_drag_t < 0.05f) { cw_drag_t = 0.05f; }
-    }
-    if (cw_key_j || cw_key_l) {
-        const float side = (cw_key_l ? speed : 0.0f) -
-                           (cw_key_j ? speed : 0.0f);
-        const vector3 right = cad_view_right (&cw_camera);
-        cw_drag_offset = vector3_addition (
-            cw_drag_offset, vector3_scaling (right, side));
-    }
-}
-
-/* The FREE half of the IJKL nudge (WP4 4.6o — the user's ruling: "ijkl
- * is the OBJECT movement, not the camera movement anymore"): nothing
- * is carried, so the SAME view-relative semantics apply to the
- * SELECTED part — I pushes it AWAY along the view ray (forward), K
- * pulls it closer, J slides it left along the camera's right, L
- * right. Same speed as the carry nudge (CW_NUDGE_SPEED, 0.5 m/s).
- * The delta writes EXACT (cw_write_exact — snap bypassed: a direct
- * move is a surface truth, like the G lift) and the floor wins after
- * (the resize lift rule: cw_rest_y_for, exact lift if clipped). The
- * tick calls this only in IDLE — frozen during the settle fall (the
- * arrows' own rule) and silent with nothing selected, so a held IJKL
- * never fights the settle's writes. Works in BOTH pointer modes (the
- * carry nudge's not-lock-gated rule extends here). */
-static void cw_nudge_selected (float dt) {
-    if (cw_design.selected < 0) { return; }
-    const float speed = CW_NUDGE_SPEED * dt;
-    const vector3 fwd = cad_view_forward (&cw_camera);
-    const vector3 right = cad_view_right (&cw_camera);
+/* IJKL: the ARROWS' motion twin (WP4 4.6p — the user's ruling: "make
+ * ijkl like the arrows keys (ikl toggles x y z motion, j toggles
+ * increase or decrease)"). I = x, K = y, L = z; J toggles
+ * cw_nudge_dir (+1/-1, shown as "mov +/-"), exactly Left for the
+ * resize. One CW_NUDGE_STEP (0.05 m — the resize pitch) per press in
+ * the toggled direction, EVENT-DRIVEN like the arrows (no latches;
+ * key repeat fires repeated steps; NOT lock-gated; the settle guard
+ * lives in the keybind switch — a nudge under the fall would fight
+ * the settle's own writes).
+ *
+ * WHILE CARRYING the axis step folds into the GRIP OFFSET
+ * (cw_drag_offset — a world-space vector), so it survives the
+ * every-frame ray recompute; the apply's floor clamp still wins
+ * (the floor rule). WHILE FREE it moves the SELECTED part: the step
+ * writes EXACT (cw_write_exact — snap bypassed, a direct move is a
+ * surface truth, like the G lift) and the floor wins after (the
+ * resize lift rule via cw_rest_y_for). Silent with nothing selected
+ * and not carrying. */
+static void cw_nudge_axis (int axis) {
+    const float step = CW_NUDGE_STEP * (float) cw_nudge_dir;
     vector3 delta = {0.0f, 0.0f, 0.0f};
-    if (cw_key_i) {
-        delta = vector3_addition (delta, vector3_scaling (fwd, speed));
-    }
-    if (cw_key_k) {
-        delta = vector3_subtraction (delta, vector3_scaling (fwd, speed));
-    }
-    if (cw_key_j) {
-        delta = vector3_subtraction (delta, vector3_scaling (right, speed));
-    }
-    if (cw_key_l) {
-        delta = vector3_addition (delta, vector3_scaling (right, speed));
-    }
-    if ((delta.x == 0.0f) && (delta.y == 0.0f) && (delta.z == 0.0f)) {
+    if (axis == 0) { delta.x = step; }
+    else if (axis == 1) { delta.y = step; }
+    else { delta.z = step; }
+    if ((cw_mode == CW_MODE_CARRY) && (cw_drag_part >= 0)) {
+        cw_drag_offset = vector3_addition (cw_drag_offset, delta);
+        cw_status_refresh ();
         return;
     }
+    if (cw_design.selected < 0) { return; }
     const int idx = cw_design.selected;
     vector3 pos = vector3_addition (cw_design.parts [idx].position, delta);
     cw_write_exact (idx, pos);
@@ -1628,10 +1606,10 @@ static void cw_fly_translate (float dt) {
     cw_camera.target = t;
 }
 
-/* Kill every MOVE latch — the fly keys AND the IJKL object nudge (WP4
- * 4.6m, carried; 4.6o extends the nudge to the selected part — same
- * latches, same discipline). Called on lock edges, focus loss and
- * destroy, so a held key never outlives its context. */
+/* Kill every MOVE latch — the fly keys (WP4 4.6p: IJKL is per-press
+ * axis motion like the arrows and carries NO latches). Called on lock
+ * edges, focus loss and destroy, so a held key never outlives its
+ * context. */
 static void cw_kill_move_latches (void) {
     cw_key_w = 0;
     cw_key_a = 0;
@@ -1639,10 +1617,6 @@ static void cw_kill_move_latches (void) {
     cw_key_d = 0;
     cw_key_up = 0;
     cw_key_down = 0;
-    cw_key_i = 0;
-    cw_key_j = 0;
-    cw_key_k = 0;
-    cw_key_l = 0;
 }
 
 /* Acquire the pointer lock (the engine's re-engage). Dead latches are
@@ -1868,14 +1842,13 @@ static gboolean cw_on_key (GtkEventControllerKey *controller, guint keyval,
     if (cw_focus_in_name_entry ()) {
         return FALSE;
     }
-    /* The MOVE latches (the fly keys AND the IJKL object nudge — the
-     * user's 4.6o ruling: IJKL moves the OBJECT, never the camera;
-     * carried = the direct grip nudge, free = the selected part):
-     * press sets, the tick polls, release clears (key repeat
-     * irrelevant — the engine's on_keypress pattern). Mode-free: the
-     * fly only runs while locked (the tick gates it), the nudge only
-     * with a carry live or a part selected — a latch set in the wrong
-     * context is simply dead. */
+    /* The MOVE latches — the FLY keys only (WP4 4.6p: IJKL is
+     * per-press axis motion like the arrows, event-driven below in
+     * the arrows' settle-guarded switch; it carries no latches).
+     * Press sets, the tick polls, release clears (key repeat
+     * irrelevant — the engine's on_keypress pattern). The fly only
+     * runs while locked (the tick gates it) — a latch set unlocked is
+     * simply dead. */
     switch (keyval) {
         case GDK_KEY_w: case GDK_KEY_W: cw_key_w = 1; return TRUE;
         case GDK_KEY_a: case GDK_KEY_A: cw_key_a = 1; return TRUE;
@@ -1884,10 +1857,6 @@ static gboolean cw_on_key (GtkEventControllerKey *controller, guint keyval,
         case GDK_KEY_space: cw_key_up = 1; return TRUE;
         case GDK_KEY_Shift_L:
         case GDK_KEY_Shift_R: cw_key_down = 1; return TRUE;
-        case GDK_KEY_i: case GDK_KEY_I: cw_key_i = 1; return TRUE;
-        case GDK_KEY_j: case GDK_KEY_J: cw_key_j = 1; return TRUE;
-        case GDK_KEY_k: case GDK_KEY_K: cw_key_k = 1; return TRUE;
-        case GDK_KEY_l: case GDK_KEY_L: cw_key_l = 1; return TRUE;
         default: break;
     }
     /* 1/2/3 PICK the shape RMB places (the user's "keep 1/2/3 as
@@ -1903,9 +1872,11 @@ static gboolean cw_on_key (GtkEventControllerKey *controller, guint keyval,
     }
     /* Arrows resize the SELECTED part (the user's axis ruling:
      * right/up/down = x/y/z, LEFT toggles the +/- direction, shown in
-     * the status). Frozen during the settle fall (the mode guard — a
-     * resize under the fall would fight the settle's own writes);
-     * silent with nothing selected. */
+     * the status) AND IJKL moves it — the arrows' motion twin (WP4
+     * 4.6p: I = x, K = y, L = z, J = the +/- toggle, "mov +/-").
+     * Frozen during the settle fall (the mode guard — a resize or
+     * nudge under the fall would fight the settle's own writes);
+     * silent with nothing selected and not carrying. */
     if (cw_mode != CW_MODE_SETTLING) {
         switch (keyval) {
             case GDK_KEY_Right: cw_resize_selected (0); return TRUE;
@@ -1913,6 +1884,13 @@ static gboolean cw_on_key (GtkEventControllerKey *controller, guint keyval,
             case GDK_KEY_Down: cw_resize_selected (2); return TRUE;
             case GDK_KEY_Left:
                 cw_resize_grow = -cw_resize_grow;
+                cw_status_refresh ();
+                return TRUE;
+            case GDK_KEY_i: case GDK_KEY_I: cw_nudge_axis (0); return TRUE;
+            case GDK_KEY_k: case GDK_KEY_K: cw_nudge_axis (1); return TRUE;
+            case GDK_KEY_l: case GDK_KEY_L: cw_nudge_axis (2); return TRUE;
+            case GDK_KEY_j: case GDK_KEY_J:
+                cw_nudge_dir = -cw_nudge_dir;
                 cw_status_refresh ();
                 return TRUE;
             default: break;
@@ -1951,10 +1929,6 @@ static gboolean cw_on_key_release (GtkEventControllerKey *controller,
         case GDK_KEY_space: cw_key_up = 0; break;
         case GDK_KEY_Shift_L:
         case GDK_KEY_Shift_R: cw_key_down = 0; break;
-        case GDK_KEY_i: case GDK_KEY_I: cw_key_i = 0; break;
-        case GDK_KEY_j: case GDK_KEY_J: cw_key_j = 0; break;
-        case GDK_KEY_k: case GDK_KEY_K: cw_key_k = 0; break;
-        case GDK_KEY_l: case GDK_KEY_L: cw_key_l = 0; break;
         default: break;
     }
     return FALSE;
@@ -2116,11 +2090,9 @@ static gboolean cw_tick (gpointer user_data) {
      *     input_control_poll_locked_mouse analog; X11 steers per
      *     motion event instead);
      *   - fly: the latched WASD/Space/Shift translate;
-     *   - IJKL (WP4 4.6o — the user's "ijkl is the OBJECT movement,
-     *     not the camera movement anymore"): the CARRY branch nudges
-     *     the carried part through the drag state; the IDLE branch
-     *     nudges the SELECTED part directly (cw_nudge_selected).
-     *     SETTLING freezes it (the arrows' own rule);
+     *   - IJKL is NOT polled here (WP4 4.6p: it is the arrows'
+     *     motion twin — event-driven per press in cw_on_key, folding
+     *     into the carry grip or writing the selected part exact);
      *   - the carried part follows EVERY frame — the crosshair ray
      *     while locked, the stored cursor otherwise (zoom mid-carry
      *     keeps it glued); a settling part falls at the world's own
@@ -2130,10 +2102,6 @@ static gboolean cw_tick (gpointer user_data) {
         cw_fly_translate (0.016f);
     }
     if (cw_mode == CW_MODE_CARRY) {
-        /* WP4 4.6m: IJKL nudges the CARRIED part directly — BEFORE the
-         * apply, so the nudge lands in the carry state itself and
-         * survives the every-frame ray recompute below. */
-        cw_nudge_carry (0.016f);
         if (cw_look_locked) {
             cw_carry_apply_ndc (0.0f, 0.0f);
         } else {
@@ -2141,10 +2109,6 @@ static gboolean cw_tick (gpointer user_data) {
         }
     } else if (cw_mode == CW_MODE_SETTLING) {
         cw_settle_tick (0.016f);
-    } else {
-        /* WP4 4.6o: IJKL free — the selected part gets the same
-         * view-relative nudge, written exact with the floor lift. */
-        cw_nudge_selected (0.016f);
     }
     if (cw_gl_area) {
         gtk_gl_area_queue_render (GTK_GL_AREA (cw_gl_area));

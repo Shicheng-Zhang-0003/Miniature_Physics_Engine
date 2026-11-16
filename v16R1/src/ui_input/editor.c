@@ -2,6 +2,7 @@
  * holds the v15R3 GTK3 engine. */
 #include "../mpe_engine.h"
 #include "editor.h"
+#include "term_priv.h" /* MIG WP4 4.6p: the spec store feeds the cycle */
 static void editor_reacquire_mouse (GtkWidget *parent_window) {
     if (!parent_window) { return; }
     GtkWidget *toplevel = NULL;
@@ -92,14 +93,19 @@ void editor_update_menus (GtkWidget *parent_window) {
         main_inputs.spawner_menu_level = 0;
     }
     if (main_inputs.spawner_menu_level == 8) {
-        /* Eight-way spawn-type cycle (sphere, cube, cylinder, prism,
-         * pyr4, pyr3, icosa, ell — MIG WP2.6 spawn-menu). */
+        /* Spawn-type cycle (sphere, cube, cylinder, prism, pyr4, pyr3,
+         * icosa, ell — MIG WP2.6 spawn-menu — then the SAVED MIG/CAD
+         * specs in spec-store order, MIG WP4 4.6p: a CAD-editor save
+         * is spawnable on the very next press). */
+        const int total_types = 8 + mig_spec_store_count ();
         if (main_inputs.up_arrow_pressed) {
-            main_inputs.current_spawn_type = (main_inputs.current_spawn_type + 1) % 8;
+            main_inputs.current_spawn_type =
+                (main_inputs.current_spawn_type + 1) % total_types;
             main_inputs.up_arrow_pressed = false;
             main_inputs.down_arrow_pressed = false;
         } else if (main_inputs.down_arrow_pressed) {
-            main_inputs.current_spawn_type = (main_inputs.current_spawn_type + 7) % 8;
+            main_inputs.current_spawn_type =
+                (main_inputs.current_spawn_type + total_types - 1) % total_types;
             main_inputs.up_arrow_pressed = false;
             main_inputs.down_arrow_pressed = false;
         }

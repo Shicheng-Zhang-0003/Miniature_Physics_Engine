@@ -2544,6 +2544,54 @@ Ledger (new entries get a line, never an edit of a past line):
   failures; quick 86/86; mgb PASS 44 FAIL 0 (tier B skips sans
   s2tui); mfs FTC gated 5/5 (12 ungated diags); tui-smoke PASS; make
   everything green in background.
+- 2026-11-16 — WP4 4.6p (this commit, CAD IJKL-AXES + SAVE->SPAWN +
+  CROSSHAIR — the user's verdict on 4.6o, "better, but here's the
+  thing", with three asks). (1) IJKL IS THE ARROWS' MOTION TWIN —
+  the user's ruling: "make ijkl like the arrows keys (ikl toggles x
+  y z motion, j toggles increase or decrease)": I = x, K = y, L = z,
+  J = the +/- direction toggle (the arrows' Left), one CW_NUDGE_STEP
+  0.05 m per press in the toggled direction (the resize pitch; the
+  4.6m continuous 0.5 m/s nudge and its latches are GONE —
+  cw_nudge_carry + cw_nudge_selected replaced by ONE
+  event-driven cw_nudge_axis, no IJKL latches anywhere, the tick no
+  longer polls it), shown as "mov +/-" in the status next to
+  "res +/-". Presses ride the arrows' OWN switch (settle-guarded:
+  frozen during the fall; key repeat fires repeated steps; NOT
+  lock-gated). WHILE CARRYING the axis step folds into the GRIP
+  OFFSET (cw_drag_offset is a world-space vector, so it survives the
+  every-frame ray recompute and the apply's floor clamp still wins);
+  WHILE FREE it moves the SELECTED part (cw_write_exact — snap
+  bypassed, a direct move is a surface truth — then the floor lift
+  via cw_rest_y_for). Silent with nothing selected and not
+  carrying. (2) SAVE -> SPAWNABLE IN THE MAIN ENGINE — the user's
+  "as soon as a new object type is saved that the object can be
+  spawned in the main engine": the spawn gun now cycles 8 + spec-
+  store-count TYPES (editor.c's menu level 8 modulo; the store is
+  read LIVE so a CAD save is selectable on the very next Up/Down
+  press), term_spawn_type_name names types >= 8 from the store
+  (single source of truth, the overlay spawn menu shows the spec's
+  own name), and NEW spawner_launch_spec spawns it: the store spec
+  -> the gated build seam (cad_design_from_spec + cad_build — the
+  compose refusal battery + totals, the CAD window's own Spawn
+  truth) -> the raw assembly-frame parts translated so the
+  ASSEMBLY'S COM lands 3 m out on the view ray (authored relative
+  layout preserved) -> physics_world_add_composite composes and
+  re-anchors -> the body rides the gun's launch velocity (forward x
+  spawner.speed + viewpoint velocity). Refusals (slot gone / model
+  rejected / empty / mass-window / cap) log to the event log AND
+  bump the NEW spawner_spec_refusal_count, chipped in the HUD as
+  "SpecRef:N" beside "HullRef:N" (the event log is terminal-only).
+  The save ALSO notifies the 4.4 MIG editor panel (NEW
+  mig_editor_notify_store_changed) so an OPEN panel's dropdown shows
+  the new spec with no reopen. input_state.h documents types 8+.
+  (3) CROSSHAIR — the user's "the crosshair in the cad editor is
+  quite large": the NDC half-length 0.045 -> 0.015 (a third of the
+  arm, ~3% of the viewport height across, comparable to the main
+  engine's "+" label). cad_window.c + 8 engine TUs touched — full
+  battery: engine + build_tui with ZERO warnings (-Werror); suite 72
+  registered / 70 blocking / 0 failures; quick 86/86; mgb PASS 44
+  FAIL 0 (tier B skips sans s2tui); mfs FTC gated 5/5 (12 ungated
+  diags); tui-smoke PASS; make everything green in background.
 
 ## §10 Definition of done for v16S (the cut checklist)
 

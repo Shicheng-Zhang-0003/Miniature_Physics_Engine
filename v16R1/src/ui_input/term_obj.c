@@ -21,10 +21,13 @@ const char *term_object_type_name (rigidbody *rigid_body) {
     if (rigid_body -> type == object_cylinder) { return "cyl"; }
     return "cube";
 } /* Single source of truth for the spawn-gun type label (sphere/cube/
- * cylinder + the five catalog hulls — MIG WP2.6 spawn-menu). All
+ * cylinder + the five catalog hulls — MIG WP2.6 spawn-menu — then the
+ * SAVED MIG/CAD specs in spec-store order, MIG WP4 4.6p; the label is
+ * read live so a CAD save shows on the next cycle press). All
  * terminal + overlay-adjacent displays must use this, never inline. */
 const char *term_spawn_type_name (void) {
-    switch (main_inputs.current_spawn_type) {
+    const int t = main_inputs.current_spawn_type;
+    switch (t) {
         case 0: { return "sphere"; }
         case 1: { return "cube"; }
         case 2: { return "cylinder"; }
@@ -32,7 +35,15 @@ const char *term_spawn_type_name (void) {
         case 4: { return "pyr4"; }
         case 5: { return "pyr3"; }
         case 6: { return "icosa"; }
-        default: { return "ell"; }
+        case 7: { return "ell"; }
+        default: {
+            const int n = mig_spec_store_count ();
+            if (t - 8 < n) {
+                const char *name = mig_spec_store_name_at (t - 8);
+                if (name) { return name; }
+            }
+            return "spec";
+        }
     }
 }
 const char *term_object_state_name (rigidbody *rigid_body) {
