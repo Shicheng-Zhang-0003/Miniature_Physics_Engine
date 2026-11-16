@@ -53,23 +53,25 @@
  *     straight-down gravity settle to the highest supporter or the
  *     floor, landed EXACTLY). An Esc mid-carry unlocks and the carry
  *     follows the cursor until the release.
- *   - IJKL (WP4 4.6n — DUAL meaning, the user's fix ruling "fix the
- *     ijkl": 4.6m made it carry-only, so free it did NOTHING):
- *     while FREE (locked, not carrying) it is the ENGINE's own IJKL
- *     fine steer, verbatim signs from simulation_camera.c:63-67
- *     (I=pitch+, K=pitch−, J=yaw−, L=yaw+ at ijkl_speed*dt), mapped
- *     through the CAD camera's two documented flips (its yaw+ turns
- *     left, its pitch+ is eye elevation) — so I looks up, K looks
- *     down, J turns left, L turns right, and the eye never moves (a
- *     LOOK, via cw_rotate_view). While CARRYING it stays the 4.6m
+ *   - IJKL (WP4 4.6o — the user's ruling: "ijkl is the OBJECT
+ *     movement, not the camera movement anymore" — this supersedes
+ *     the 4.6n free-steer meaning; the camera NEVER moves from IJKL,
+ *     the mouse is the only look). While CARRYING it is the 4.6m
  *     DIRECT nudge — the user's "just like the mouse can move the
  *     objects around, ijkl moves objects around much more
  *     precisely": the camera does NOT move; I/K push the carried
  *     part farther/closer ALONG the view ray (cw_drag_t, floored
  *     above the eye) and J/L slide it left/right ACROSS the view
  *     (the grip offset along the camera's right) at CW_NUDGE_SPEED
- *     (0.5 m/s — a tenth of the fly). Latched like the fly keys
- *     (press sets, release clears, the tick polls) in BOTH modes.
+ *     (0.5 m/s — a tenth of the fly). While FREE it is the SAME
+ *     view-relative nudge applied to the SELECTED part
+ *     (cw_nudge_selected: silent with nothing selected, frozen
+ *     during the settle fall like the arrows; the delta writes
+ *     EXACT — snap bypassed, a direct move is a surface truth — and
+ *     the floor wins after, the resize lift rule). Latched like the
+ *     fly keys (press sets, release clears, the tick polls), in
+ *     BOTH pointer modes, not lock-gated (an Esc'd carry stays
+ *     nudgeable).
  *   - RMB: PLACE the picker shape at the aim point — the crosshair
  *     while locked, the cursor ray while unlocked; no-op while a
  *     carry is live (the carried part sits at the crosshair; a place
@@ -768,6 +770,17 @@ static void cw_refresh_dropdown (void) {
  * panel pattern): emit canonical text -> write -> parse back -> stage
  * into the shared store. Write-on-success everywhere. */
 static void cw_save_design (void) {
+    if (cw_design.name [0] == '\0') {
+        /* Belt-and-braces for the grammar's one refused state (the
+         * init names the design and cad_set_name guards renames, so
+         * this is unreachable in practice — but the dead end must not
+         * exist): an empty name auto-fills and the save proceeds. */
+        cad_set_name (&cw_design, "untitled");
+        if (cw_name_entry) {
+            gtk_editable_set_text (GTK_EDITABLE (cw_name_entry),
+                                   cw_design.name);
+        }
+    }
     mig_spec spec;
     int rc = cad_design_to_spec (&cw_design, &spec);
     if (rc != cad_ok) {
@@ -848,7 +861,16 @@ static void cw_rename_from_entry (void) {
     int rc = cad_set_name (&cw_design, text);
     if (rc != cad_ok) {
         char buf [128];
-        snprintf (buf, sizeof (buf), "rename refused (%s)", cw_err_name (rc));
+        /* WP4 4.6o: the bad-name refusal states the grammar's charset
+         * — "rename refused (bad-name)" alone gave the user nothing
+         * to type next. */
+        if (rc == cad_bad_name) {
+            snprintf (buf, sizeof (buf), "rename refused (bad-name: "
+                                         "use A-Z a-z 0-9 _ -)");
+        } else {
+            snprintf (buf, sizeof (buf), "rename refused (%s)",
+                      cw_err_name (rc));
+        }
         cw_status_err (buf);
         return;
     }
@@ -1240,6 +1262,53 @@ static void cw_nudge_carry (float dt) {
     }
 }
 
+/* The FREE half of the IJKL nudge (WP4 4.6o — the user's ruling: "ijkl
+ * is the OBJECT movement, not the camera movement anymore"): nothing
+ * is carried, so the SAME view-relative semantics apply to the
+ * SELECTED part — I pushes it AWAY along the view ray (forward), K
+ * pulls it closer, J slides it left along the camera's right, L
+ * right. Same speed as the carry nudge (CW_NUDGE_SPEED, 0.5 m/s).
+ * The delta writes EXACT (cw_write_exact — snap bypassed: a direct
+ * move is a surface truth, like the G lift) and the floor wins after
+ * (the resize lift rule: cw_rest_y_for, exact lift if clipped). The
+ * tick calls this only in IDLE — frozen during the settle fall (the
+ * arrows' own rule) and silent with nothing selected, so a held IJKL
+ * never fights the settle's writes. Works in BOTH pointer modes (the
+ * carry nudge's not-lock-gated rule extends here). */
+static void cw_nudge_selected (float dt) {
+    if (cw_design.selected < 0) { return; }
+    const float speed = CW_NUDGE_SPEED * dt;
+    const vector3 fwd = cad_view_forward (&cw_camera);
+    const vector3 right = cad_view_right (&cw_camera);
+    vector3 delta = {0.0f, 0.0f, 0.0f};
+    if (cw_key_i) {
+        delta = vector3_addition (delta, vector3_scaling (fwd, speed));
+    }
+    if (cw_key_k) {
+        delta = vector3_subtraction (delta, vector3_scaling (fwd, speed));
+    }
+    if (cw_key_j) {
+        delta = vector3_subtraction (delta, vector3_scaling (right, speed));
+    }
+    if (cw_key_l) {
+        delta = vector3_addition (delta, vector3_scaling (right, speed));
+    }
+    if ((delta.x == 0.0f) && (delta.y == 0.0f) && (delta.z == 0.0f)) {
+        return;
+    }
+    const int idx = cw_design.selected;
+    vector3 pos = vector3_addition (cw_design.parts [idx].position, delta);
+    cw_write_exact (idx, pos);
+    const mig_part *q = &cw_design.parts [idx];
+    const float rest = cw_rest_y_for (idx);
+    if (q -> position.y < rest) {
+        pos = q -> position;
+        pos.y = rest;
+        cw_write_exact (idx, pos);
+    }
+    cw_status_refresh ();
+}
+
 /* Delete a part by INDEX, retargeting (or cancelling) the carry and
  * settle slots BEFORE the model shifts indices — cad_delete moves
  * every higher part down one, and a slot pointing past the shift
@@ -1512,9 +1581,9 @@ static void cw_rotate_view (float d_yaw_deg, float d_pitch_deg) {
  * forward_x = -sin(yaw)*cos(pitch), so yaw_deg+ turns LEFT — mouse-
  * right must turn right, hence the yaw negation; pitch_deg is the
  * EYE's elevation above the target, so looking UP lowers it — the
- * pitch negation. The MOUSE flips live here; the IJKL flips live at
- * cw_steer_keys. Sensitivity is the engine's own config
- * (camera.steer_sensitivity, default 0.12). */
+ * pitch negation. Both flips live HERE and nowhere else (the mouse is
+ * the only look — 4.6o removed the IJKL steer). Sensitivity is the
+ * engine's own config (camera.steer_sensitivity, default 0.12). */
 static void cw_apply_steer (float dx_right, float dy_up) {
     const float s = g_cfg.camera.steer_sensitivity;
     cw_rotate_view (-dx_right * s, -dy_up * s);
@@ -1559,30 +1628,10 @@ static void cw_fly_translate (float dt) {
     cw_camera.target = t;
 }
 
-/* The ENGINE's own IJKL fine steer, ported (WP4 4.6n — the user's
- * "fix the ijkl": 4.6m made IJKL carry-only, so free it did nothing).
- * simulation_camera.c:63-67 verbatim:
- *   I = pitch+ (look up), K = pitch- (look down),
- *   J = yaw- (turn left),  L = yaw+ (turn right),
- * at g_cfg.camera.ijkl_speed (deg/s, default 35) * dt, gated on the
- * engine's debug mode — this window IS that mode while locked. The
- * CAD camera's two documented flips map the intent: pitch_deg is the
- * EYE's elevation (so CAD pitch+ looks DOWN — I negates, K keeps),
- * and yaw_deg+ turns LEFT (so CAD yaw+ IS J's left — J keeps, L
- * negates). Each press routes through cw_rotate_view, so the eye
- * never moves: IJKL turns the view exactly like the mouse does. */
-static void cw_steer_keys (float dt) {
-    const float speed = g_cfg.camera.ijkl_speed * dt;
-    if (cw_key_i) { cw_rotate_view (0.0f, -speed); } /* look up */
-    if (cw_key_k) { cw_rotate_view (0.0f, speed); }  /* look down */
-    if (cw_key_j) { cw_rotate_view (speed, 0.0f); }  /* turn left */
-    if (cw_key_l) { cw_rotate_view (-speed, 0.0f); } /* turn right */
-}
-
-/* Kill every MOVE latch — the fly keys AND the IJKL carry nudge (WP4
- * 4.6m: the nudge rides the same latch discipline). Called on lock
- * edges, focus loss and destroy, so a held key never outlives its
- * context. */
+/* Kill every MOVE latch — the fly keys AND the IJKL object nudge (WP4
+ * 4.6m, carried; 4.6o extends the nudge to the selected part — same
+ * latches, same discipline). Called on lock edges, focus loss and
+ * destroy, so a held key never outlives its context. */
 static void cw_kill_move_latches (void) {
     cw_key_w = 0;
     cw_key_a = 0;
@@ -1819,14 +1868,14 @@ static gboolean cw_on_key (GtkEventControllerKey *controller, guint keyval,
     if (cw_focus_in_name_entry ()) {
         return FALSE;
     }
-    /* The MOVE latches (the fly keys AND the IJKL keys — dual duty
-     * since WP4 4.6n: fine steer while locked and free, the direct
-     * carry nudge while a carry is live): press sets, the tick polls,
-     * release clears (key repeat irrelevant — the engine's on_keypress
-     * pattern). Mode-free: the fly only runs while locked (the tick
-     * gates it), the steer only while locked AND free, the nudge only
-     * while a carry is live — a latch set in the wrong context is
-     * simply dead. */
+    /* The MOVE latches (the fly keys AND the IJKL object nudge — the
+     * user's 4.6o ruling: IJKL moves the OBJECT, never the camera;
+     * carried = the direct grip nudge, free = the selected part):
+     * press sets, the tick polls, release clears (key repeat
+     * irrelevant — the engine's on_keypress pattern). Mode-free: the
+     * fly only runs while locked (the tick gates it), the nudge only
+     * with a carry live or a part selected — a latch set in the wrong
+     * context is simply dead. */
     switch (keyval) {
         case GDK_KEY_w: case GDK_KEY_W: cw_key_w = 1; return TRUE;
         case GDK_KEY_a: case GDK_KEY_A: cw_key_a = 1; return TRUE;
@@ -2067,9 +2116,11 @@ static gboolean cw_tick (gpointer user_data) {
      *     input_control_poll_locked_mouse analog; X11 steers per
      *     motion event instead);
      *   - fly: the latched WASD/Space/Shift translate;
-     *   - free IJKL (WP4 4.6n): the engine's own fine steer while
-     *     locked and NOT carrying (mid-carry IJKL stays the 4.6m
-     *     direct object nudge, polled in the carry branch below);
+     *   - IJKL (WP4 4.6o — the user's "ijkl is the OBJECT movement,
+     *     not the camera movement anymore"): the CARRY branch nudges
+     *     the carried part through the drag state; the IDLE branch
+     *     nudges the SELECTED part directly (cw_nudge_selected).
+     *     SETTLING freezes it (the arrows' own rule);
      *   - the carried part follows EVERY frame — the crosshair ray
      *     while locked, the stored cursor otherwise (zoom mid-carry
      *     keeps it glued); a settling part falls at the world's own
@@ -2077,7 +2128,6 @@ static gboolean cw_tick (gpointer user_data) {
     if (cw_look_locked) {
         cw_look_steer ();
         cw_fly_translate (0.016f);
-        if (cw_mode != CW_MODE_CARRY) { cw_steer_keys (0.016f); }
     }
     if (cw_mode == CW_MODE_CARRY) {
         /* WP4 4.6m: IJKL nudges the CARRIED part directly — BEFORE the
@@ -2091,6 +2141,10 @@ static gboolean cw_tick (gpointer user_data) {
         }
     } else if (cw_mode == CW_MODE_SETTLING) {
         cw_settle_tick (0.016f);
+    } else {
+        /* WP4 4.6o: IJKL free — the selected part gets the same
+         * view-relative nudge, written exact with the floor lift. */
+        cw_nudge_selected (0.016f);
     }
     if (cw_gl_area) {
         gtk_gl_area_queue_render (GTK_GL_AREA (cw_gl_area));
@@ -2186,6 +2240,12 @@ static void cw_on_name_activate (GtkEntry *entry, gpointer user_data) {
 void cad_window_toggle (void) {
     if (!cw_design_ready) {
         cad_design_init (&cw_design);
+        /* WP4 4.6o: a legal name ALWAYS exists. cad_design_init leaves
+         * the name empty and the spec grammar refuses an empty name —
+         * every fresh save died with "save refused (bad-name)" (the
+         * user's report). "untitled" is store-replace-on-save, so
+         * consecutive saves of the same design overwrite cleanly. */
+        cad_set_name (&cw_design, "untitled");
         /* A default pose so the first open shows a usable rig: the
          * camera looks at the grid origin from the usual 3/4 angle. */
         cw_camera.target = (vector3) {0.0f, 0.4f, 0.0f};

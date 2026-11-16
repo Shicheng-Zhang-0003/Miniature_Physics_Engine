@@ -2507,6 +2507,43 @@ Ledger (new entries get a line, never an edit of a past line):
   mgb PASS 44 FAIL 0 (tier B skips sans s2tui); mfs FTC gated 5/5
   (12 ungated diags); tui-smoke PASS; make everything green in
   background.
+- 2026-11-15 — WP4 4.6o (this commit, CAD SAVE-NAME + IJKL OBJECT
+  RULE — the user's verdict on 4.6n, "excellent to a extent" with two
+  reports: "ijkl is the OBJECT movement, not the camera movement
+  anymore, and object saving does not work (everything gives save
+  refused bad name)"). IJKL REINTERPRETED: the 4.6n free-steer port
+  was the wrong reading of "fix the ijkl" — IJKL moves the OBJECT,
+  never the camera (the mouse is the only look; cw_rotate_view stays
+  as the free-look primitive the mouse uses). cw_steer_keys is
+  GONE with its tick call. While CARRYING, IJKL stays the 4.6m
+  direct grip nudge (I/K along the view ray via cw_drag_t, J/L
+  across the view via the grip offset, 0.5 m/s). While FREE it is
+  now the SAME view-relative nudge applied to the SELECTED part —
+  NEW cw_nudge_selected (I pushes away along the forward, K pulls
+  closer, J slides left along the camera's right, L right; silent
+  with nothing selected; the delta writes EXACT via cw_write_exact
+  — snap bypassed, a direct move is a surface truth — and the floor
+  wins after, the resize lift rule via cw_rest_y_for; frozen during
+  SETTLING like the arrows, polled in a new IDLE branch of the
+  tick). Latches unchanged, not lock-gated (an Esc'd carry stays
+  nudgeable; the free nudge rides the same discipline). SAVE FIXED:
+  the "save refused (bad-name)" dead end was the EMPTY design name —
+  cad_design_init leaves name "" and the frozen spec grammar
+  (cad_name_legal: [A-Z a-z 0-9 _ -], 1..63) refuses empty, so EVERY
+  fresh design refused until the user happened to type a legal name
+  into the rename entry and pressed Enter. The window now names the
+  design "untitled" at init (cad_set_name — legal, and the spec
+  store REPLACES on the same name, so consecutive saves overwrite
+  cleanly), cw_save_design belt-and-braces auto-fills "untitled" if
+  the name is somehow still empty (plus the entry refresh), and the
+  rename refusal now states the grammar ("rename refused (bad-name:
+  use A-Z a-z 0-9 _ -)") instead of a bare "bad-name" that gave the
+  user nothing to type next. cad_window.c is an ENGINE TU
+  (ENGINE_SRCS wildcard) — full battery: engine + build_tui with
+  ZERO warnings (-Werror); suite 72 registered / 70 blocking / 0
+  failures; quick 86/86; mgb PASS 44 FAIL 0 (tier B skips sans
+  s2tui); mfs FTC gated 5/5 (12 ungated diags); tui-smoke PASS; make
+  everything green in background.
 
 ## §10 Definition of done for v16S (the cut checklist)
 
