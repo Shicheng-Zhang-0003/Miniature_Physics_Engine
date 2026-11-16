@@ -91,6 +91,15 @@ void editor_update_menus (GtkWidget *parent_window) {
         if (g_cfg.spawner.hull_height < 0.02f) { g_cfg.spawner.hull_height = 0.02f; }
         else if (g_cfg.spawner.hull_height > 200.0f) { g_cfg.spawner.hull_height = 200.0f; }
         main_inputs.spawner_menu_level = 0;
+    } else if (main_inputs.spawner_menu_level == 17) {
+        /* MIG WP4 4.6s: the ell's own polar diameter (2:1 prolate
+         * default) — the same clamp windows as the other hull dials. */
+        g_cfg.spawner.ell_height =
+            open_numerical_input_dialog (parent_window, "Ell Height h_ell (m)", g_cfg.spawner.ell_height);
+        editor_reacquire_mouse (parent_window);
+        if (g_cfg.spawner.ell_height < 0.02f) { g_cfg.spawner.ell_height = 0.02f; }
+        else if (g_cfg.spawner.ell_height > 200.0f) { g_cfg.spawner.ell_height = 200.0f; }
+        main_inputs.spawner_menu_level = 0;
     }
     if (main_inputs.spawner_menu_level == 8) {
         /* Spawn-type cycle (sphere, cube, cylinder, prism, pyr4, pyr3,

@@ -2680,6 +2680,41 @@ Ledger (new entries get a line, never an edit of a past line):
   71 blocking / 0 failures; quick 87/87; mgb PASS 44 FAIL 0 (tier
   B skips sans s2tui); mfs FTC gated 5/5 (12 ungated diags);
   tui-smoke PASS; make everything green in background.
+- 2026-11-15 — WP4 4.6s (this commit, ELL SPAWN 2:1 PROLATE — the
+  user's post-4.6r report: "the elliptoid shape isn't an elliptoid
+  → it's just a sphere with a mesh smaller than a normal cube and
+  masquerading as a sphere"). The render was honest: the ell spawns
+  with the SHARED dials (hull_size = hull_height = 1.0 — schema
+  default AND the user's engine.cfg), and an ellipsoid with
+  equatorial diameter = polar diameter IS a sphere (inscribed in
+  the default cube's footprint, hence "smaller"), and NO code path
+  resizes a hull after spawn (the S4a resize panel covers sphere/
+  cylinder/cube only — a selected hull even titled "Cube" with all
+  rows hidden; hull_size_s/h are written ONLY by the add_hull
+  stamp). FIX, spawn-shape scope per the user's pick: the ell gets
+  its OWN polar diameter — NEW config key spawner.ell_height
+  ("Ell Height (h_ell)", schema default 2.0, windows [0.02, 200];
+  hull_height's descriptor now scopes it to prism/pyr4/pyr3; h
+  below s is oblate and documented) — spawner_launch_hull hands
+  add_hull (s, ell_height) for kind 4 (other kinds unchanged) and
+  the reach uses max(s, h_spawn) so tall ells clear the player;
+  the spawn menu's Hull Settings screen carries the dial (5: Ell
+  Height → dialog 17, input_control dispatch + editor dialog +
+  overlay screens, the same clamp windows as the other dials).
+  The config save/load is schema-driven so old engine.cfg files
+  default to 2.0 with no edit. Suite gate mig_spawner_ell_default
+  (74th) pins the schema default via the registry walk and the
+  (s, h) = (1, 2) spawn truth end to end (hull_size stamp,
+  hull_analytic 1, semi-axes (0.5, 0.5, 1.0), pool slice
+  untouched). KNOWN NEXT: hulls are still un-resizable post-spawn
+  (a re-stamp seam: pool-slice discipline + inertia + analytic
+  fields) — the natural follow-up brick. mpe_config.h +
+  mpe_config_schema.c + object_spawner.c + input_control.c +
+  editor.c + overlay.c + suite — full battery: engine + build_tui
+  with ZERO warnings (-Werror); suite 74 registered / 72 blocking
+  / 0 failures; quick 88/88; mgb PASS 44 FAIL 0 (tier B skips
+  sans s2tui); mfs FTC gated 5/5 (12 ungated diags); tui-smoke
+  PASS; make everything green in background.
 
 ## §10 Definition of done for v16S (the cut checklist)
 

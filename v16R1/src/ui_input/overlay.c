@@ -196,7 +196,7 @@ void overlay_update (void) {
              * through. */
             else if (main_inputs.spawner_menu_level == 13)
                 snprintf (buf, sizeof (buf),
-                          "-- Hull Settings --\n1: Mass\n2: Size (s)\n3: Height (h)\n4: Hull Contacts: %s\nEnter: Close",
+                          "-- Hull Settings --\n1: Mass\n2: Size (s)\n3: Height (h)\n4: Hull Contacts: %s\n5: Ell Height (h_ell)\nEnter: Close",
                           g_cfg.composite.hull ? "ON" : "OFF");
             else if (main_inputs.spawner_menu_level == 14)
                 snprintf (buf, sizeof (buf),
@@ -210,6 +210,11 @@ void overlay_update (void) {
                 snprintf (buf, sizeof (buf),
                           "-- Hull Height (h) --\nCurrent: %.2f m\n\nValue dialog active (step %.2f)",
                           g_cfg.spawner.hull_height, adj);
+            /* MIG WP4 4.6s: the ell's own polar diameter screen. */
+            else if (main_inputs.spawner_menu_level == 17)
+                snprintf (buf, sizeof (buf),
+                          "-- Ell Height (h_ell) --\nCurrent: %.2f m\n\nValue dialog active (step %.2f)",
+                          g_cfg.spawner.ell_height, adj);
             else
             buf [0] = 0;
             gtk_label_set_text (GTK_LABEL (spawner_menu_label), buf);

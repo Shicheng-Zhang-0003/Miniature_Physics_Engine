@@ -82,11 +82,17 @@ void spawner_launch_hull (mpe_hull_shape_kind kind, const char *name, float laun
         return;
     }
     physics_world *world = physics_world_get_primary ();
-    const float reach = fmaxf (g_cfg.spawner.hull_size, g_cfg.spawner.hull_height) + 1.0f;
+    /* MIG WP4 4.6s: the ell spawns its OWN polar diameter (ell_height,
+     * schema default 2 = the visible 2:1 prolate shape) — hull_height
+     * keeps serving the prism/pyramid family. Reach = max(s, h) + 1 so
+     * tall shapes clear the player. */
+    const float h_spawn = (kind == mpe_hull_shape_ellipsoid) ? g_cfg.spawner.ell_height
+                                                             : g_cfg.spawner.hull_height;
+    const float reach = fmaxf (g_cfg.spawner.hull_size, h_spawn) + 1.0f;
     vector3 initial_spawn_position = vector3_addition (
         main_camera_fov.position, vector3_scaling (main_camera_fov.forward_vector, reach));
     int newly_spawned_object_index = physics_world_add_hull (
-        world, kind, g_cfg.spawner.hull_size, g_cfg.spawner.hull_height, g_cfg.spawner.hull_mass,
+        world, kind, g_cfg.spawner.hull_size, h_spawn, g_cfg.spawner.hull_mass,
         initial_spawn_position);
     if (newly_spawned_object_index < 0) {
         event_log_push (2, "spawn refused: %s outside add_hull windows (mass [1e-4,1e6], circumradius [0.01,100]) or pool full",

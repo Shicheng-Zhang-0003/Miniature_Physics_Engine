@@ -306,6 +306,9 @@ gboolean on_keypress (GtkEventControllerKey *w, guint keyval, guint keycode, Gdk
             fprintf (stderr, "[spawner] composite.hull = %d (%s)\n", g_cfg.composite.hull,
                      g_cfg.composite.hull ? "hull contacts ON" : "hull contacts OFF");
         }
+        /* MIG WP4 4.6s: the ell's own polar diameter dial. */
+        if (keyval == GDK_KEY_5)
+            st -> spawner_menu_level = 17;
     } else if (st -> spawner_menu_level == 9) {
         if (keyval == GDK_KEY_1)
             st -> spawner_menu_level = 10;

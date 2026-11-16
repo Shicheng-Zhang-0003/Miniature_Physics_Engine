@@ -208,8 +208,14 @@ static mpe_param s_registry [] = {
      &g_cfg.spawner.hull_mass, 1.0, 0.0001, 1000000.0, false},
     {"spawner.hull_size", "Hull Size (s)", "Base size s for spawned hulls (m): prism/pyr4/pyr3 base width, icosa edge, ell equatorial diameter", p_float,
      cat_spawner, &g_cfg.spawner.hull_size, 1.0, 0.02, 200.0, false},
-    {"spawner.hull_height", "Hull Height (h)", "Height h for spawned hulls (m): prism/pyr4/pyr3 height, ell polar diameter (ignored for icosa)", p_float,
+    {"spawner.hull_height", "Hull Height (h)", "Height h for spawned hulls (m): prism/pyr4/pyr3 height (ignored for icosa and ell)", p_float,
      cat_spawner, &g_cfg.spawner.hull_height, 1.0, 0.02, 200.0, false},
+    /* MIG WP4 4.6s: the ell's own polar diameter — default 2 makes the
+     * spawned ell a visible 2:1 prolate ellipsoid instead of a sphere
+     * masquerading as one (the shared hull_height stays 1 for the
+     * prism/pyramid family). */
+    {"spawner.ell_height", "Ell Height (h_ell)", "Polar diameter h for the spawned ell (m): default 2 is the visible 2:1 prolate shape (equatorial diameter = Hull Size s); h below s is oblate", p_float,
+     cat_spawner, &g_cfg.spawner.ell_height, 2.0, 0.02, 200.0, false},
     {"spawner.speed", "Launch Speed", "Launch velocity for spawned objects (m/s, uncapped — CCD owns fast bodies)",
      p_float, cat_spawner, &g_cfg.spawner.speed, 20.0, 0.0, 150.0, false},
     {"spawner.friction_s", "Spawn Friction (Static)", "Static friction applied to new objects", p_float, cat_spawner,

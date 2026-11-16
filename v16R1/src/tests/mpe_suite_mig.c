@@ -5112,3 +5112,64 @@ int mpe_t_mig_hull_analytic_ell (void) {
     mpe_test_end (&t);
     return t.failures;
 }
+
+/* ---- MIG WP4 4.6s: the ell spawns 2:1 prolate (74th) ----
+ * The ell kind spawns its OWN polar diameter — spawner.ell_height,
+ * schema default 2.0 — instead of the shared hull_height (1.0), so
+ * the out-of-the-box ell reads as an ellipsoid (equatorial diameter
+ * s, polar 2 s) instead of a sphere masquerading as one. The spawn
+ * menu's Hull Settings screen carries the dial (5 -> dialog 17) and
+ * the schema row documents the oblate case. Gate pins the schema
+ * default and the (s, h) = (1, 2) spawn truth end to end: the
+ * stamp, the analytic marker, the exact semi-axes (0.5, 0.5, 1.0),
+ * and the pool slice untouched. */
+int mpe_t_mig_spawner_ell_default (void) {
+    mpe_test_t t;
+    mpe_test_begin (&t, "mig_spawner_ell_default");
+    mpe_clamp_counters_reset ();
+    /* 1. The schema default: walk the registry for the key. */
+    {
+        const mpe_param *found = NULL;
+        for (size_t i = 0; i < g_registry_count; i++) {
+            if (strcmp (g_registry [i].key, "spawner.ell_height") == 0) {
+                found = &g_registry [i];
+                break;
+            }
+        }
+        MPE_CHECK (&t, found != NULL);
+        if (found) {
+            MPE_CHECK (&t, found -> type == p_float);
+            MPE_CHECK_NEAR (&t, (float) found -> def, 2.0f, 1e-6f, "ell_height schema default 2.0");
+        }
+    }
+    /* 2. The (s, h) = (1, 2) spawn truth the spawner now hands add_hull
+     * for kind 4 (the default dial values). */
+    {
+        physics_world w9;
+        mpe_world_begin (&w9);
+        mpe_config_t c9 = g_cfg;
+        c9.composite.hull = 0; /* spawning is NOT flag-gated */
+        physics_world_set_config (&w9, &c9);
+        const int e9 = physics_world_add_hull (&w9, mpe_hull_shape_ellipsoid, 1.0, 2.0, 1.0f,
+                                               (vector3) {0.0f, 2.0f, 0.0f});
+        MPE_CHECK (&t, e9 >= 0);
+        MPE_CHECK (&t, w9.bodies [e9].hull_analytic == 1);
+        MPE_CHECK_NEAR (&t, w9.bodies [e9].hull_size_s, 1.0f, 1e-5f, "ell spawn s stamp");
+        MPE_CHECK_NEAR (&t, w9.bodies [e9].hull_size_h, 2.0f, 1e-5f, "ell spawn h stamp (2:1)");
+        MPE_CHECK_NEAR (&t, w9.bodies [e9].hull_semi_axes.x, 0.5f, 1e-5f, "ell semi a = s/2");
+        MPE_CHECK_NEAR (&t, w9.bodies [e9].hull_semi_axes.y, 0.5f, 1e-5f, "ell semi b = s/2");
+        MPE_CHECK_NEAR (&t, w9.bodies [e9].hull_semi_axes.z, 1.0f, 1e-5f, "ell semi c = h/2");
+        MPE_CHECK (&t, w9.bodies [e9].hull_vert_count > 0); /* pool slice untouched */
+        physics_world_cleanup (&w9);
+    }
+    if (t.failures == 0) {
+        printf ("[PASS] mig WP4 4.6s: ell spawn 2:1 prolate — dedicated ell_height dial + (1,2) spawn stamp\n");
+        MPE_INFO ("spawner.ell_height schema default 2.0 (the ell's own polar diameter;"
+                  " hull_height keeps serving prism/pyr4/pyr3); spawner_launch_hull hands"
+                  " add_hull (s, ell_height) for kind 4 with reach max(s, h) + 1; the (1, 2)"
+                  " spawn stamps hull_size (1, 2), hull_analytic 1, semi (0.5, 0.5, 1.0),"
+                  " pool slice untouched");
+    }
+    mpe_test_end (&t);
+    return t.failures;
+}
