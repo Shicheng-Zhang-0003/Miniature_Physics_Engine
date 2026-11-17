@@ -1149,7 +1149,10 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
                 /* Legacy handling aid for non-mecanum drivetrains (tank):
                  * deadbanded above 3.0 rad/s and ramping to full by 4.5.
                  * Kept verbatim so the calibrated tank pivot baseline
-                 * (0.1555 m / 3.0639 rad) is reproduced; the tank plant has
+                 * (0.1555 m / 3.0639 rad at calibration; re-measured
+                 * 0.0713 m / 2.8206 rad after the 2026-11-17 4.6t torque-free
+                 * rotor fix — coasting governor-cut ticks now take the
+                 * rotor's Newton path) is reproduced; the tank plant has
                  * full engine hub friction and does not need the rate target.
                  * Mirrored per side = zero net force, pure moment.
                  * DESPOT-2026-10-20 (constants policy): 0.6 ramp ceiling and
@@ -1165,7 +1168,9 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
                         float moment = 0.6f * ramp * yaw_mag;
                         /* The 0.24 below is an EMPIRICALLY TUNED GAIN, NOT
                          * the wheel stance: the calibrated tank pivot
-                         * baseline (0.1555 m / 3.0639 rad) was measured with
+                         * baseline (0.1555 m / 3.0639 rad at calibration;
+                         * 0.0713 m / 2.8206 rad after the 2026-11-17 4.6t
+                         * torque-free rotor fix) was measured with
                          * this literal value, and the tank plant routes yaw
                          * through full engine hub friction, not the analytic
                          * roller path. Do NOT "fix" it toward WHEEL_OFFSET_X

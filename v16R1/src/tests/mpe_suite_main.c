@@ -133,6 +133,7 @@ int mpe_t_mig_hull_ellipsoid (void);
 int mpe_t_mig_hull_render_stamp (void);
 int mpe_t_mig_hull_analytic_ell (void);
 int mpe_t_mig_spawner_ell_default (void); /* MIG WP4 4.6s */
+int mpe_t_mig_rotor_spin_stability (void); /* MIG WP4 4.6t */
 int mpe_t_cad_editor_model (void);
 int mpe_t_cad_view_math (void);
 typedef struct {
@@ -313,6 +314,13 @@ static const mpe_entry_t mpe_registry [] = {
      * spawner.ell_height dial (schema default 2) and the (1, 2)
      * spawn stamp the spawner hands add_hull. */
     {"mig_spawner_ell_default", mpe_t_mig_spawner_ell_default, 0},
+    /* MIG WP4 4.6t: torque-free rotor spin stability — the spin-pump fix.
+     * The L-rotor's fixed point is linearly unstable across a wide band of
+     * |w|*dt; the old explicit-gyro fall-through pumped a tilted spinning
+     * ellipsoid 60 -> 760 rad/s in flight. Newton on the SAME implicit
+     * equation now owns the band: |L| conserved to round-off, |w| inside
+     * the exact envelope, rotational energy never grows. */
+    {"mig_rotor_spin_stability", mpe_t_mig_rotor_spin_stability, 0},
     /* MIG WP4 4.6: the miniature CAD editor's DESIGN MODEL (cad/cad_editor.c)
      * — typed adds + full refusal battery (write-on-success, memcmp
      * witness), snap/rotate/dup/array transforms with the left-composition

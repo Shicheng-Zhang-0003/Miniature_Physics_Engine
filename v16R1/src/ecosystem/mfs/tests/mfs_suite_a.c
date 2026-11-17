@@ -283,7 +283,7 @@ int mfs_t_tank (void) {
          * bit-identical disp/heading over three -O2 runs and under
          * -O1+ASan/UBSan (both failed identically pre-rebaseline, proving
          * determinism, not flake). */
-        MFS_CHECK_REL (t_ptr, heading, 3.0639f, 0.08f, "tank pivot heading (measured baseline)");
+        MFS_CHECK_REL (t_ptr, heading, 2.8206f, 0.08f, "tank pivot heading (measured baseline)");
         /* DESPOT-2026-10-20 CCD-TOI GRAVITY re-baseline: the sweep-clamped
          * ticks of the physics loop no longer double-count gravity (the
          * pre-touch window is banked in v_toi, the post-impulse flight is
@@ -301,8 +301,32 @@ int mfs_t_tank (void) {
          * 0.0478 translation was measured under the last sliding-value
          * regime; under true rolling differential the pivot translates
          * 0.1555 (deterministic, verified suite-wide — teleop/odometry/
-         * strafe/yaw-sign/stall all still reference-pass). */
-        MFS_CHECK_REL (t_ptr, disp, 0.1555f, 0.20f, "tank pivot translation (measured baseline)");
+         * strafe/yaw-sign/stall all still reference-pass).
+         * DESPOT-2026-11-17 4.6T ROTOR re-baseline: the torque-free L rotor
+         * in rb_integrate_velocity is linearly UNSTABLE as a fixed point
+         * across |w|*dt ~(0.8, 2pi) (Jacobian rho > 1 at its own root; a
+         * tilted ellipsoid pumped 60 -> 760 rad/s in free flight), so its
+         * non-converged path now solves the SAME implicit equation with a
+         * damped step-limited Newton (converged implicit-Euler,
+         * dissipative) instead of falling through to the explicit Euler
+         * gyroscopic step. Tank pivot wheels coast on governor-cut ticks
+         * at the no-load bound — those ticks are torque-free — so the
+         * transverse (yaw) wheel spin now gets the converged+dissipative
+         * treatment instead of the old energy-growing gyro kick, and the
+         * pivot's stray translation halves: 0.1555 -> 0.0713 (less
+         * parasitic scrub, same drive law). Heading moved
+         * 3.0639 -> 2.8206 (-7.9%, was razor-thin inside its 8% band)
+         * under the same cause — re-anchored together so the next engine
+         * correction does not trip a stale margin. Suite-wide check:
+         * teleop/odometry/strafe/yaw-sign/stall/physics_truth all still
+         * reference-pass; the engine-level contract is pinned headless by
+         * the mpe suite gate mig_rotor_spin_stability (|L| conserved to
+         * round-off, |w| inside the exact torque-free envelope,
+         * rotational energy never grows).
+         * This is a correction, not a regression. Verified a fixed point:
+         * bit-identical disp/heading over three -O2 runs and under
+         * -O1+ASan/UBSan (0.071349 / 2.8206 in all four). */
+        MFS_CHECK_REL (t_ptr, disp, 0.0713f, 0.20f, "tank pivot translation (measured baseline)");
         if (t_ptr -> failures == 0) { printf ("[PASS] tank differential turn (disp=%.4f, heading=%.4f)\n", disp, heading); }
     } physics_world_cleanup (&w);
     free (robot);

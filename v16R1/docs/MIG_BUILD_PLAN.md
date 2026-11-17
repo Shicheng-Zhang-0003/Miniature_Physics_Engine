@@ -2715,6 +2715,64 @@ Ledger (new entries get a line, never an edit of a past line):
   / 0 failures; quick 88/88; mgb PASS 44 FAIL 0 (tier B skips
   sans s2tui); mfs FTC gated 5/5 (12 ungated diags); tui-smoke
   PASS; make everything green in background.
+- 2026-11-17 — WP4 4.6t (this commit, TORQUE-FREE ROTOR SPIN STABILITY —
+   the user's report: "bounce and restitution for elliptoids are a
+   little off (sometimes the elliptoids after spinning too quickly
+   just bounced and kept rotating extremely rapidly)"). DIAGNOSIS
+   (traced, not guessed): the restitution/oracle path verified EXACT
+   in symmetric poses; the pump is NOT in the contact solver — a
+   per-pass applied-impulse trace showed dL_resolve = dL_poisson = 0
+   through the whole explosion window (t=30-49) — it is the IN-FLIGHT
+   ROTATIONAL INTEGRATOR. The torque-free L-conservation rotor's
+   8-pass fixed point is LINEARLY UNSTABLE AT ITS OWN ROOT (standalone
+   study, 17/11/26: Jacobian spectral radius 1.0-1.6 across
+   |w|*dt ~(0.8, 2pi); the failure windows repeat with period 2pi), so
+   a tilted ellipsoid spun at 60 rad/s (= 1.0 rad/step) failed every
+   pass and fell through to the explicit Euler gyroscopic step, which
+   is unconditionally energy-growing for anisotropic bodies: |w|
+   60 -> 760 rad/s in ~20 ticks, 499 m launch, restitution 0 still
+   reached 382 (the same implicit equation has a perfectly good root
+   there — I(R_root).w_root reproduces L to 1e-9..1e-13 with |w_root|
+   inside the exact torque-free envelope [|L|/I_max, |L|/I_min]; only
+   the ITERATION was wrong). FIX: the non-converged path now solves
+   the SAME implicit equation with a damped step-limited Newton
+   (finite-difference Jacobian, quarter-|w| trust region, line
+   search; the shared map rb_rotor_predicted_omega is byte-for-byte
+   the inline rotor construction, so the converged path's numerics
+   are untouched); the physical-envelope acceptance rejects aliased
+   roots (|w|*dt = theta + 2pi*k); if Newton stalls (2 of 52 sweep
+   points, near-singular band) omega FREEZES (bounded drift, zero
+   growth). The explicit gyro path remains only where it is correct:
+   external-torque bodies (L-branch skipped), isotropic bodies (the
+   gyro term is exactly zero), and L ~ 0. HONEST LIMIT (documented):
+   the scheme is first-order implicit-Euler — dissipative, never
+   growing — so a hard tumbler at |w|*dt ~ 1 rolls its rotational KE
+   down to the 0.5 L^2/I_max floor (measured T/T0 = 0.387 in 10 s of
+   free tumble, then stable; the theory floor is 0.388) while |L|
+   stays conserved to 2.5e-4 (round-off on the orientation product;
+   the pump path measured 16% L drift). A second-order rotational
+   scheme is the future brick. Suite gate mig_rotor_spin_stability
+   (75th) pins the contract headless: free-flight tilted tumble —
+   |L| drift <= 0.5%, |w| inside the exact envelope both edges,
+   rotational energy never grows; ground contact at the user's exact
+   pose (70 deg tilt, spin 60, e = 0.5) — max|w| <= 1.25x start
+   (measured 60.000; the pump ran to 1862), y_max <= 15 m (measured
+   1.199; the pump reached 499), no net spin gain. MFS side impact:
+   the tank pivot's coasting governor-cut ticks are torque-free, so
+   their transverse wheel spin moved from the energy-growing gyro
+   kick to the converged+dissipative path — stray pivot translation
+   0.1555 -> 0.0713 (less parasitic scrub), heading 3.0639 ->
+   2.8206 (-7.9%, was razor-thin inside its 8% band); re-baselined
+   with the cause chain + determinism proof (bit-identical over
+   three -O2 runs and under -O1+ASan/UBSan, 0.071349 / 2.8206 in all
+   four; robot.c provenance comments updated, tuned constants
+   untouched). core/rigidbody.c + tests/mpe_suite_main.c +
+   tests/mpe_suite_mig.c + ecosystem/mfs/tests/mfs_suite_a.c +
+   ecosystem/mfs/modules/ftc/submodules/robot.c — full battery:
+   suite 75 registered / 73 blocking / 0 failures; quick 89/89; mgb
+   PASS 44 FAIL 0 (tier B skips sans s2tui); mfs FTC gated 5/5
+   (12 ungated diags); tui-smoke PASS; make everything green in
+   background.
 
 ## §10 Definition of done for v16S (the cut checklist)
 

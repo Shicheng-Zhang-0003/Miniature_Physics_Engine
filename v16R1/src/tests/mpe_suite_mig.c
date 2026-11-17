@@ -5173,3 +5173,146 @@ int mpe_t_mig_spawner_ell_default (void) {
     mpe_test_end (&t);
     return t.failures;
 }
+
+int mpe_t_mig_rotor_spin_stability (void) {
+    mpe_test_t t;
+    mpe_test_begin (&t, "mig_rotor_spin_stability");
+    mpe_clamp_counters_reset ();
+    /* 1. Free-flight torque-free anisotropic tumble. The user's spin-pump
+     * bug lived here: the torque-free L rotor's 8-pass fixed point is
+     * LINEARLY UNSTABLE at its own root (Jacobian spectral radius 1.0-1.6,
+     * study 17/11/26) across |w|*dt ~(0.8, 2pi), so a tilted ellipsoid
+     * spun at 60 rad/s (= 1.0 rad/step) failed every pass in flight and
+     * fell through to the explicit Euler gyroscopic step — unconditionally
+     * energy-growing for anisotropic bodies: |w| 60 -> 760 in ~20 ticks,
+     * 499 m launch, restitution 0 still reached 382. The fix hands the
+     * band to a damped step-limited Newton solve of the SAME implicit
+     * equation, so the solved omega is the one the converged fixed point
+     * would produce and the orientation rotor applied later stays exactly
+     * self-consistent; if Newton stalls, omega freezes (bounded drift,
+     * zero growth). Contract here: |L| conserved to round-off, |w| pinned
+     * inside the exact torque-free envelope, rotational energy never
+     * GROWS (implicit-Euler dissipation toward the 0.5*L^2/I_max floor is
+     * the documented honest limit of the first-order scheme; the pump was
+     * unbounded growth). */
+    {
+        physics_world w9;
+        mpe_world_begin (&w9); /* static_plane_enabled defaults false: free flight */
+        mpe_config_t c9 = g_cfg;
+        c9.composite.hull = 0; /* spawning is NOT flag-gated */
+        physics_world_set_config (&w9, &c9);
+        const int e9 = physics_world_add_hull (&w9, mpe_hull_shape_ellipsoid, 1.0, 2.0, 1.0f,
+                                               (vector3) {0.0f, 50.0f, 0.0f});
+        MPE_CHECK (&t, e9 >= 0);
+        /* Tilt 10 deg about world x; spin 60 rad/s along body-z (world dir
+         * (0, -sin10, cos10)) plus a 2 rad/s transverse kick about world x
+         * (body-x == world-x after the tilt): genuine off-principal-axis
+         * tumbling at |w|*dt ~ 1 rad/step, inside the old failure band. */
+        w9.bodies [e9].orientation =
+            vector4_from_axis_with_angle ((vector3) {1, 0, 0}, 10.0f * 3.14159265f / 180.0f);
+        rigidbody_update_axes (&w9.bodies [e9]);
+        const float s10 = 0.17364818f, c10 = 0.98480775f;
+        w9.bodies [e9].angular_velocity = (vector3) {2.0f, -60.0f * s10, 60.0f * c10};
+        rigidbody_wake (&w9.bodies [e9]);
+        math3 Rm = vector4_to_math3 (w9.bodies [e9].orientation);
+        math3 Rmt = math3_transposition (Rm);
+        math3 Iw = math3_multiplication (Rm, math3_multiplication (w9.bodies [e9].inertia_tensor_local, Rmt));
+        vector3 L0 = math3_multiplication_vector3 (Iw, w9.bodies [e9].angular_velocity);
+        const float l0 = vector3_length (L0);
+        math3 Il = w9.bodies [e9].inertia_tensor_local;
+        const float imin = fminf (fminf (Il.matrix [0][0], Il.matrix [1][1]), Il.matrix [2][2]);
+        const float imax = fmaxf (fmaxf (Il.matrix [0][0], Il.matrix [1][1]), Il.matrix [2][2]);
+        const float t0_energy =
+            0.5f * vector3_dot (w9.bodies [e9].angular_velocity, L0);
+        MPE_CHECK (&t, t0_energy > 0.0f);
+        float l_drift_max = 0.0f, w_max = 0.0f, w_min = 1e30f, t_ratio_max = -1e30f;
+        for (int step = 0; step < 600; step++) { /* 10 s */
+            physics_world_step (&w9, 1.0f / 60.0f);
+            Rm = vector4_to_math3 (w9.bodies [e9].orientation);
+            Rmt = math3_transposition (Rm);
+            Iw = math3_multiplication (Rm, math3_multiplication (w9.bodies [e9].inertia_tensor_local, Rmt));
+            vector3 L = math3_multiplication_vector3 (Iw, w9.bodies [e9].angular_velocity);
+            const float ld = fabsf (vector3_length (L) - l0) / l0;
+            if (ld > l_drift_max) { l_drift_max = ld; }
+            const float wm = vector3_length (w9.bodies [e9].angular_velocity);
+            if (wm > w_max) { w_max = wm; }
+            if (wm < w_min) { w_min = wm; }
+            const float tr =
+                0.5f * vector3_dot (w9.bodies [e9].angular_velocity, L) / t0_energy;
+            if (tr > t_ratio_max) { t_ratio_max = tr; }
+        }
+        /* |L| drift: measured 2.5e-4 over 10 s (float roundoff on the
+         * orientation product); the pump path measured 16 pct. Gate at the
+         * house angmom ceiling. */
+        MPE_CHECK (&t, l_drift_max <= 0.005f);
+        /* Envelope pin, both edges: omega is derived each tick as
+         * I(R_current)^-1 L with the conserved L, so |w| lives in
+         * [|L|/I_max, |L|/I_min] exactly (measured [23.23, 59.98] inside
+         * [23.23, 60.27]; the pump ran to 402). */
+        MPE_CHECK (&t, w_max <= l0 / imin + 0.05f);
+        MPE_CHECK (&t, w_min >= l0 / imax - 0.05f);
+        /* No energy injection: the rotor is dissipative, never growing T
+         * (measured max ratio 0.999). */
+        MPE_CHECK (&t, t_ratio_max <= 1.01f);
+        MPE_CHECK (&t, mpe_world_finite (&w9));
+        physics_world_cleanup (&w9);
+    }
+    /* 2. The user's report verbatim, ground contact: the tilted spinning
+     * ell at the pump speed on the floor. Old behavior: bounces converted
+     * the pumped spin into launches (y to 499 m, |w| x31, hops sustained
+     * even at restitution 0). Contract: no pump, no mega-launch, no net
+     * spin gain after 10 s of contact. */
+    {
+        physics_world w9;
+        mpe_world_begin (&w9);
+        w9.static_plane_enabled = true;
+        mpe_config_t c9 = g_cfg;
+        c9.composite.hull = 1;
+        physics_world_set_config (&w9, &c9);
+        const int e9 = physics_world_add_hull (&w9, mpe_hull_shape_ellipsoid, 1.0, 2.0, 1.0f,
+                                               (vector3) {0.0f, 1.2f, 0.0f});
+        MPE_CHECK (&t, e9 >= 0);
+        w9.bodies [e9].orientation =
+            vector4_from_axis_with_angle ((vector3) {1, 0, 0}, 70.0f * 3.14159265f / 180.0f);
+        rigidbody_update_axes (&w9.bodies [e9]);
+        w9.bodies [e9].restitution = 0.5f;
+        w9.bodies [e9].friction_static = 0.3f;
+        w9.bodies [e9].friction_kinetic = 0.2f;
+        const float s70 = 0.93969262f, c70 = 0.34202014f;
+        w9.bodies [e9].angular_velocity = (vector3) {0.0f, -60.0f * s70, 60.0f * c70};
+        rigidbody_wake (&w9.bodies [e9]);
+        const float w_start = vector3_length (w9.bodies [e9].angular_velocity);
+        float w_max = 0.0f, y_max = 0.0f;
+        for (int step = 0; step < 600; step++) { /* 10 s */
+            physics_world_step (&w9, 1.0f / 60.0f);
+            const float wm = vector3_length (w9.bodies [e9].angular_velocity);
+            if (wm > w_max) { w_max = wm; }
+            if (w9.bodies [e9].position.y > y_max) { y_max = w9.bodies [e9].position.y; }
+        }
+        /* No pump (measured max 60.000 == start; the pump ran to 1862). */
+        MPE_CHECK (&t, w_max <= 1.25f * w_start);
+        /* No mega-launch (measured 1.199 m; the pump reached 499 m). */
+        MPE_CHECK (&t, y_max <= 15.0f);
+        /* No net spin gain: friction/contact may bleed spin, never feed it
+         * past the start (measured final 20.2). */
+        MPE_CHECK (&t, vector3_length (w9.bodies [e9].angular_velocity) <= w_start);
+        MPE_CHECK (&t, mpe_world_finite (&w9));
+        physics_world_cleanup (&w9);
+    }
+    if (t.failures == 0) {
+        printf ("[PASS] mig WP4 4.6t: torque-free rotor spin stability — Newton fallback kills the spin pump\n");
+        MPE_INFO ("the torque-free L rotor's fixed point is linearly unstable (Jacobian rho > 1 at its"
+                  " own root) across |w|*dt ~(0.8, 2pi): a tilted ellipsoid spun at 60 rad/s (=1.0"
+                  " rad/step) fell through to the explicit Euler gyroscopic step and pumped 60 -> 760"
+                  " rad/s in flight (499 m launch; e=0 still reached 382). Fix: damped step-limited"
+                  " Newton solves the SAME implicit equation (root = the converged fixed point's"
+                  " omega, so the later orientation rotor stays self-consistent; physical-envelope"
+                  " acceptance rejects aliased roots); if Newton stalls omega freezes. |L| conserves"
+                  " to round-off (measured 2.5e-4 over 10 s; the pump path measured 16 pct), |w| stays"
+                  " inside the exact envelope, rotational energy never grows (implicit-Euler"
+                  " dissipation toward the 0.5 L^2/I_max floor at 1 rad/step is the documented honest"
+                  " limit; a second-order scheme is the future brick)");
+    }
+    mpe_test_end (&t);
+    return t.failures;
+}

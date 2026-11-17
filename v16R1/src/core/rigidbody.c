@@ -812,7 +812,133 @@ float rb_get_kinetic_energy (rigidbody *rigid_body) {
     vector3 angular_momemtum = math3_multiplication_vector3 (a3_ke_world_inertia, rigid_body -> angular_velocity);
     float rotational_kinetic_energy = 0.5f * vector3_dot (rigid_body -> angular_velocity, angular_momemtum);
     return linear_kinetic_energy + rotational_kinetic_energy;
-} // Integration Segmentation (Movement Compute)
+} /* MPE_TASK_4.6T rotor map: one evaluation of the torque-free implicit
+   *
+   *   w' = I(rotor(w, |w|*dt) . R0)^-1 . L
+   *
+   * shared by the fixed-point iteration and the Newton fallback below. The
+   * math is byte-for-byte the construction that lived inline in the fixed
+   * point (double-precision half-angle, same operation order), so the
+   * converged path's numerics are untouched by the refactor. */
+static vector3 rb_rotor_predicted_omega (math3 inertia_local, vector4 orientation, vector3 L,
+                                         float delta_time, vector3 w) {
+    float wsq = vector3_length_squared (w);
+    vector4 rotor = vector4_identity ();
+    if (isfinite (wsq) && wsq > 0.0f) {
+        float wr = sqrtf (wsq);
+        double half = 0.5 * (double) wr * (double) delta_time;
+        double inv = 1.0 / (double) wr;
+        rotor = (vector4) {(float) det_cos (half), (float) ((double) w.x * inv * det_sin (half)),
+                           (float) ((double) w.y * inv * det_sin (half)),
+                           (float) ((double) w.z * inv * det_sin (half))};
+    }
+    vector4 Rp = vector4_normalisation (vector4_multiplication (rotor, orientation));
+    math3 Rn = vector4_to_math3 (Rp);
+    math3 Rnt = math3_transposition (Rn);
+    math3 In = math3_multiplication (Rn, math3_multiplication (inertia_local, Rnt));
+    return math3_multiplication_vector3 (math3_inverse (In), L);
+} /* MPE_TASK_4.6T Newton fallback for the torque-free rotor.
+   *
+   * WHY: the plain fixed point w <- f(w) is linearly unstable at its own
+   * root across a wide band of step angles. Study (17/11/26, spin 60 rad/s
+   * tilted off the symmetry axis, sweep |w|*dt over [0.05, 13] rad): the
+   * iteration converges only near theta ~< 0.7 and in windows around
+   * theta = 2*pi*k; through the rest the Jacobian spectral radius at the
+   * true root measures 1.0-1.6, the iterate oscillates with residuals up to
+   * ~12 rad/s, and no pass count or damping can converge a map whose
+   * derivative exceeds 1. The engine hit this in the wild: a tilted
+   * ellipsoid spun at 60 rad/s (=1.0 rad/step) failed all 8 passes in
+   * flight and fell through to the explicit Euler gyroscopic step, which is
+   * unconditionally energy-growing for anisotropic bodies - |w| doubled
+   * every ~5 steps (60 -> 760 rad/s, 499 m launch; restitution 0 still
+   * reached 382). THE SAME IMPLICIT EQUATION has a perfectly good root
+   * there (I(R_root).w_root reproduces L to 1e-9..1e-13 and |w_root| stays
+   * inside the exact torque-free envelope [|L|/I_max, |L|/I_min]); only the
+   * iteration is wrong. So: solve g(w) = f(w) - w = 0 with damped,
+   * step-limited Newton (finite-difference Jacobian). The solved root is
+   * the SAME omega the converged fixed point would produce, so the later
+   * orientation rotor (applied once with the final omega) stays exactly
+   * self-consistent with the inertia the omega was derived from.
+   *
+   * If Newton stalls too (measured at 2 of 52 sweep points, near-singular
+   * Jacobian), the caller freezes omega: bounded L drift (|L| changes by at
+   * most the inertia anisotropy as the body tumbles about a frozen axis),
+   * ZERO energy growth - never the explicit gyro pump. */
+static int rb_rotor_newton_solve (math3 inertia_local, vector4 orientation, vector3 L, float delta_time,
+                                  vector3 w_start, vector3 *w_out) {
+    const float tol = 1e-4f * (vector3_length (L) + 1.0f);
+    /* Physical acceptance envelope for the root. Torque-free flow conserves
+     * L and T, which pins |w| in [|L|/I_max, |L|/I_min] exactly (I_min/I_max
+     * from the local diagonal; exact for the primitive shapes whose local
+     * inertia is diagonal). This rejects any wildly aliased root (the
+     * implicit equation has roots at |w|*dt = theta + 2*pi*k; converging to
+     * one would teleport |w| by 2*pi*k/dt). */
+    const float i_min = fminf (fminf (inertia_local.matrix [0][0], inertia_local.matrix [1][1]),
+                               inertia_local.matrix [2][2]);
+    const float i_max = fmaxf (fmaxf (inertia_local.matrix [0][0], inertia_local.matrix [1][1]),
+                               inertia_local.matrix [2][2]);
+    const float l_mag = vector3_length (L);
+    const float w_hi = (i_min > 0.0f) ? 1.1f * l_mag / i_min : 0.0f;
+    const float w_lo = (i_max > 0.0f) ? 0.9f * l_mag / i_max : 0.0f;
+    vector3 w = w_start;
+    vector3 g0 = simd_sub (rb_rotor_predicted_omega (inertia_local, orientation, L, delta_time, w), w);
+    float resid = vector3_length (g0);
+    for (int it = 0; it < 12; it++) {
+        if (!a3_vector3_is_finite (w)) { return 0; }
+        if (resid < tol) {
+            /* Root found: accept only inside the physical envelope. */
+            float wm = vector3_length (w);
+            if ((wm < w_lo) || (wm > w_hi)) { return 0; }
+            *w_out = w;
+            return 1;
+        }
+        /* Central-difference Jacobian of g at w (columns = d g / d w_c). */
+        const float eps = 1e-6f * (vector3_length (w) + 1.0f);
+        math3 J;
+        vector3 axis [3] = {{1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}};
+        for (int c = 0; c < 3; c++) {
+            vector3 wp = simd_add (w, simd_scale (axis [c], eps));
+            vector3 wm = simd_sub (w, simd_scale (axis [c], eps));
+            vector3 gp = simd_sub (rb_rotor_predicted_omega (inertia_local, orientation, L, delta_time, wp), wp);
+            vector3 gm = simd_sub (rb_rotor_predicted_omega (inertia_local, orientation, L, delta_time, wm), wm);
+            vector3 col = simd_scale (simd_sub (gp, gm), 1.0f / (2.0f * eps));
+            J.matrix [0][c] = col.x;
+            J.matrix [1][c] = col.y;
+            J.matrix [2][c] = col.z;
+        }
+        /* Solve (J - I) d = -g0 for the Newton direction. */
+        math3 A;
+        for (int r = 0; r < 3; r++) {
+            for (int c = 0; c < 3; c++) { A.matrix [r][c] = J.matrix [r][c] - ((r == c) ? 1.0f : 0.0f); }
+        }
+        math3 Ainv = math3_inverse (A);
+        if (!isfinite (Ainv.matrix [0][0])) { return 0; }
+        vector3 d = simd_scale (math3_multiplication_vector3 (Ainv, g0), -1.0f);
+        if (!a3_vector3_is_finite (d)) { return 0; }
+        /* Trust region: the root we want sits near w_start (bodies change
+         * slowly), so cap every step at a quarter of |w|. */
+        float dn = vector3_length (d);
+        float wl = vector3_length (w);
+        if (dn > 0.25f * wl) { d = simd_scale (d, 0.25f * wl / dn); }
+        /* Damped line search: halve until the residual improves. */
+        float resid_best = resid;
+        vector3 w_best = w;
+        vector3 d_try = d;
+        for (int ls = 0; ls < 10; ls++) {
+            vector3 wt = simd_add (w, d_try);
+            vector3 gt = simd_sub (rb_rotor_predicted_omega (inertia_local, orientation, L, delta_time, wt), wt);
+            float rt = vector3_length (gt);
+            if (isfinite (rt) && (rt < resid_best)) { resid_best = rt; w_best = wt; break; }
+            d_try = simd_scale (d_try, 0.5f);
+        }
+        if (resid_best >= resid) { return 0; } /* stalled */
+        w = w_best;
+        g0 = simd_sub (rb_rotor_predicted_omega (inertia_local, orientation, L, delta_time, w), w);
+        resid = vector3_length (g0);
+    }
+    return 0;
+}
+// Integration Segmentation (Movement Compute)
 void rb_integrate_velocity (rigidbody *rigid_body, float delta_time, float linear_damping, float angular_damping) {
     if (!rigid_body) { return; }
     /* TRUTH: NaN dt must not execute. !(dt>0) catches NaN, <=0, Inf-neg. */
@@ -930,20 +1056,7 @@ void rb_integrate_velocity (rigidbody *rigid_body, float delta_time, float linea
                 vector3 w_new = w;
                 int converged = 0;
                 for (int it = 0; it < 8; it++) {
-                    float wsq = vector3_length_squared (w);
-                    vector4 rotor = vector4_identity ();
-                    if (isfinite (wsq) && wsq > 0.0f) {
-                        float wr = sqrtf (wsq);
-                        double half = 0.5 * (double) wr * (double) delta_time;
-                        double inv = 1.0 / (double) wr;
-                        rotor = (vector4) {(float) det_cos (half), (float) ((double) w.x * inv * det_sin (half)),
-                                          (float) ((double) w.y * inv * det_sin (half)),
-                                          (float) ((double) w.z * inv * det_sin (half))};
-                    } vector4 Rp = vector4_normalisation (vector4_multiplication (rotor, R0));
-                    math3 Rn = vector4_to_math3 (Rp);
-                    math3 Rnt = math3_transposition (Rn);
-                    math3 In = math3_multiplication (Rn, math3_multiplication (Il, Rnt));
-                    vector3 cand = math3_multiplication_vector3 (math3_inverse (In), L);
+                    vector3 cand = rb_rotor_predicted_omega (Il, R0, L, delta_time, w);
                     if (!a3_vector3_is_finite (cand))
                         break;
                     float step = vector3_length (simd_sub (cand, w));
@@ -971,8 +1084,34 @@ void rb_integrate_velocity (rigidbody *rigid_body, float delta_time, float linea
                     if (!a3_vector3_is_finite (rigid_body -> angular_velocity)) { rigid_body -> angular_velocity = vector3_zero (); }
                     goto rotational_done;
                 }
-                /* Not converged in 8 passes: fall through to the explicit
-                 * path rather than trust a partially converged omega. */
+                /* MPE_TASK_4.6T: not converged in 8 passes. The old
+                 * fall-through ran the explicit Euler gyroscopic step below,
+                 * which is unconditionally energy-growing for anisotropic
+                 * bodies and pumped a tilted spinning ellipsoid from 60 to
+                 * 760 rad/s in ~20 ticks (the fixed point is linearly
+                 * unstable — Jacobian rho > 1 at its own root — across a
+                 * wide band of |w|*dt, so this is the COMMON case for fast
+                 * anisotropic spin, not an edge case). Solve the SAME
+                 * implicit equation with damped step-limited Newton instead;
+                 * its root is the omega the converged fixed point would have
+                 * produced, so the orientation rotor applied later stays
+                 * exactly self-consistent. */
+                vector3 w_root = w_new;
+                if (rb_rotor_newton_solve (Il, R0, L, delta_time, w_new, &w_root)) {
+                    rigid_body -> angular_velocity = w_root;
+                    rigid_body -> angular_acceleration = vector3_zero ();
+                    rigid_body -> angular_velocity = simd_scale (rigid_body -> angular_velocity, angular_damping);
+                    if (!a3_vector3_is_finite (rigid_body -> angular_velocity)) { rigid_body -> angular_velocity = vector3_zero (); }
+                    goto rotational_done;
+                }
+                /* Newton stalled (near-singular Jacobian band): freeze omega
+                 * for this tick. Conserves world-space omega (bounded |L|
+                 * drift, zero energy growth) — strictly safer than any
+                 * explicit gyroscopic kick on the torque-free path. */
+                rigid_body -> angular_acceleration = vector3_zero ();
+                rigid_body -> angular_velocity = simd_scale (rigid_body -> angular_velocity, angular_damping);
+                if (!a3_vector3_is_finite (rigid_body -> angular_velocity)) { rigid_body -> angular_velocity = vector3_zero (); }
+                goto rotational_done;
             }
         }
     }
