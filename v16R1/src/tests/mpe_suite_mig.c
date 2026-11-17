@@ -41,6 +41,7 @@
 #include "core/mig_mass.h"
 #include "core/mig_spec.h"
 #include "core/mig_hull.h"
+#include "core/mig_void.h"
 #include "config/mpe_config.h"
 #include "core/mpe_registry.h"
 
@@ -5313,6 +5314,293 @@ int mpe_t_mig_rotor_spin_stability (void) {
                   " dissipation toward the 0.5 L^2/I_max floor at 1 rad/step is the documented honest"
                   " limit; a second-order scheme is the future brick)");
     }
+    mpe_test_end (&t);
+    return t.failures;
+}
+
+/* ---- MIG WP7 7.0a: the standalone void compose core -------------------
+ * mig_void.c is the cad_editor.c-pattern standalone: compiled into the
+ * engine and suite builds, called by NOTHING in the engine yet (zero
+ * behavior change — the hook-in is the next brick, gated on THIS
+ * battery per the user's "separately, until compliance and stability"
+ * ruling). The gate pins:
+ *   1. material-only PARITY: a void-free call is mig_compose
+ *      bit-for-bit (same mass/COM/inertia BITS, same refusal codes);
+ *   2. the exact sealed-cavity truth: centred spherical cavity in a
+ *      cube vs the hand closed form (mass, COM, tensor);
+ *   3. the off-centre cavity: COM shift + Steiner tensor vs the same
+ *      hand arithmetic written independently here;
+ *   4. split invariance: one cube void == its 8 exact octant sub-voids
+ *      (an exact partition — the totals agree to round-off);
+ *   5. the refusal battery: void-only, explicit-mode void, bad density,
+ *      bad dims, missing arrays, non-positive total, NOT-PD (a
+ *      mis-placed void larger than its material is refused, never a
+ *      garbage tensor);
+ *   6. write-on-success: a refused call leaves *out byte-untouched. */
+int mpe_t_mig_void_compose_core (void) {
+    mpe_test_t t;
+    mpe_test_begin (&t, "mig_void_compose_core");
+    /* Pure math, never steps the world (the mig_mass_composite rule). */
+    mpe_clamp_counters_reset ();
+
+    /* ---- 1. material-only bitwise parity ----
+     * Mixed family + a real rotation: sphere explicit, cube density,
+     * cylinder density rotated 90 deg about Z (axle local X -> world Y).
+     * (w,x,y,z) = (cos45, 0, 0, sin45); float rounding is irrelevant —
+     * BOTH composers eat the identical bits. */
+    {
+        mig_part mat [3] = {0};
+        mat [0].type = mig_part_sphere; mat [0].radius = 0.25f;
+        mat [0].mass_mode = mig_mass_mode_explicit; mat [0].mass = 2.0f;
+        mat [0].position = (vector3) {-0.5f, 0.0f, 0.0f};
+        mat [0].orientation = (vector4) {1.0f, 0.0f, 0.0f, 0.0f};
+        mat [1].type = mig_part_cube;
+        mat [1].half_extensions = (vector3) {0.25f, 0.25f, 0.25f};
+        mat [1].mass_mode = mig_mass_mode_density; mat [1].mass = 800.0f;
+        mat [1].position = (vector3) {0.5f, 0.0f, 0.0f};
+        mat [1].orientation = (vector4) {1.0f, 0.0f, 0.0f, 0.0f};
+        mat [2].type = mig_part_cylinder;
+        mat [2].radius = 0.1f; mat [2].cylinder_half_length = 0.3f;
+        mat [2].mass_mode = mig_mass_mode_density; mat [2].mass = 2700.0f;
+        mat [2].position = (vector3) {0.0f, 0.6f, 0.2f};
+        mat [2].orientation = (vector4) {0.7071067811865476f, 0.0f, 0.0f, 0.7071067811865476f};
+        mig_totals via_compose;
+        mig_totals via_void;
+        const int rc_compose = mig_compose (mat, 3, &via_compose);
+        const int rc_void = mig_void_compose (mat, 3, NULL, 0, &via_void);
+        MPE_CHECK (&t, rc_compose == mig_compose_ok);
+        MPE_CHECK (&t, rc_void == mig_void_ok);
+        /* mig_totals has no padding bytes (the unchanged_slab contract),
+         * so memcmp IS a bitwise comparison here. */
+        MPE_CHECK (&t, memcmp (&via_compose, &via_void, sizeof (mig_totals)) == 0);
+        /* The refusal path agrees too (bad quat on record 0), and the
+         * write-on-success rule holds on BOTH composers. */
+        mig_part bad = mat [0];
+        bad.orientation = (vector4) {2.0f, 0.0f, 0.0f, 0.0f};
+        mig_totals scratch;
+        memset (&scratch, 0xAB, sizeof (scratch));
+        MPE_CHECK (&t, mig_compose (&bad, 1, &scratch) == mig_compose_bad_quat);
+        MPE_CHECK (&t, unchanged_slab (&scratch));
+        memset (&scratch, 0xAB, sizeof (scratch));
+        MPE_CHECK (&t, mig_void_compose (&bad, 1, NULL, 0, &scratch) == mig_void_bad_quat);
+        MPE_CHECK (&t, unchanged_slab (&scratch));
+    }
+
+    /* ---- 2. centred spherical cavity in a cube (the closed form) ----
+     * Cube half 0.5^3, rho 1000 -> m_box = 1000. Cavity sphere r 0.25,
+     * rho 1000, both centred -> COM stays the origin, and about that
+     * shared point Ixx = Iyy = Izz = I_box − I_sphere exactly (no
+     * Steiner terms: every offset is zero). */
+    {
+        const double m_box = 1000.0 * 8.0 * 0.5 * 0.5 * 0.5;
+        const double m_v = 1000.0 * (4.0 / 3.0) * 3.14159265358979323846 * 0.25 * 0.25 * 0.25;
+        const double i_box = (m_box / 12.0) * (4.0 * 0.25 + 4.0 * 0.25);
+        const double i_v = 0.4 * m_v * 0.25 * 0.25;
+        mig_part mat [1] = {0};
+        mat [0].type = mig_part_cube;
+        mat [0].half_extensions = (vector3) {0.5f, 0.5f, 0.5f};
+        mat [0].mass_mode = mig_mass_mode_density; mat [0].mass = 1000.0f;
+        mat [0].position = (vector3) {0.0f, 0.0f, 0.0f};
+        mat [0].orientation = (vector4) {1.0f, 0.0f, 0.0f, 0.0f};
+        mig_part vd [1] = {0};
+        vd [0].type = mig_part_sphere; vd [0].radius = 0.25f;
+        vd [0].mass_mode = mig_mass_mode_density; vd [0].mass = 1000.0f;
+        vd [0].position = (vector3) {0.0f, 0.0f, 0.0f};
+        vd [0].orientation = (vector4) {1.0f, 0.0f, 0.0f, 0.0f};
+        mig_totals total;
+        MPE_CHECK (&t, mig_void_compose (mat, 1, vd, 1, &total) == mig_void_ok);
+        MPE_CHECK_NEAR (&t, total.mass, m_box - m_v, 1e-9, "cavity mass");
+        MPE_CHECK_NEAR (&t, total.com.x, 0.0, 1e-9, "cavity com x");
+        MPE_CHECK_NEAR (&t, total.com.y, 0.0, 1e-9, "cavity com y");
+        MPE_CHECK_NEAR (&t, total.com.z, 0.0, 1e-9, "cavity com z");
+        MPE_CHECK_NEAR (&t, total.inertia.matrix [0][0], i_box - i_v, 1e-4, "cavity Ixx");
+        MPE_CHECK_NEAR (&t, total.inertia.matrix [1][1], i_box - i_v, 1e-4, "cavity Iyy");
+        MPE_CHECK_NEAR (&t, total.inertia.matrix [2][2], i_box - i_v, 1e-4, "cavity Izz");
+        MPE_CHECK_NEAR (&t, total.inertia.matrix [0][1], 0.0, 1e-6, "cavity Ixy");
+        MPE_CHECK_NEAR (&t, total.inertia.matrix [1][2], 0.0, 1e-6, "cavity Iyz");
+        MPE_CHECK_NEAR (&t, total.inertia.matrix [0][2], 0.0, 1e-6, "cavity Ixz");
+    }
+
+    /* ---- 3. off-centre cavity (COM shift + Steiner, hand arithmetic) ----
+     * Cube half 0.5^3 rho 1000 at the origin; cavity sphere r 0.2
+     * rho 1000 at (0.3, 0, 0). Everything sits on the X axis, so the
+     * Steiner terms reduce to closed forms written independently here. */
+    {
+        /* The dims are FLOAT struct fields (0.2f/0.3f widen to
+         * 0.20000000298…/0.30000001192…) — the hand truth widens the
+         * SAME literals so the comparison is exact at the double
+         * boundary. */
+        const double r_v = (double) 0.2f;
+        const double off_v = (double) 0.3f;
+        const double m_box = 1000.0;
+        const double m_v = 1000.0 * (4.0 / 3.0) * 3.14159265358979323846 * r_v * r_v * r_v;
+        const double M_total = m_box - m_v;
+        const double com_x = (-m_v * off_v) / M_total;
+        const double i_box = (m_box / 12.0) * (4.0 * 0.25 + 4.0 * 0.25);
+        const double i_v_axial = 0.4 * m_v * r_v * r_v;
+        /* Ixx: both dy,dz vanish -> no Steiner at all, just the tensors. */
+        const double Ixx = i_box - i_v_axial;
+        /* Iyy: box Steiner +m_box·com_x² (dz = 0); cavity Steiner
+         * −m_v·(0.3 − com_x)². */
+        const double Iyy = i_box + m_box * com_x * com_x
+                         - (i_v_axial + m_v * (off_v - com_x) * (off_v - com_x));
+        mig_part mat [1] = {0};
+        mat [0].type = mig_part_cube;
+        mat [0].half_extensions = (vector3) {0.5f, 0.5f, 0.5f};
+        mat [0].mass_mode = mig_mass_mode_density; mat [0].mass = 1000.0f;
+        mat [0].position = (vector3) {0.0f, 0.0f, 0.0f};
+        mat [0].orientation = (vector4) {1.0f, 0.0f, 0.0f, 0.0f};
+        mig_part vd [1] = {0};
+        vd [0].type = mig_part_sphere; vd [0].radius = 0.2f;
+        vd [0].mass_mode = mig_mass_mode_density; vd [0].mass = 1000.0f;
+        vd [0].position = (vector3) {0.3f, 0.0f, 0.0f};
+        vd [0].orientation = (vector4) {1.0f, 0.0f, 0.0f, 0.0f};
+        mig_totals total;
+        MPE_CHECK (&t, mig_void_compose (mat, 1, vd, 1, &total) == mig_void_ok);
+        MPE_CHECK_NEAR (&t, total.mass, M_total, 1e-9, "offcavity mass");
+        MPE_CHECK_NEAR (&t, total.com.x, com_x, 1e-8, "offcavity com x");
+        MPE_CHECK_NEAR (&t, total.com.y, 0.0, 1e-9, "offcavity com y");
+        MPE_CHECK_NEAR (&t, total.com.z, 0.0, 1e-9, "offcavity com z");
+        MPE_CHECK_NEAR (&t, total.inertia.matrix [0][0], Ixx, 1e-4, "offcavity Ixx");
+        MPE_CHECK_NEAR (&t, total.inertia.matrix [1][1], Iyy, 1e-4, "offcavity Iyy");
+        MPE_CHECK_NEAR (&t, total.inertia.matrix [2][2], Iyy, 1e-4, "offcavity Izz");
+        MPE_CHECK_NEAR (&t, total.inertia.matrix [0][1], 0.0, 1e-6, "offcavity Ixy");
+        MPE_CHECK_NEAR (&t, total.inertia.matrix [1][2], 0.0, 1e-6, "offcavity Iyz");
+        MPE_CHECK_NEAR (&t, total.inertia.matrix [0][2], 0.0, 1e-6, "offcavity Ixz");
+    }
+
+    /* ---- 4. split invariance: one void == its 8 exact octant sub-voids
+     * (the only EXACT partition a cube admits — a strong self-
+     * consistency truth for the signed sums: same total to round-off
+     * under a different accumulation order). */
+    {
+        mig_part mat [1] = {0};
+        mat [0].type = mig_part_cube;
+        mat [0].half_extensions = (vector3) {0.5f, 0.5f, 0.5f};
+        mat [0].mass_mode = mig_mass_mode_density; mat [0].mass = 1000.0f;
+        mat [0].position = (vector3) {0.0f, 0.0f, 0.0f};
+        mat [0].orientation = (vector4) {1.0f, 0.0f, 0.0f, 0.0f};
+        mig_part one [1] = {0};
+        one [0].type = mig_part_cube;
+        one [0].half_extensions = (vector3) {0.4f, 0.4f, 0.4f};
+        one [0].mass_mode = mig_mass_mode_density; one [0].mass = 500.0f;
+        one [0].position = (vector3) {0.0f, 0.0f, 0.0f};
+        one [0].orientation = (vector4) {1.0f, 0.0f, 0.0f, 0.0f};
+        mig_part eight [8];
+        memset (eight, 0, sizeof (eight));
+        static const int sgn [8][3] = {
+            {+1, +1, +1}, {+1, +1, -1}, {+1, -1, +1}, {+1, -1, -1},
+            {-1, +1, +1}, {-1, +1, -1}, {-1, -1, +1}, {-1, -1, -1},
+        };
+        for (int i = 0; i < 8; i++) {
+            eight [i].type = mig_part_cube;
+            eight [i].half_extensions = (vector3) {0.2f, 0.2f, 0.2f};
+            eight [i].mass_mode = mig_mass_mode_density; eight [i].mass = 500.0f;
+            eight [i].position = (vector3) {0.2f * sgn [i][0], 0.2f * sgn [i][1], 0.2f * sgn [i][2]};
+            eight [i].orientation = (vector4) {1.0f, 0.0f, 0.0f, 0.0f};
+        }
+        mig_totals t_one;
+        mig_totals t_eight;
+        MPE_CHECK (&t, mig_void_compose (mat, 1, one, 1, &t_one) == mig_void_ok);
+        MPE_CHECK (&t, mig_void_compose (mat, 1, eight, 8, &t_eight) == mig_void_ok);
+        MPE_CHECK_NEAR (&t, t_one.mass, t_eight.mass, 1e-9, "split mass");
+        MPE_CHECK_NEAR (&t, t_one.com.x, t_eight.com.x, 1e-9, "split com x");
+        MPE_CHECK_NEAR (&t, t_one.com.y, t_eight.com.y, 1e-9, "split com y");
+        MPE_CHECK_NEAR (&t, t_one.com.z, t_eight.com.z, 1e-9, "split com z");
+        for (int a = 0; a < 3; a++) {
+            for (int b = 0; b < 3; b++) {
+                char label [64];
+                snprintf (label, sizeof (label), "split I[%d][%d]", a, b);
+                MPE_CHECK_NEAR (&t, t_one.inertia.matrix [a][b], t_eight.inertia.matrix [a][b], 1e-4, label);
+            }
+        }
+        /* And the signed truth itself, computed from the FLOAT-widened
+         * dims (0.4f is not binary-exact; the material cube's 0.5f is):
+         * 1000 − 500·8·0.4f³ ≈ 743.999989 kg. */
+        const double m_mat = 1000.0 * 8.0 * (double) 0.5f * (double) 0.5f * (double) 0.5f;
+        const double m_void = 500.0 * 8.0 * (double) 0.4f * (double) 0.4f * (double) 0.4f;
+        MPE_CHECK_NEAR (&t, t_one.mass, m_mat - m_void, 1e-9, "split mass value");
+    }
+
+    /* ---- 5. the refusal battery ---- */
+    {
+        mig_totals scratch;
+        /* A void alone is no body. */
+        MPE_CHECK (&t, mig_void_compose (NULL, 0, NULL, 0, &scratch) == mig_void_no_material);
+        /* An explicit-mode void is meaningless -> named refusal. */
+        mig_part vd_mode = {0};
+        vd_mode.type = mig_part_sphere; vd_mode.radius = 0.1f;
+        vd_mode.mass_mode = mig_mass_mode_explicit; vd_mode.mass = 100.0f;
+        vd_mode.position = (vector3) {0.0f, 0.0f, 0.0f};
+        vd_mode.orientation = (vector4) {1.0f, 0.0f, 0.0f, 0.0f};
+        mig_part mat [1] = {0};
+        mat [0].type = mig_part_cube;
+        mat [0].half_extensions = (vector3) {0.5f, 0.5f, 0.5f};
+        mat [0].mass_mode = mig_mass_mode_density; mat [0].mass = 1000.0f;
+        mat [0].position = (vector3) {0.0f, 0.0f, 0.0f};
+        mat [0].orientation = (vector4) {1.0f, 0.0f, 0.0f, 0.0f};
+        MPE_CHECK (&t, mig_void_compose (mat, 1, &vd_mode, 1, &scratch) == mig_void_bad_mass_mode);
+        /* Void density <= 0 or NaN -> named refusal (the removed
+         * material must HAVE a density). */
+        mig_part vd_rho = vd_mode;
+        vd_rho.mass_mode = mig_mass_mode_density;
+        vd_rho.mass = -1.0f;
+        MPE_CHECK (&t, mig_void_compose (mat, 1, &vd_rho, 1, &scratch) == mig_void_bad_density);
+        vd_rho.mass = 0.0f;
+        MPE_CHECK (&t, mig_void_compose (mat, 1, &vd_rho, 1, &scratch) == mig_void_bad_density);
+        vd_rho.mass = (float) NAN;
+        MPE_CHECK (&t, mig_void_compose (mat, 1, &vd_rho, 1, &scratch) == mig_void_bad_density);
+        /* Void dims outside the family rules -> bad_dims. */
+        mig_part vd_dims = vd_mode;
+        vd_dims.mass_mode = mig_mass_mode_density; vd_dims.mass = 1000.0f;
+        vd_dims.radius = -0.1f;
+        MPE_CHECK (&t, mig_void_compose (mat, 1, &vd_dims, 1, &scratch) == mig_void_bad_dims);
+        /* Missing arrays / null out. */
+        MPE_CHECK (&t, mig_void_compose (mat, 1, NULL, 1, &scratch) == mig_void_null);
+        MPE_CHECK (&t, mig_void_compose (NULL, 1, NULL, 0, &scratch) == mig_void_null);
+        MPE_CHECK (&t, mig_void_compose (mat, 1, NULL, 0, NULL) == mig_void_null);
+        /* The voids ate the body: cavity volume > material volume. */
+        mig_part vd_big = vd_mode;
+        vd_big.mass_mode = mig_mass_mode_density; vd_big.mass = 1000.0f;
+        vd_big.radius = 0.7f; /* V = 1.4368 > the cube's 1.0 */
+        MPE_CHECK (&t, mig_void_compose (mat, 1, &vd_big, 1, &scratch) == mig_void_nonpositive);
+        /* A mis-placed void LARGER than its material: total mass stays
+         * positive (200 kg) but the tensor goes non-PD — refused
+         * LOUDLY, never a garbage tensor. Void cube half (10, 10, 0.2)
+         * rho 5 -> m_v = 800, M = 200; Ixx_total = 166.67 − 26677 < 0. */
+        mig_part vd_misplaced = {0};
+        vd_misplaced.type = mig_part_cube;
+        vd_misplaced.half_extensions = (vector3) {10.0f, 10.0f, 0.2f};
+        vd_misplaced.mass_mode = mig_mass_mode_density; vd_misplaced.mass = 5.0f;
+        vd_misplaced.position = (vector3) {0.0f, 0.0f, 0.0f};
+        vd_misplaced.orientation = (vector4) {1.0f, 0.0f, 0.0f, 0.0f};
+        MPE_CHECK (&t, mig_void_compose (mat, 1, &vd_misplaced, 1, &scratch) == mig_void_not_pd);
+    }
+
+    /* ---- 6. write-on-success MID-LIST: a bad void after a good one
+     * refuses the WHOLE assembly and leaves out untouched. ---- */
+    {
+        mig_part mat [1] = {0};
+        mat [0].type = mig_part_cube;
+        mat [0].half_extensions = (vector3) {0.5f, 0.5f, 0.5f};
+        mat [0].mass_mode = mig_mass_mode_density; mat [0].mass = 1000.0f;
+        mat [0].position = (vector3) {0.0f, 0.0f, 0.0f};
+        mat [0].orientation = (vector4) {1.0f, 0.0f, 0.0f, 0.0f};
+        mig_part vd [2] = {0};
+        vd [0].type = mig_part_sphere; vd [0].radius = 0.1f;
+        vd [0].mass_mode = mig_mass_mode_density; vd [0].mass = 1000.0f;
+        vd [0].position = (vector3) {0.0f, 0.0f, 0.0f};
+        vd [0].orientation = (vector4) {1.0f, 0.0f, 0.0f, 0.0f};
+        vd [1].type = mig_part_sphere; vd [1].radius = (float) NAN;
+        vd [1].mass_mode = mig_mass_mode_density; vd [1].mass = 1000.0f;
+        vd [1].position = (vector3) {0.1f, 0.0f, 0.0f};
+        vd [1].orientation = (vector4) {1.0f, 0.0f, 0.0f, 0.0f};
+        mig_totals scratch;
+        memset (&scratch, 0xAB, sizeof (scratch));
+        MPE_CHECK (&t, mig_void_compose (mat, 1, vd, 2, &scratch) == mig_void_bad_dims);
+        MPE_CHECK (&t, unchanged_slab (&scratch));
+    }
+
     mpe_test_end (&t);
     return t.failures;
 }

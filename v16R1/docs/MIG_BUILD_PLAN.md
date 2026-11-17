@@ -273,7 +273,15 @@
 > center → cleanly separated. Doc consolidation swept the stale counts
 > everywhere (readme, RELEASE_POLICY, RELEASE_GATES, GLOSSARY, INDEX,
 > install instructions, runner docstring + floor narration, MFS
-> TESTING.md 33→37 amendment, DEV_GUIDE MIG math row).
+> TESTING.md 33→37 amendment, DEV_GUIDE MIG math row). WP7 7.0a
+> LANDED 2026-11-17 (this commit): the VOID COMPOSE CORE, STANDALONE
+> — core/mig_void.{h,c}, one signed negative-mass compose mirroring
+> mig_compose bit-for-bit on void-free input, PD-guarded totals,
+> gate mig_void_compose_core (76th); NOTHING in the engine calls it
+> yet per the user's separate-until-compliance ruling (§8.7). Suite
+> 76/74/0, quick 90/90, mgb 44/0, mfs 37/37 + FTC 5/5, tui-smoke
+> PASS, everything green. THE HOOK-IN IS THE NEXT BRICK (7.0b),
+> gated on this battery.
 
 ---
 
@@ -1315,6 +1323,65 @@ the study's closed-form oracles are the gates' oracles, unchanged.
   bounce off the pyr4 apex, hull-hull MTD 0.1 both orders +
   drop-from-6 smoke; regime-robust (e = ½ and the heavier base twin
   pinned in-scenario).
+
+## §8.7 WP7 — void objects (the CAD Boolean-subtraction side-train)
+
+Appended 2026-11-17. The user's charter: CAD-style void objects — the
+engine learns SUBTRACTION (a negative-mass contribution per void
+part), starting from the observation in the untracked study
+`studies/void_objects_plan.md` (never committed, the §8.6 precedent).
+The taxonomy that fixes scope:
+
+- **Sealed cavity** — EXACT negative-mass subtraction only (T1): the
+  interior is unreachable by collision and invisible to render BY
+  DEFINITION, so mass/COM/inertia subtraction is its complete
+  physical truth. No partition, no new collision code.
+- **Open void** (a mouth to the outside) — bake-to-pieces partition
+  (T1+T2+T3): the target splits into ordinary material pieces around
+  the void geometry; zero engine changes, the pieces are plain parts.
+- **Box void in cube target** — exact ≤6-slab partition (a centred
+  through-window = exactly 4 pieces). **Round voids** — disclosed
+  inscribed-square envelope (mass/collision/render agree on the
+  envelope; removes less than authored, never more). **Round
+  targets** — refused until the hull-piece brick.
+
+RULING (the user, 2026-11-17): "make the code separately and do not
+hook the code into the main system UNTIL we have tested proper
+compliance and stability" — the ladder therefore builds the void core
+STANDALONE first (the cad_editor.c pattern: compiled into every
+build, gated, called by NOTHING in the engine), and the hook-in is
+its own brick, gated on this module's compliance battery. Keys
+4/5/6 are the planned void pickers (1/2/3 stay the solid pickers;
+4–6 verified free today).
+
+- [x] **7.0a Void compose core, standalone (LANDED 2026-11-17, see
+  the §9 ledger line).** `core/mig_void.{h,c}`: one signed compose
+  mirroring mig_compose exactly — same double truth, same term
+  order, the float boundary lands once — so a void-free call is
+  BITWISE identical to mig_compose (the parity gate pins the totals
+  AND the refusal codes). Void records are plain `mig_part` geometry
+  with density interpretation ONLY; totals keep M > 0 and GAIN a
+  Sylvester positive-definiteness check on the double truth (a
+  mis-placed void larger than its material is refused LOUDLY,
+  `mig_void_not_pd`).
+- [ ] **7.0b Hook-in: engine consumption + pool-inclusive
+  representation.** `mig_part` void types (additive enum),
+  `composite_part.is_void` with REAL pool slices, skip-sites check
+  the flag (ghost refresh refuses; per-part iterate, floor batch and
+  render packing skip; the bound walk ignores voids), `add_composite`
+  + compose consumption, sealed-void spawn, scene-save veto until
+  7.0d.
+- [ ] **7.0c The CAD void tool (open voids).** `cad_subtract_*`
+  verbs, keys 4/5/6 pickers, the exact ≤6-slab box partition /
+  disclosed inscribed envelope for round voids, cube-target-only
+  refusal for round targets, one-level undo snapshot with the
+  destructive verb.
+- [ ] **7.0d Portability: voids survive every persistence boundary.**
+  Scene v202 per-part `is_void` flag + a DATED grammar v2 amendment
+  (spec save refuses void designs until then; the v201-reload
+  recomposes-heavier trap stays closed by refusal, never silence).
+- [ ] **7.0e Quality lifts.** Hull ring pieces make round holes real
+  (the envelope retires), part caps raise 16 → 64 for heavy cuts.
 
 ## §9 Risk register + the standing ledger
 
@@ -2773,6 +2840,70 @@ Ledger (new entries get a line, never an edit of a past line):
    PASS 44 FAIL 0 (tier B skips sans s2tui); mfs FTC gated 5/5
    (12 ungated diags); tui-smoke PASS; make everything green in
    background.
+- 2026-11-17 — WP7 7.0a (this commit, VOID COMPOSE CORE, STANDALONE —
+   the user's charter: CAD-style void objects; standing ruling: "make
+   the code separately and do not hook the code into the main system
+   UNTIL we have tested proper compliance and stability", so this
+   brick edits ZERO engine TUs — new files plus build-list and
+   test-suite additions only, the cad_editor.c pattern). New
+   core/mig_void.{h,c}: ONE signed compose mirroring mig_compose
+   exactly — same double truth, same term order, the float boundary
+   lands ONCE (the 2026-11-10 audit fix mirrored verbatim) — so a
+   void-free call is bitwise identical to mig_compose; the formulas
+   DUPLICATE mig_mass.c's statics verbatim under mv_* names with the
+   π literal spelled MIG_VOID_PI (textual independence by design;
+   what to share is the hook brick's decision, after compliance).
+   Void records are plain mig_part geometry records, density
+   interpretation ONLY (explicit mass on a void is meaningless →
+   mig_void_bad_mass_mode); material records keep the frozen spec §4
+   rules. Validation: every record first (quat, then type/dims/mass
+   per the mig_compose pass-0 order, materials then voids), then the
+   totals: M finite > 0 AND the tensor POSITIVE-DEFINITE by
+   Sylvester's criterion on the double truth BEFORE the one float
+   narrowing — compose purity has no geometry (the model layer owns
+   placement from 7.0b), so a mis-placed void larger than its
+   material is refused LOUDLY as mig_void_not_pd, never a garbage
+   tensor. Full named-error enum (null/bad_type/bad_dims/bad_quat/
+   bad_mass/bad_mass_mode/bad_density/no_material/nonpositive/
+   not_pd); write-on-success (out byte-untouched on any refusal).
+   Integration: core/mig_void.c added to MPE_TEST_CORE (the engine
+   wildcard picks core/*.c up automatically), gate
+   mig_void_compose_core (76th) appended to mpe_suite_mig.c +
+   declared/registered in mpe_suite_main.c — nothing else. The gate
+   pins: (1) material-only BITWISE PARITY vs mig_compose (memcmp on
+   the padding-free mig_totals, refusal codes included + the 0xAB
+   write-on-success slab both ways); (2) centred spherical cavity in
+   a cube vs the hand closed form (mass, COM, tensor, off-diagonals
+   at round-off); (3) off-centre cavity COM shift + Steiner vs
+   independently written hand arithmetic (float-widened literals —
+   0.2f/0.3f are not binary-exact, the hand truth widens the SAME
+   bits; first draft's exact-0.2 oracles failed by 1e-9 and were
+   corrected); (4) split invariance: one cube void == its 8 exact
+   octant sub-voids to round-off (1000 − 500·8·0.4f³ =
+   743.999989 kg); (5) the refusal battery (no_material,
+   bad_mass_mode, bad_density ×3, bad_dims, null ×3, nonpositive,
+   not_pd); (6) write-on-success mid-list (a bad void after a good
+   one refuses the WHOLE assembly). ASan/UBSan compliance for the
+   new TU: mig_void_compose_core passes CLEAN under
+   -fsanitize=address,undefined (run twice, incl. after the
+   stash/restore dance). PRE-EXISTING FINDING documented and proven
+   NOT ours: test_mpe_suite_asan --all aborts with
+   stack-use-after-return at physics_world.c:2758
+   (step_cfg -> world.gravity, reached from the WP2-era
+   mpe_t_mig_composite_stack gate) — reproduced IDENTICALLY on the
+   stashed clean HEAD tree (make asan at 0127d9a, isolated
+   mig_composite_stack run, same frame line 1930), a test the house
+   battery never ran under ASan (mfs only — this brick's extra
+   diligence surfaced it); the fix is an engine-TU edit, out of
+   7.0a's standalone scope — queued for a future brick, and the
+   house battery definition is unchanged (ASan runs mfs, not the mpe
+   suite). Full battery: suite 76 registered / 74 blocking /
+   0 failures; quick 90/90; mgb PASS 44 FAIL 0 (tier B skips sans
+   s2tui); mfs 37/37 + FTC gated 5/5 (12 ungated diags); tui-smoke
+   PASS; make everything green in background, full-log audit zero
+   warning:/error: lines. core/mig_void.c + core/mig_void.h +
+   makefile + tests/mpe_suite_mig.c + tests/mpe_suite_main.c +
+   docs/MIG_BUILD_PLAN.md (§8.7 scaffold + this line + STATUS).
 
 ## §10 Definition of done for v16S (the cut checklist)
 

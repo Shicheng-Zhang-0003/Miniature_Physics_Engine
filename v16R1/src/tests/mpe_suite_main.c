@@ -134,6 +134,7 @@ int mpe_t_mig_hull_render_stamp (void);
 int mpe_t_mig_hull_analytic_ell (void);
 int mpe_t_mig_spawner_ell_default (void); /* MIG WP4 4.6s */
 int mpe_t_mig_rotor_spin_stability (void); /* MIG WP4 4.6t */
+int mpe_t_mig_void_compose_core (void); /* MIG WP7 7.0a */
 int mpe_t_cad_editor_model (void);
 int mpe_t_cad_view_math (void);
 typedef struct {
@@ -321,6 +322,7 @@ static const mpe_entry_t mpe_registry [] = {
      * equation now owns the band: |L| conserved to round-off, |w| inside
      * the exact envelope, rotational energy never grows. */
     {"mig_rotor_spin_stability", mpe_t_mig_rotor_spin_stability, 0},
+    {"mig_void_compose_core", mpe_t_mig_void_compose_core, 0},
     /* MIG WP4 4.6: the miniature CAD editor's DESIGN MODEL (cad/cad_editor.c)
      * — typed adds + full refusal battery (write-on-success, memcmp
      * witness), snap/rotate/dup/array transforms with the left-composition
