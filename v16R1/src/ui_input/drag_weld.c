@@ -58,9 +58,12 @@ static int weld_type_to_mig (object_type t) {
     return t == object_sphere ? mig_part_sphere : t == object_cylinder ? mig_part_cylinder : mig_part_cube;
 }
 /* Pre-flight: count the ACTIVE parts a source would contribute and flag
- * unsupported types (object_custom has no primitive part mapping). Nothing
- * is mutated here — the weld refuses BEFORE any array is built. */
-static int weld_count_parts (physics_world *w, rigidbody *src, bool *unsupported) {
+ * unsupported types (object_custom has no primitive part mapping). WP7
+ * 7.0b: void records also refuse — the weld re-composes every collected
+ * part as MATERIAL, so a carried cavity would silently refill; void
+ * re-composition is a later brick. Nothing is mutated here — the weld
+ * refuses BEFORE any array is built. */
+static int weld_count_parts (physics_world *w, rigidbody *src, bool *unsupported, bool *has_void) {
     if (src -> type != object_composite) {
         if ((src -> type != object_sphere) && (src -> type != object_cube) && (src -> type != object_cylinder)) {
             *unsupported = true;
@@ -71,6 +74,7 @@ static int weld_count_parts (physics_world *w, rigidbody *src, bool *unsupported
     for (int pi = 0; pi < src -> composite_part_count; pi++) {
         long slot = (long) src -> part_base + (long) pi;
         if ((slot < 0) || (slot >= (long) w -> composite_part_count)) { continue; }
+        if (w -> composite_parts [slot].is_void) { *has_void = true; continue; }
         if (w -> composite_parts [slot].active) { n++; }
     }
     return n;
@@ -106,7 +110,11 @@ static void weld_collect_parts (physics_world *w, rigidbody *src, mig_part parts
         long slot = (long) src -> part_base + (long) pi;
         if ((slot < 0) || (slot >= (long) w -> composite_part_count)) { continue; }
         const composite_part *cp = &w -> composite_parts [slot];
-        if (!cp -> active) { continue; }
+        /* WP7 7.0b defensive door: the pre-flight refuses void-bearing
+         * sources, so a void record never reaches the collector; a void
+         * collected here would come back as MATERIAL (explicit negative
+         * mass refuses loudly in compose anyway) — skip it outright. */
+        if ((!cp -> active) || (cp -> is_void)) { continue; }
         mig_part *p = &parts [*count];
         p -> type = (mig_part_type) weld_type_to_mig (cp -> type);
         p -> radius = (cp -> type == object_cube) ? 0.0f : cp -> radius;
@@ -172,9 +180,19 @@ static void weld_collect_parts (physics_world *w, rigidbody *src, mig_part parts
      * The old flow collected through the truncating collector, welded the
      * truncated 16, and then DELETED both sources: silent geometry loss. */
     bool unsupported = false;
-    const int total_parts = weld_count_parts (w, a, &unsupported) + weld_count_parts (w, b, &unsupported);
+    bool has_void = false;
+    const int total_parts = weld_count_parts (w, a, &unsupported, &has_void) +
+                            weld_count_parts (w, b, &unsupported, &has_void);
     if (unsupported) {
         printf ("[weld] refused: custom/plugin bodies have no primitive part mapping\n");
+        return;
+    }
+    /* WP7 7.0b: a void-bearing source refuses BEFORE anything is built —
+     * the weld re-composes every collected part as material, so a carried
+     * cavity would silently REFILL. Void re-composition is a later brick;
+     * both originals are kept, nothing mutated. */
+    if (has_void) {
+        printf ("[weld] refused: source body holds void parts — weld re-composition of voids is a later brick\n");
         return;
     }
     if (total_parts > WELD_PART_CAP) {

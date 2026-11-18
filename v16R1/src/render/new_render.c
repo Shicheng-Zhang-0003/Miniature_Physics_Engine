@@ -91,6 +91,12 @@ static int render_pack_composite_part (float *target_array, int *target_count, c
                                        const vector4 *world_ori, const composite_part *part,
                                        const vector3 *body_colour) {
     vector3 scale;
+    /* WP7 7.0b defensive door: the caller skips void records (a void is
+     * invisible AND its geometry would fall into the wrong per-type
+     * branch here); reaching this point with one is a caller bug, so it
+     * drops loudly through the same guard channel instead of packing a
+     * phantom instance. */
+    if (part -> is_void) { return 0; }
     if (part -> type == object_sphere) {
         scale = (vector3) {part -> radius, part -> radius, part -> radius};
     } else if (part -> type == object_cylinder) {
@@ -491,7 +497,10 @@ void render_scene_current (int widget_width, int widget_height) {
                 long slot = (long) rigid_body -> part_base + (long) pi;
                 if ((slot < 0) || (slot >= (long) rw -> composite_part_count)) { continue; }
                 const composite_part *part = &rw -> composite_parts [slot];
-                if (!part -> active) { continue; }
+                /* WP7 7.0b: a void part renders NOTHING — invisible by
+                 * definition, and the type dispatch below would fall
+                 * into a wrong per-type branch for a twin record. */
+                if ((!part -> active) || (part -> is_void)) { continue; }
                 vector3 part_pos = vector3_addition (
                     rigid_body -> position,
                     vector4_rotate_to_vector3 (rigid_body -> orientation, part -> local_position));

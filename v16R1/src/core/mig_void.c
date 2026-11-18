@@ -51,9 +51,24 @@ static void mv_rotate_tensor (const mv_rot3 *R, const double diag [3], double ou
  * mass math is the SAME primitive volume expression, negated. */
 static int mv_part_tensor_signed (const mig_part *p, mig_mass_mode mode,
                                   int is_void, double *m_out, double diag [3]) {
+    /* WP7 7.0b: void-typed records normalize to their GEOMETRY TWIN —
+     * the same dim fields carry the void's size, the same exact volume
+     * and tensor expressions apply, and the role negation at the end is
+     * the subtraction. The MATERIAL role refuses void types outright
+     * (a void is not material — plain mig_compose refuses them the same
+     * way); the VOID role accepts both the void twins and the 7.0a
+     * primitive-typed form (still pinned by the parity gate). */
+    mig_part_type geom = p -> type;
+    if (is_void) {
+        if (geom == mig_part_void_sphere) { geom = mig_part_sphere; }
+        else if (geom == mig_part_void_cube) { geom = mig_part_cube; }
+        else if (geom == mig_part_void_cylinder) { geom = mig_part_cylinder; }
+    } else if (geom >= mig_part_void_sphere) {
+        return mig_void_bad_type;
+    }
     double m = 0.0, r = 0.0, hl = 0.0, hx = 0.0, hy = 0.0, hz = 0.0;
     /* Dims and pose first, per type — identical rule in BOTH roles. */
-    switch (p -> type) {
+    switch (geom) {
         case mig_part_sphere: {
             r = p -> radius;
             if (!isfinite (r) || r <= 0.0 || /* radius must be sane */
@@ -84,7 +99,7 @@ static int mv_part_tensor_signed (const mig_part *p, mig_mass_mode mode,
         /* The void's density interpretation: the SAME exact primitive
          * volume expressions — no second-source volume math. */
         if (mode != mig_mass_mode_density) { return mig_void_bad_mass_mode; }
-        switch (p -> type) {
+        switch (geom) {
             case mig_part_sphere:    m = p -> mass * (4.0 / 3.0) * MIG_VOID_PI * r * r * r; break;
             case mig_part_cylinder:  m = p -> mass * MIG_VOID_PI * r * r * ((double) hl * 2.0); break;
             case mig_part_cube:      m = p -> mass * 8.0 * hx * hy * hz; break;
@@ -95,7 +110,7 @@ static int mv_part_tensor_signed (const mig_part *p, mig_mass_mode mode,
         m = p -> mass;
         if (!isfinite (m) || m <= 0.0) { return mig_void_bad_mass; }
     } else if (mode == mig_mass_mode_density) {
-        switch (p -> type) {
+        switch (geom) {
             case mig_part_sphere:    m = p -> mass * (4.0 / 3.0) * MIG_VOID_PI * r * r * r; break;
             case mig_part_cylinder:  m = p -> mass * MIG_VOID_PI * r * r * ((double) hl * 2.0); break;
             case mig_part_cube:      m = p -> mass * 8.0 * hx * hy * hz; break;
@@ -109,7 +124,7 @@ static int mv_part_tensor_signed (const mig_part *p, mig_mass_mode mode,
     }
     /* Principal tensor third: dims validated, |mass| positive. The
      * formulas are linear in m, so the ROLE negation below is exact. */
-    switch (p -> type) {
+    switch (geom) {
         case mig_part_sphere:
             diag [0] = diag [1] = diag [2] = 0.4 * m * r * r;
             break;
@@ -280,5 +295,57 @@ int mig_void_compose (const mig_part *material, int material_count,
     result.inertia.matrix [2][0] = (float) I [2][0]; result.inertia.matrix [2][1] = (float) I [2][1];
     result.inertia.matrix [2][2] = (float) I [2][2];
     *out = result;
+    return mig_void_ok;
+}
+
+/* WP7 7.0b: the per-record door — the compose pass-0 order (quat, then
+ * the tensor dry run) with the ROLE picked by the record's own type:
+ * primitive types validate as material, void types as void (density
+ * interpretation only, twin dims). NO totals checks: a discarded
+ * over-cap tail must be validated without composing totals that would
+ * never be stored. Same named errors as compose. */
+int mig_void_validate_record (const mig_part *p) {
+    if (!p) { return mig_void_null; }
+    const double n2 = (double) p -> orientation.w * (double) p -> orientation.w +
+                      (double) p -> orientation.x * (double) p -> orientation.x +
+                      (double) p -> orientation.y * (double) p -> orientation.y +
+                      (double) p -> orientation.z * (double) p -> orientation.z;
+    const double a = (n2 > 1.0) ? (n2 - 1.0) : (1.0 - n2);
+    if (!isfinite (n2) || !isfinite (a) || a > 1e-4) { return mig_void_bad_quat; }
+    double m_dry; double diag_dry [3];
+    if (p -> type >= mig_part_void_sphere) {
+        return mv_part_tensor_signed (p, p -> mass_mode, 1, &m_dry, diag_dry);
+    }
+    return mv_part_tensor_signed (p, p -> mass_mode, 0, &m_dry, diag_dry);
+}
+
+/* WP7 7.0b: the void-aware bridge. Contract in mig_void.h. The
+ * partition preserves definition order WITHIN each role (the compose's
+ * pinned accumulation order: all materials, then all voids); a
+ * void-free assembly therefore lands on mig_void_compose's
+ * bitwise-parity path (mig_compose-identical totals), a mixed one on
+ * the signed path. The re-anchor is mig_rebase_parts — ONE code path
+ * with mig_make_bridge. Fixed partition scratch sized MIG_VOID_BRIDGE_MAX
+ * (headroom over the engine's frozen 16-part cap); larger counts refuse
+ * rather than ever overflowing. */
+int mig_void_make_bridge (const mig_part *src, int count, mig_part *out_parts,
+                          mig_bridge *out) {
+    if ((!src) || (!out_parts) || (!out) || (out_parts == src)) { return mig_void_null; }
+    if ((count <= 0) || (count > MIG_VOID_BRIDGE_MAX)) { return mig_void_null; }
+    mig_part mats [MIG_VOID_BRIDGE_MAX];
+    mig_part voids [MIG_VOID_BRIDGE_MAX];
+    int m = 0, v = 0;
+    for (int i = 0; i < count; i++) {
+        if (src [i].type >= mig_part_void_sphere) { voids [v++] = src [i]; }
+        else { mats [m++] = src [i]; }
+    }
+    mig_totals composed;
+    int err = mig_void_compose (mats, m, voids, v, &composed);
+    if (err != mig_void_ok) { return err; }
+    for (int i = 0; i < count; i++) { out_parts [i] = src [i]; }
+    mig_rebase_parts (out_parts, count, composed.com);
+    out -> totals = composed;
+    out -> parts = out_parts;
+    out -> count = count;
     return mig_void_ok;
 }

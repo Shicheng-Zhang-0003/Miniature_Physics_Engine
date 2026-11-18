@@ -208,7 +208,9 @@ static bool ccd_part_support_down (const rigidbody *parent, const composite_part
     vector3 lowest = vector3_zero ();
     for (int slot = 0; slot < body -> composite_part_count; slot++) {
         const composite_part *part = ccd_composite_part_at (world, body, slot);
-        if ((!part) || (!part -> active)) { continue; }
+        /* WP7 7.0b: void parts project no support — the CCD sweeps the
+         * MATERIAL surface only (the cavity interior is unreachable). */
+        if ((!part) || (!part -> active) || (part -> is_void)) { continue; }
         vector3 support;
         if (!ccd_part_support_down (body, part, &support)) { continue; }
         vector3 center = vector4_rotate_to_vector3 (body -> orientation, part -> local_position);

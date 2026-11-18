@@ -274,14 +274,22 @@
 > everywhere (readme, RELEASE_POLICY, RELEASE_GATES, GLOSSARY, INDEX,
 > install instructions, runner docstring + floor narration, MFS
 > TESTING.md 33→37 amendment, DEV_GUIDE MIG math row). WP7 7.0a
-> LANDED 2026-11-17 (this commit): the VOID COMPOSE CORE, STANDALONE
+> LANDED 2026-11-17 (`7ee84cd`): the VOID COMPOSE CORE, STANDALONE
 > — core/mig_void.{h,c}, one signed negative-mass compose mirroring
 > mig_compose bit-for-bit on void-free input, PD-guarded totals,
 > gate mig_void_compose_core (76th); NOTHING in the engine calls it
-> yet per the user's separate-until-compliance ruling (§8.7). Suite
-> 76/74/0, quick 90/90, mgb 44/0, mfs 37/37 + FTC 5/5, tui-smoke
-> PASS, everything green. THE HOOK-IN IS THE NEXT BRICK (7.0b),
-> gated on this battery.
+> yet per the separate-until-compliance ruling (§8.7).
+> WP7 7.0b LANDED 2026-11-18: the HOOK-IN — engine consumption of the
+> tested void core: additive void enum values (void_sphere/void_cube/
+> void_cylinder), composite_part.is_void with real pool slices,
+> add_composite routes void-bearing assemblies through mig_void_make_bridge,
+> skip-sites check is_void (ghost refresh, per-part iterate ×2, floor
+> batch, boundary extrema, CCD support, render pack), sealed-void spawn,
+> scene-save veto SVF07 until 7.0d, CAD void verbs + density-only mass
+> + to_spec grammar refusal + void-aware build routing + void glyphs.
+> Suite 79/77/0, quick 93/93/0, mgb PASS 44 FAIL 0, mfs 37/37 + FTC
+> 5/5, tui-smoke PASS, make everything clean (zero warning:/error:/FAIL).
+> WP7 7.0b COMPLETE — void pickers (keys 4/5/6) are 7.0c.
 
 ---
 
@@ -1364,7 +1372,7 @@ its own brick, gated on this module's compliance battery. Keys
   Sylvester positive-definiteness check on the double truth (a
   mis-placed void larger than its material is refused LOUDLY,
   `mig_void_not_pd`).
-- [ ] **7.0b Hook-in: engine consumption + pool-inclusive
+- [x] **7.0b Hook-in: engine consumption + pool-inclusive
   representation.** `mig_part` void types (additive enum),
   `composite_part.is_void` with REAL pool slices, skip-sites check
   the flag (ghost refresh refuses; per-part iterate, floor batch and
@@ -2904,6 +2912,57 @@ Ledger (new entries get a line, never an edit of a past line):
    warning:/error: lines. core/mig_void.c + core/mig_void.h +
    makefile + tests/mpe_suite_mig.c + tests/mpe_suite_main.c +
    docs/MIG_BUILD_PLAN.md (§8.7 scaffold + this line + STATUS).
+- 2026-11-18 — WP7 7.0b (this commit, VOID HOOK-IN — engine consumption
+   of the tested void core, standing ruling now satisfied: "make the
+   code separately and do not hook the code into the main system UNTIL
+   we have tested proper compliance and stability" — hooking into
+   engine TUs is allowed for 7.0b). Scope: additive void enum values
+   (mig_part_void_sphere/cube/cylinder = 3/4/5) in mig_mass.h; the
+   void case in mig_part_mass (twin-geometry probe, density mode only,
+   NEGATIVE effective mass, explicit → bad_mass_mode); mig_void.h gains
+   mig_void_validate_record + mig_void_make_bridge (MIG_VOID_BRIDGE_MAX
+   64, fixed scratch, refuses count>64/aliasing with mig_void_null);
+   mig_void.c twin normalization in mv_part_tensor_signed; the
+   new public void module is unchanged otherwise. Engine: physics_world.h
+   composite_part gains is_void; physics_world.c add_composite routes
+   void-bearing assemblies through mig_void_make_bridge (material-only
+   keeps mig_make_bridge bitwise), over-cap walk validates per-record
+   via mig_void_validate_record (no totals on a discarded tail), bound
+   walk skips voids (a void cannot extend the covering sphere), pool
+   staging maps void types → twin geometry + is_void=1 + negative mass
+   (inert field). Skip-sites: ghost refresh doc note + floor batch +
+   both per-part iterate sides + boundary extrema + CCD support all
+   check is_void; new_render.c call loop + render_pack_composite_part
+   defensive guard (is_void returns 0 → dropped_instances). scene_saving.c
+   gains SVF07 (void-bearing composite → "scene NOT saved", v201-trap
+   documented) inserted after SVF06. drag_weld.c weld_count_parts gains
+   bool *has_void; weld_try refuses void-bearing sources pre-flight
+   (distinct message, nothing mutated). CAD: cad_editor.h cad_err
+   appends 14-17 (bad_mass_mode/nonpositive/not_pd/void_grammar) +
+   cad_add_void_sphere/cube/cylinder declarations + contract comments;
+   cad_editor.c cad_dims_valid/cad_validate_part extended for void types
+   (twin rules, density-only), three void verbs at CAD_DEFAULT_DENSITY,
+   cad_set_mass refuses explicit on void, dims verbs match the geometry
+   twin, cad_design_to_spec refuses void-bearing (cad_void_grammar
+   BEFORE staging), cad_build routes void-bearing → mig_void_make_bridge
+   with extended error mapping, cad_plan_glyph void glyphs O/%/!. Tests:
+   mig_void_hook_composite (77th, engine truth: mass/COM/inertia vs hand,
+   bitwise vs material-only twin, pool-inclusive is_void+negative
+   mass+part_index, bound == twin's bound, refusals → -1, over-cap +
+   malformed void tail refused + valid 16-stored, floor-rest skip vs
+   void below floor); cad_void_model (78th, verbs/validation/to_spec
+   refusal/build/glyphs/net mass/full chain spawn); scene_save_svf07
+   (79th, void-bearing save returns 0, material-only saves 1). Gates
+   registered in mpe_suite_main.c (declarations + table rows after the
+   76th). Full battery: suite 79 registered / 77 blocking / 0 failures;
+   quick 93/93/0; mgb PASS 44 FAIL 0; mfs 37/37 + FTC gated 5/5; tui-smoke
+   PASS; make everything background + full-log audit zero warning:/error:/
+   FAIL lines. No new TUs (engine wildcard picks core/*.c; mgb makefile
+   CORE + mfs build_tests.sh CORE gained core/mig_void.c). House
+   invariants hold: mig_reviews.txt/studies/ untracked, never committed.
+   Pre-existing ASan abort at physics_world.c:2758 in
+   mpe_t_mig_composite_stack is proven on clean HEAD 0127d9a, queued for
+   a future brick, house battery unchanged.
 
 ## §10 Definition of done for v16S (the cut checklist)
 

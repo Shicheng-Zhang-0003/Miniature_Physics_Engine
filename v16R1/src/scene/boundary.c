@@ -162,7 +162,10 @@ static int boundary_composite_extrema_along_axis (const physics_world *world, co
     float best_max = -INFINITY;
     for (long i = rigid_body -> part_base; i < last; i++) {
         const composite_part *part = &world -> composite_parts [i];
-        if (!part -> active) { continue; }
+        /* WP7 7.0b: a void record projects NO extrema — the safety net
+         * rests on the material surface, never on a cavity's phantom
+         * geometry (the covering-sphere-envelope lesson, per part). */
+        if ((!part -> active) || (part -> is_void)) { continue; }
         vector3 part_world = vector3_addition (rigid_body -> position,
                                                vector4_rotate_to_vector3 (rigid_body -> orientation, part -> local_position));
         /* 2026-11-10 audit fix: the axis must reach the part's OWN frame —

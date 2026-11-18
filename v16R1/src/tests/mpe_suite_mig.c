@@ -5604,3 +5604,316 @@ int mpe_t_mig_void_compose_core (void) {
     mpe_test_end (&t);
     return t.failures;
 }
+
+/* MIG WP7 7.0b (DESPOT-2026-11-17) — the hook-in: engine consumption of
+ * the tested void core through physics_world_add_composite. This gate
+ * proves the composed-in vs composed-out story end to end:
+ *
+ *   - mig_part_mass carries the void's NEGATED effective mass (no caller
+ *     double-negation) and refuses explicit-on-void with bad_mass_mode.
+ *   - mig_void_validate_record is the per-record door (no totals).
+ *   - mig_void_make_bridge: mixed == direct mig_void_compose (memcmp),
+ *     void-free == mig_make_bridge parity, void-only -> no_material,
+ *     count>64/aliasing -> null.
+ *   - physics_world_add_composite routes void-bearing assemblies through
+ *     the void module: pool-inclusive count + is_void + negative mass +
+ *     part_index all staged; bound skips voids (== twin's bound); mass
+ *     nets negative vs the material-only twin body.
+ *   - refusals -> -1: void-only (no_material), over-eating void
+ *     (nonpositive), mis-placed big void (not_pd).
+ *   - over-cap + a malformed void tail refuses the whole assembly; a
+ *     valid 16-stored + discarded-tail stores 16 and counts the clamp.
+ *   - floor-rest skip: a void sphere poking below the floor cannot
+ *     phantom-contact, so a composite resting on the floor still sleeps
+ *     (no ghost -> no collision is the subtraction's truth).
+ */
+int mpe_t_mig_void_hook_composite (void) {
+    mpe_test_t t;
+    mpe_test_begin (&t, "mig_void_hook_composite");
+    mpe_clamp_counters_reset ();
+
+    /* ---- 1. mig_part_mass: void negation + explicit refusal ---------- */
+    {
+        double m = 0.0;
+        mig_part sphere = { mig_part_sphere, 0.25f, 0.0f, {0.0f,0.0f,0.0f},
+                            {0.0f,0.0f,0.0f}, {1.0f,0.0f,0.0f,0.0f},
+                            mig_mass_mode_density, 1000.0f };
+        mig_part vsphere = sphere;
+        vsphere.type = mig_part_void_sphere;
+        mig_part vcube = sphere;
+        vcube.type = mig_part_void_cube;
+        vcube.half_extensions = (vector3) {0.5f, 0.5f, 0.5f};
+        mig_part vcy = sphere;
+        vcy.type = mig_part_void_cylinder;
+        vcy.radius = 0.25f; vcy.cylinder_half_length = 0.3f;
+
+        MPE_CHECK (&t, mig_part_mass (&sphere, &m) == mig_compose_ok);
+        MPE_CHECK_NEAR (&t, m, 1000.0 * (4.0/3.0) * 3.14159265358979323846 * 0.25 * 0.25 * 0.25,
+                        1e-9, "sphere mass positive");
+        MPE_CHECK (&t, mig_part_mass (&vsphere, &m) == mig_compose_ok);
+        MPE_CHECK_NEAR (&t, m, -1000.0 * (4.0/3.0) * 3.14159265358979323846 * 0.25 * 0.25 * 0.25,
+                        1e-9, "void sphere mass negated");
+        MPE_CHECK (&t, mig_part_mass (&vcube, &m) == mig_compose_ok);
+        MPE_CHECK_NEAR (&t, m, -1000.0 * 8.0 * 0.5 * 0.5 * 0.5, 1e-9, "void cube mass negated");
+        MPE_CHECK (&t, mig_part_mass (&vcy, &m) == mig_compose_ok);
+        MPE_CHECK_NEAR (&t, m, -1000.0 * 3.14159265358979323846 * 0.25 * 0.25 * (2.0 * 0.3),
+                        1e-4, "void cylinder mass negated (0.3f is not binary-exact)");
+        /* explicit mode on a void is meaningless -> bad_mass_mode; write-on-success
+         * leaves *out_mass untouched (sentinel preserved). */
+        mig_part vexpl = vsphere;
+        vexpl.mass_mode = mig_mass_mode_explicit;
+        m = 12345.0;
+        MPE_CHECK (&t, mig_part_mass (&vexpl, &m) == mig_compose_bad_mass_mode);
+        MPE_CHECK (&t, m == 12345.0);
+    }
+
+    /* ---- 2. mig_void_validate_record: per-record door, no totals ----- */
+    {
+        mig_part good = { mig_part_sphere, 0.25f, 0.0f, {0.0f,0.0f,0.0f},
+                          {0.0f,0.0f,0.0f}, {1.0f,0.0f,0.0f,0.0f},
+                          mig_mass_mode_density, 1000.0f };
+        mig_part vgood = good;
+        vgood.type = mig_part_void_sphere;
+        mig_part vbad_mode = vgood;
+        vbad_mode.mass_mode = mig_mass_mode_explicit;
+        mig_part vbad_quat = vgood;
+        vbad_quat.orientation = (vector4) {2.0f, 0.0f, 0.0f, 0.0f};
+        mig_part vbad_dims = vgood;
+        vbad_dims.radius = -0.1f;
+        MPE_CHECK (&t, mig_void_validate_record (&good) == mig_void_ok);
+        MPE_CHECK (&t, mig_void_validate_record (&vgood) == mig_void_ok);
+        MPE_CHECK (&t, mig_void_validate_record (&vbad_mode) == mig_void_bad_mass_mode);
+        MPE_CHECK (&t, mig_void_validate_record (&vbad_quat) == mig_void_bad_quat);
+        MPE_CHECK (&t, mig_void_validate_record (&vbad_dims) == mig_void_bad_dims);
+        MPE_CHECK (&t, mig_void_validate_record (NULL) == mig_void_null);
+    }
+
+    /* ---- 3. mig_void_make_bridge: parity, void-only, oversize -------- */
+    {
+        mig_part cube = { mig_part_cube, 0.0f, 0.0f, {0.5f,0.5f,0.5f},
+                          {0.0f,0.0f,0.0f}, {1.0f,0.0f,0.0f,0.0f},
+                          mig_mass_mode_density, 1000.0f };
+        mig_part vsphere = cube;
+        vsphere.type = mig_part_void_sphere;
+        vsphere.radius = 0.25f;
+        vsphere.position = (vector3) {0.0f, 0.0f, 0.0f};
+        mig_part mixed [2] = { cube, vsphere };
+
+        mig_part out_a [16]; mig_bridge br_a;
+        mig_part out_b [16]; mig_bridge br_b;
+        memset (&br_a, 0, sizeof (br_a));
+        memset (&br_b, 0, sizeof (br_b));
+        /* mixed: void-aware bridge partitions internally == direct signed compose (memcmp) */
+        mig_totals direct;
+        memset (&direct, 0, sizeof (direct));
+        MPE_CHECK (&t, mig_void_compose (&cube, 1, &vsphere, 1, &direct) == mig_void_ok);
+        MPE_CHECK (&t, mig_void_make_bridge (mixed, 2, out_a, &br_a) == mig_void_ok);
+        MPE_CHECK (&t, memcmp (&br_a.totals, &direct, sizeof (mig_totals)) == 0);
+        MPE_CHECK (&t, br_a.count == 2 && br_a.parts == out_a);
+        /* void-free: identical to mig_make_bridge (bitwise) — compare the
+         * cube-alone bridge against the void module on the same cube. */
+        MPE_CHECK (&t, mig_make_bridge (&cube, 1, out_b, &br_b) == mig_compose_ok);
+        {
+            mig_part out_c [16]; mig_bridge br_c;
+            memset (&br_c, 0, sizeof (br_c));
+            MPE_CHECK (&t, mig_void_make_bridge (&cube, 1, out_c, &br_c) == mig_void_ok);
+            MPE_CHECK (&t, memcmp (&br_b.totals, &br_c.totals, sizeof (mig_totals)) == 0 &&
+                           br_b.count == br_c.count);
+        }
+        /* void-only: no body */
+        MPE_CHECK (&t, mig_void_make_bridge (&vsphere, 1, out_a, &br_a) == mig_void_no_material);
+        /* oversize count (> MIG_VOID_BRIDGE_MAX 64) and aliasing refuse */
+        {
+            mig_part big [MIG_VOID_BRIDGE_MAX + 1];
+            memset (big, 0, sizeof (big));
+            for (int i = 0; i < MIG_VOID_BRIDGE_MAX + 1; i++) {
+                big [i].type = mig_part_cube;
+                big [i].half_extensions = (vector3) {0.1f, 0.1f, 0.1f};
+                big [i].mass_mode = mig_mass_mode_density; big [i].mass = 1000.0f;
+                big [i].orientation = (vector4) {1.0f,0.0f,0.0f,0.0f};
+            }
+            MPE_CHECK (&t, mig_void_make_bridge (big, MIG_VOID_BRIDGE_MAX + 1,
+                                                 out_a, &br_a) == mig_void_null);
+        }
+        MPE_CHECK (&t, mig_void_make_bridge (&cube, 1, &cube, &br_a) == mig_void_null); /* aliasing: out_parts == src */
+        MPE_CHECK (&t, mig_void_make_bridge (NULL, 1, out_a, &br_a) == mig_void_null);
+    }
+
+    /* ---- 4. add_composite engine truth: void-bearing spawn ----------- */
+    {
+        const double m_box = 1000.0 * 1.0 * 1.0 * 1.0;            /* half 0.5 cube */
+        const double m_void = 1000.0 * (4.0/3.0) * 3.14159265358979323846 * 0.25 * 0.25 * 0.25;
+        const double m_net = m_box - m_void;
+        const double i_box = (m_box / 12.0) * (4.0 * 0.5 * 0.5 + 4.0 * 0.5 * 0.5); /* cube tensor: 4*h^2 */
+        const double i_void = 0.4 * m_void * 0.25 * 0.25;
+        const double i_net = i_box - i_void;
+        mig_part parts [2] = {
+            { mig_part_cube, 0.0f, 0.0f, {0.5f,0.5f,0.5f}, {0.0f,0.0f,0.0f},
+              {1.0f,0.0f,0.0f,0.0f}, mig_mass_mode_density, 1000.0f },
+            { mig_part_void_sphere, 0.25f, 0.0f, {0.0f,0.0f,0.0f},
+              {0.0f,0.0f,0.0f}, {1.0f,0.0f,0.0f,0.0f}, mig_mass_mode_density, 1000.0f },
+        };
+        physics_world w;
+        mpe_world_begin (&w);
+        const int cb = physics_world_add_composite (&w, parts, 2);
+        MPE_CHECK (&t, cb == 0 && w.body_count == 1 && w.composite_part_count == 2);
+        if (cb >= 0) {
+            rigidbody *body = &w.bodies [cb];
+            MPE_CHECK (&t, body -> type == object_composite && body -> mass_is_composed);
+            MPE_CHECK_NEAR (&t, body -> mass, (float) m_net, 1e-4f, "net mass (void subtracted)");
+            MPE_CHECK_NEAR (&t, body -> position.x, 0.0f, 1e-6f, "body at COM x");
+            MPE_CHECK_NEAR (&t, body -> position.y, 0.0f, 1e-6f, "body at COM y");
+            MPE_CHECK_NEAR (&t, body -> radius, 0.8660254f, 1e-6f, "bound skips the void == twin bound (sqrt(3)/2 for half 0.5 cube)");
+            MPE_CHECK_NEAR (&t, body -> inertia_tensor_local.matrix [0][0], (float) i_net,
+                            1e-4f, "net inertia (void subtracted)");
+            MPE_CHECK_NEAR (&t, body -> inertia_tensor_local.matrix [1][1], (float) i_net,
+                            1e-4f, "net inertia yy");
+            MPE_CHECK_NEAR (&t, body -> inertia_tensor_local.matrix [2][2], (float) i_net,
+                            1e-4f, "net inertia zz");
+            /* pool-inclusive: both records get real slices, is_void flag,
+             * negative mass for the void, part_index aligned to design. */
+            MPE_CHECK (&t, w.composite_parts [0].part_index == 0 &&
+                           w.composite_parts [1].part_index == 1);
+            MPE_CHECK (&t, w.composite_parts [0].is_void == 0 &&
+                           w.composite_parts [1].is_void == 1);
+            MPE_CHECK_NEAR (&t, w.composite_parts [0].mass, (float) m_box, 1e-6f, "material mass kept");
+            MPE_CHECK_NEAR (&t, w.composite_parts [1].mass, (float) -m_void, 1e-6f, "void mass negative");
+            MPE_CHECK (&t, w.composite_parts [0].active == 1 &&
+                           w.composite_parts [1].active == 1);
+            /* material-only twin body (the cube alone): same bound since
+             * the void is skipped, but full mass/inertia (the void only
+             * subtracts in the real assembly). */
+            physics_world wt;
+            mpe_world_begin (&wt);
+            mig_part twin [1] = { parts [0] };
+            const int tb = physics_world_add_composite (&wt, twin, 1);
+            MPE_CHECK (&t, tb == 0);
+            if (tb >= 0) {
+                rigidbody *tt = &wt.bodies [tb];
+                MPE_CHECK_NEAR (&t, tt -> mass, (float) m_box, 1e-6f, "twin mass (cube alone)");
+                MPE_CHECK_NEAR (&t, tt -> radius, body -> radius, 1e-6f, "bound equal: void skipped");
+                MPE_CHECK_NEAR (&t, tt -> inertia_tensor_local.matrix [0][0], (float) i_box,
+                                1e-4f, "twin inertia (cube alone)");
+                MPE_CHECK_NEAR (&t, body -> inertia_tensor_local.matrix [0][0], (float) i_net,
+                                1e-4f, "assembly inertia (void subtracted)");
+                MPE_CHECK (&t, body -> mass < tt -> mass); /* void lightened the body */
+            }
+            physics_world_cleanup (&wt);
+        }
+        physics_world_cleanup (&w);
+    }
+
+    /* ---- 5. refusals -> -1 ------------------------------------------ */
+    {
+        /* void-only: no body at all */
+        mig_part vonly [1] = { { mig_part_void_sphere, 0.25f, 0.0f, {0.0f,0.0f,0.0f},
+                                 {0.0f,0.0f,0.0f}, {1.0f,0.0f,0.0f,0.0f},
+                                 mig_mass_mode_density, 1000.0f } };
+        physics_world w; mpe_world_begin (&w);
+        MPE_CHECK (&t, physics_world_add_composite (&w, vonly, 1) == -1);
+        physics_world_cleanup (&w);
+        /* over-eating void: total mass non-positive -> refuse */
+        mig_part bigvoid [2] = {
+            { mig_part_cube, 0.0f, 0.0f, {0.5f,0.5f,0.5f}, {0.0f,0.0f,0.0f},
+              {1.0f,0.0f,0.0f,0.0f}, mig_mass_mode_density, 1000.0f },
+            { mig_part_void_sphere, 0.7f, 0.0f, {0.0f,0.0f,0.0f},
+              {0.0f,0.0f,0.0f}, {1.0f,0.0f,0.0f,0.0f}, mig_mass_mode_density, 1000.0f }, /* vol > cube */
+        };
+        mpe_world_begin (&w);
+        MPE_CHECK (&t, physics_world_add_composite (&w, bigvoid, 2) == -1);
+        physics_world_cleanup (&w);
+        /* mis-placed big void: mass stays positive but tensor not PD */
+        mig_part misplaced [2] = {
+            { mig_part_cube, 0.0f, 0.0f, {10.0f,10.0f,0.2f}, {0.0f,0.0f,0.0f},
+              {1.0f,0.0f,0.0f,0.0f}, mig_mass_mode_density, 5.0f },
+            { mig_part_cube, 0.0f, 0.0f, {10.0f,10.0f,0.2f}, {0.0f,0.0f,0.0f},
+              {1.0f,0.0f,0.0f,0.0f}, mig_mass_mode_density, 5.0f },
+        };
+        misplaced [1].type = mig_part_void_cube;
+        misplaced [1].mass_mode = mig_mass_mode_density; misplaced [1].mass = 500.0f;
+        mpe_world_begin (&w);
+        MPE_CHECK (&t, physics_world_add_composite (&w, misplaced, 2) == -1);
+        physics_world_cleanup (&w);
+    }
+
+    /* ---- 6. over-cap: malformed void tail refuses; valid tail stores 16*/
+    {
+        mig_part bad [17];
+        for (int i = 0; i < 17; i++) {
+            bad [i] = (mig_part) { mig_part_cube, 0.0f, 0.0f, {0.1f,0.1f,0.1f},
+                                   {0.0f,0.0f,0.0f}, {1.0f,0.0f,0.0f,0.0f},
+                                   mig_mass_mode_density, 1000.0f };
+        }
+        bad [16].type = mig_part_void_sphere;
+        bad [16].radius = (float) NAN; /* malformed discarded tail */
+        physics_world w; mpe_world_begin (&w);
+        MPE_CHECK (&t, physics_world_add_composite (&w, bad, 17) == -1); /* tail poisons all */
+        physics_world_cleanup (&w);
+        /* valid 16 stored, 17th (valid cube) discarded: the void lives at
+         * index 15 (inside the stored slice), the tail cube is discarded,
+         * the clamp fires once. */
+        mig_part good17 [17];
+        for (int i = 0; i < 17; i++) {
+            good17 [i] = (mig_part) { mig_part_cube, 0.0f, 0.0f, {0.5f,0.5f,0.5f},
+                                      {0.0f,0.0f,0.0f}, {1.0f,0.0f,0.0f,0.0f},
+                                      mig_mass_mode_density, 1000.0f };
+        }
+        good17 [15].type = mig_part_void_sphere; /* stored void */
+        good17 [15].radius = 0.25f;              /* void sphere needs a radius */
+        good17 [16].radius = 0.1f;               /* valid tail: validated, then discarded (only 16 stored) */
+        mpe_world_begin (&w);
+        const int cg = physics_world_add_composite (&w, good17, 17);
+        MPE_CHECK (&t, cg == 0 && w.body_count == 1 && w.composite_part_count == 16 &&
+                       w.composite_parts [15].is_void == 1 &&
+                       w.composite_parts [15].type == object_sphere);
+        physics_world_cleanup (&w);
+    }
+
+    /* ---- 7. floor-rest skip: void below floor cannot phantom-contact -- */
+    {
+        /* material cube resting on the floor (y=0), void sphere just
+         * below the floor at y=0.05 (its r=0.1 pokes to y=-0.05): the void
+         * is close to the cube so the totals stay physical, but its
+         * geometry pokes below the floor. If the void were treated as
+         * material it would interpenetrate the floor and keep the body
+         * awake; skipped, the body rests and sleeps. */
+        mig_part parts [2] = {
+            /* cube resting on the floor (bottom exactly y=0), void sphere
+             * just below the floor (centre y=0.1, r 0.2 -> pokes to y=-0.1):
+             * the void is close to the cube so PD holds comfortably, but
+             * its geometry pokes below the floor. If the void were
+             * material it would interpenetrate the floor and keep the body
+             * awake; skipped, the body rests and sleeps. */
+            { mig_part_cube, 0.0f, 0.0f, {0.3f,0.3f,0.3f}, {0.0f,0.3f,0.0f},
+              {1.0f,0.0f,0.0f,0.0f}, mig_mass_mode_density, 1000.0f },
+            { mig_part_void_sphere, 0.2f, 0.0f, {0.0f,0.0f,0.0f},
+              {0.0f,0.1f,0.0f}, {1.0f,0.0f,0.0f,0.0f}, mig_mass_mode_density, 1000.0f },
+        };
+        g_cfg.world.gravity = -9.81f;
+        g_cfg.world.drag = 0.0f;
+        g_cfg.sleep.enable = 1;
+        g_cfg.body_defaults.cube_restitution = 0.0f;
+        physics_world w; mpe_world_begin (&w);
+        /* Floor slab under the cube (top surface exactly y=0). */
+        int floor = physics_world_add_cube (&w, (vector3) {0.0f, -0.51f, 0.0f},
+                                            (vector3) {10.0f, 0.5f, 10.0f}, 0.0f);
+        MPE_CHECK (&t, floor >= 0);
+        w.bodies [floor].static_state = true;
+        w.bodies [floor].restitution = 0.0f;
+        w.bodies [floor].friction_static = 0.8f;
+        const int cb = physics_world_add_composite (&w, parts, 2);
+        MPE_CHECK (&t, cb >= 0);
+        if (cb >= 0) {
+            rigidbody *body = &w.bodies [cb];
+            MPE_CHECK (&t, w.composite_parts [1].is_void == 1);
+            for (int k = 0; k < 300 && !body -> is_sleeping; k++) {
+                physics_world_step (&w, 1.0f / 60.0f);
+            }
+            MPE_CHECK (&t, body -> is_sleeping); /* void below floor did not keep the body awake */
+        }
+        physics_world_cleanup (&w);
+    }
+
+    mpe_test_end (&t);
+    return t.failures;
+}

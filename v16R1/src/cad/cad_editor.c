@@ -24,7 +24,9 @@ static bool cad_finite3 (vector3 v) {
 }
 
 /* mig_part_tensor_local's dims rules, mirrored for early refusal:
- * per-type subsets, every dimension finite and strictly positive. */
+ * per-type subsets, every dimension finite and strictly positive.
+ * WP7 7.0b: a VOID record validates by its GEOMETRY TWIN's rules —
+ * the same dim fields carry the void's size. */
 static bool cad_dims_valid (const mig_part *p) {
     if (!isfinite (p -> radius) || !isfinite (p -> cylinder_half_length) ||
         !cad_finite3 (p -> half_extensions)) {
@@ -37,22 +39,38 @@ static bool cad_dims_valid (const mig_part *p) {
                                    (p -> half_extensions.z > 0.0f);
         case mig_part_cylinder: return (p -> radius > 0.0f) &&
                                        (p -> cylinder_half_length > 0.0f);
+        case mig_part_void_sphere: return p -> radius > 0.0f;
+        case mig_part_void_cube: return (p -> half_extensions.x > 0.0f) &&
+                                        (p -> half_extensions.y > 0.0f) &&
+                                        (p -> half_extensions.z > 0.0f);
+        case mig_part_void_cylinder: return (p -> radius > 0.0f) &&
+                                            (p -> cylinder_half_length > 0.0f);
         default: return false;
     }
 }
 
 /* One shared validator for every part-entering verb. Returns the
  * same-named cad_err the compose path would surface later — refusing
- * at the door keeps the design always buildable. */
+ * at the door keeps the design always buildable. WP7 7.0b: a VOID
+ * record enters on its twin's dims rules with DENSITY interpretation
+ * ONLY (explicit mass on a void is meaningless — cad_bad_mass_mode,
+ * the same named rule the signed compose enforces); the density value
+ * itself still passes the strictly-positive mass check below. */
 static int cad_validate_part (const mig_part *p) {
     if (!p) { return cad_null; }
     if ((p -> type != mig_part_sphere) && (p -> type != mig_part_cube) &&
-        (p -> type != mig_part_cylinder)) {
+        (p -> type != mig_part_cylinder) &&
+        (p -> type != mig_part_void_sphere) && (p -> type != mig_part_void_cube) &&
+        (p -> type != mig_part_void_cylinder)) {
         return cad_bad_type;
     }
     if (!cad_dims_valid (p)) { return cad_bad_dims; }
     if (!cad_finite3 (p -> position)) { return cad_bad_pose; }
     if (!cad_quat_unit (p -> orientation)) { return cad_bad_quat; }
+    if ((p -> type >= mig_part_void_sphere) &&
+        (p -> mass_mode != mig_mass_mode_density)) {
+        return cad_bad_mass_mode;
+    }
     if (!isfinite (p -> mass) || (p -> mass <= 0.0f)) { return cad_bad_mass; }
     return cad_ok;
 }
@@ -150,6 +168,50 @@ int cad_add_cylinder (cad_design *design, float radius, float half_length,
     mig_part p;
     memset (&p, 0, sizeof (p));
     p.type = mig_part_cylinder;
+    p.radius = radius;
+    p.cylinder_half_length = half_length;
+    p.position = position;
+    p.orientation = vector4_identity ();
+    p.mass_mode = mig_mass_mode_density;
+    p.mass = CAD_DEFAULT_DENSITY;
+    return cad_append_validated (design, &p);
+}
+
+/* WP7 7.0b: the VOID adds — identical authoring shape to the material
+ * adds (identity quat, CAD_DEFAULT_DENSITY) but the record is stored
+ * VOID-typed and the mass field is its DENSITY in density mode (a void
+ * has no explicit-kilogram meaning). The engine's signed compose
+ * subtracts the twin-geometry volume at this density. */
+int cad_add_void_sphere (cad_design *design, float radius, vector3 position) {
+    mig_part p;
+    memset (&p, 0, sizeof (p));
+    p.type = mig_part_void_sphere;
+    p.radius = radius;
+    p.position = position;
+    p.orientation = vector4_identity ();
+    p.mass_mode = mig_mass_mode_density;
+    p.mass = CAD_DEFAULT_DENSITY;
+    return cad_append_validated (design, &p);
+}
+
+int cad_add_void_cube (cad_design *design, vector3 half_extensions,
+                       vector3 position) {
+    mig_part p;
+    memset (&p, 0, sizeof (p));
+    p.type = mig_part_void_cube;
+    p.half_extensions = half_extensions;
+    p.position = position;
+    p.orientation = vector4_identity ();
+    p.mass_mode = mig_mass_mode_density;
+    p.mass = CAD_DEFAULT_DENSITY;
+    return cad_append_validated (design, &p);
+}
+
+int cad_add_void_cylinder (cad_design *design, float radius, float half_length,
+                           vector3 position) {
+    mig_part p;
+    memset (&p, 0, sizeof (p));
+    p.type = mig_part_void_cylinder;
     p.radius = radius;
     p.cylinder_half_length = half_length;
     p.position = position;
@@ -264,6 +326,13 @@ int cad_set_mass (cad_design *design, int index, mig_mass_mode mode, float value
     if ((mode != mig_mass_mode_explicit) && (mode != mig_mass_mode_density)) {
         return cad_bad_arg;
     }
+    /* WP7 7.0b: a VOID record is density-only — explicit kilograms on a
+     * cavity is meaningless (the signed compose refuses it the same
+     * way). The density VALUE stays freely rewritable. */
+    if ((design -> parts [index].type >= mig_part_void_sphere) &&
+        (mode != mig_mass_mode_density)) {
+        return cad_bad_mass_mode;
+    }
     if (!isfinite (value) || (value <= 0.0f)) { return cad_bad_mass; }
     design -> parts [index].mass_mode = mode;
     design -> parts [index].mass = value;
@@ -271,13 +340,17 @@ int cad_set_mass (cad_design *design, int index, mig_mass_mode mode, float value
 }
 
 /* ---- dims resize: the verb must match the part's type (a sphere is
- * not resized by the cube verb), dims finite and strictly positive —
- * the mig_compose rule — and the write lands only on success. */
+ * not resized by the cube verb). WP7 7.0b: a VOID record is resized
+ * through the verb matching its GEOMETRY TWIN (the same dim fields
+ * carry the void's size — void_sphere resizes via the sphere verb).
+ * Dims finite and strictly positive — the mig_compose rule — and the
+ * write lands only on success. */
 
 int cad_set_dims_sphere (cad_design *design, int index, float radius) {
     if (!design) { return cad_null; }
     if ((index < 0) || (index >= design -> count)) { return cad_bad_index; }
-    if (design -> parts [index].type != mig_part_sphere) { return cad_bad_type; }
+    const mig_part_type t = design -> parts [index].type;
+    if ((t != mig_part_sphere) && (t != mig_part_void_sphere)) { return cad_bad_type; }
     if (!isfinite (radius) || (radius <= 0.0f)) { return cad_bad_dims; }
     design -> parts [index].radius = radius;
     return cad_ok;
@@ -286,7 +359,8 @@ int cad_set_dims_sphere (cad_design *design, int index, float radius) {
 int cad_set_dims_cube (cad_design *design, int index, vector3 half_extensions) {
     if (!design) { return cad_null; }
     if ((index < 0) || (index >= design -> count)) { return cad_bad_index; }
-    if (design -> parts [index].type != mig_part_cube) { return cad_bad_type; }
+    const mig_part_type t = design -> parts [index].type;
+    if ((t != mig_part_cube) && (t != mig_part_void_cube)) { return cad_bad_type; }
     if (!cad_finite3 (half_extensions) || (half_extensions.x <= 0.0f) ||
         (half_extensions.y <= 0.0f) || (half_extensions.z <= 0.0f)) {
         return cad_bad_dims;
@@ -299,7 +373,8 @@ int cad_set_dims_cylinder (cad_design *design, int index, float radius,
                            float half_length) {
     if (!design) { return cad_null; }
     if ((index < 0) || (index >= design -> count)) { return cad_bad_index; }
-    if (design -> parts [index].type != mig_part_cylinder) { return cad_bad_type; }
+    const mig_part_type t = design -> parts [index].type;
+    if ((t != mig_part_cylinder) && (t != mig_part_void_cylinder)) { return cad_bad_type; }
     if (!isfinite (radius) || (radius <= 0.0f) || !isfinite (half_length) ||
         (half_length <= 0.0f)) {
         return cad_bad_dims;
@@ -347,6 +422,17 @@ int cad_design_to_spec (const cad_design *design, mig_spec *out) {
     if ((!design) || (!out)) { return cad_null; }
     if (design -> count <= 0) { return cad_empty; }
     if (!cad_name_legal (design -> name)) { return cad_bad_name; }
+    /* WP7 7.0b: the frozen v1 grammar cannot express void records (the
+     * parser refuses any type outside the primitive family), so a
+     * void-bearing design must not go NEAR the emitter — a silent
+     * material reinterpretation would be the exact v201 trap the scene
+     * veto guards. Refuse loudly, write-on-success holds (nothing was
+     * written). */
+    for (int i = 0; i < design -> count; i++) {
+        if (design -> parts [i].type >= mig_part_void_sphere) {
+            return cad_void_grammar;
+        }
+    }
     /* Write-on-success: build the whole spec in a local first — a late
      * part refusal in the loop must leave *out untouched, not hand the
      * caller a half-written spec. */
@@ -464,14 +550,40 @@ int cad_load (cad_design *design, const char *path, int max_parts, int *spec_err
 int cad_build (const cad_design *design, mig_part *out_parts, mig_bridge *out) {
     if ((!design) || (!out_parts) || (!out)) { return cad_null; }
     if (design -> count <= 0) { return cad_empty; }
-    int rc = mig_make_bridge (design -> parts, design -> count, out_parts, out);
+    /* WP7 7.0b: the routing is void-aware. A material-only design keeps
+     * the untouched mig_make_bridge path (bitwise — the pinned parity);
+     * a void-bearing design routes through the tested signed module,
+     * which partitions by type and composes through mig_void_compose
+     * with the SAME rebase rule (mig_rebase_parts, one code path). */
+    bool has_void = false;
+    for (int i = 0; i < design -> count; i++) {
+        if (design -> parts [i].type >= mig_part_void_sphere) { has_void = true; break; }
+    }
+    int rc;
+    if (has_void) {
+        rc = mig_void_make_bridge (design -> parts, design -> count, out_parts, out);
+    } else {
+        rc = mig_make_bridge (design -> parts, design -> count, out_parts, out);
+    }
     switch (rc) {
+        /* The two compose enums are the same numbered family: 0-6 carry
+         * the same values under both name sets (the parity contract),
+         * 7-10 are mig_void-only. Cases below use the mig_compose_* names
+         * for the shared values and the mig_void_* names for the
+         * void-only ones — one switch table, no duplicate case values. */
         case mig_compose_ok: return cad_ok;
         case mig_compose_null: return cad_null;
         case mig_compose_bad_type: return cad_bad_type;
         case mig_compose_bad_dims: return cad_bad_dims;
         case mig_compose_bad_quat: return cad_bad_quat;
         case mig_compose_bad_mass: return cad_bad_mass;
+        case mig_compose_bad_mass_mode: return cad_bad_mass_mode;
+        /* WP7 7.0b: the signed compose's own cases map to the new
+         * same-named cad_err values. */
+        case mig_void_bad_density: return cad_bad_mass;   /* non-positive density */
+        case mig_void_no_material: return cad_empty;      /* a void alone is no body */
+        case mig_void_nonpositive: return cad_nonpositive;/* the voids ate the body */
+        case mig_void_not_pd: return cad_not_pd;          /* mis-placed void */
         default: return cad_bad_arg; /* unexpected compose code — refuse loudly */
     }
 }
@@ -483,6 +595,12 @@ static char cad_plan_glyph (mig_part_type type) {
         case mig_part_sphere: return 'o';
         case mig_part_cube: return '#';
         case mig_part_cylinder: return '|';
+        /* WP7 7.0b: the void family renders in DISTINCT glyphs — a
+         * cavity is visible as ABSENCE in the plan view, never as
+         * material (upper-case O, %, ! — visually the subtraction). */
+        case mig_part_void_sphere: return 'O';
+        case mig_part_void_cube: return '%';
+        case mig_part_void_cylinder: return '!';
         default: return '?';
     }
 }

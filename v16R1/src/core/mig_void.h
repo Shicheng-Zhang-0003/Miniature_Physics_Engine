@@ -61,19 +61,49 @@ typedef enum {
  * rules per record: explicit kg or density kg/m^3, strictly positive,
  * quats unit to 1e-4), the `voids` list SUBTRACTS (each record's mass
  * field read as kg/m^3, density mode only, same dims/pose/quat rules).
- * Both lists keep ASSEMBLY-frame poses; the totals are in that same
- * frame (the caller re-anchors, as always). Refusals, in order:
- * material records one by one (quat, then dims, then mass — the
- * mig_compose pass-0 order), then void records the same way; then the
- * totals: mass finite > 0 AND the inertia tensor positive-definite
- * (Sylvester's criterion, on the double truth BEFORE the one float
- * narrowing) — a void larger than its material is a mis-placed void,
- * refused LOUDLY, never a garbage tensor. With void_count == 0 this is
- * mig_compose bit-for-bit on the same materials (the parity gate pins
- * the totals AND the refusal codes). Write-on-success: `out` is
- * untouched on any refusal. */
+ * WP7 7.0b: a voids record may be PRIMITIVE-typed (this module's 7.0a
+ * form, still pinned by the parity gate) or VOID-typed
+ * (void_sphere/void_cube/void_cylinder — the engine's self-describing
+ * form; the geometry twin's dims rules apply). The MATERIAL list refuses
+ * void types (bad_type: a void is not material), and plain mig_compose
+ * refuses them the same way. Both lists keep ASSEMBLY-frame poses; the
+ * totals are in that same frame (the caller re-anchors, as always).
+ * Refusals, in order: material records one by one (quat, then dims,
+ * then mass — the mig_compose pass-0 order), then void records the same
+ * way; then the totals: mass finite > 0 AND the inertia tensor
+ * positive-definite (Sylvester's criterion, on the double truth BEFORE
+ * the one float narrowing) — a void larger than its material is a
+ * mis-placed void, refused LOUDLY, never a garbage tensor. With
+ * void_count == 0 this is mig_compose bit-for-bit on the same materials
+ * (the parity gate pins the totals AND the refusal codes).
+ * Write-on-success: `out` is untouched on any refusal. */
 int mig_void_compose (const mig_part *material, int material_count,
                       const mig_part *voids, int void_count,
                       mig_totals *out);
+
+/* WP7 7.0b: validate ONE record against the rules its TYPE names —
+ * primitive types by the material rules (mig_compose's pass 0: quat,
+ * then type/dims/mass), void types by the void rules (density mode
+ * only, twin dims). NO totals checks: this is the per-record door the
+ * over-cap validator walk needs (compose validates totals it must not
+ * compute for a discarded tail). Same named errors as compose. */
+int mig_void_validate_record (const mig_part *p);
+
+/* WP7 7.0b: the VOID-AWARE bridge — mig_make_bridge for assemblies that
+ * may hold void-typed records. Partitions `src` by type (materials keep
+ * definition order into the compose's material pass, voids into its
+ * void pass — the accumulation order mig_void_compose's contract pins),
+ * composes through mig_void_compose (a void-free assembly therefore
+ * lands on the pinned bitwise-parity path), copies into `out_parts`
+ * (must hold `count` slots, must NOT alias `src`) and re-anchors the
+ * copy by -totals.com (mig_rebase_parts — ONE code path with
+ * mig_make_bridge). Returns mig_void_err (mig_void_ok / the compose
+ * refusal verbatim; mig_void_null for NULL/aliasing/negative-count
+ * inputs). The engine's composite cap is frozen at 16; this helper's
+ * internal partition scratch is sized for headroom beyond it — larger
+ * counts refuse mig_void_null rather than ever overflowing. */
+#define MIG_VOID_BRIDGE_MAX 64
+int mig_void_make_bridge (const mig_part *src, int count, mig_part *out_parts,
+                          mig_bridge *out);
 
 #endif /* mig_void_h */

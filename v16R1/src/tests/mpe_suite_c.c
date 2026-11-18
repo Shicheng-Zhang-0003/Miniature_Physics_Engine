@@ -852,6 +852,72 @@ int mpe_t_composite_roundtrip (void) {
     physics_world_cleanup (w);
     mpe_test_end (&t);
     return t.failures;
+}
+
+/* MIG WP7 7.0b gate (tests/mpe_suite_c.c):
+ *   mpe_t_scene_save_svf07 — the void persistence veto: a void-bearing
+ *   composite refuses scene save (SVF07, scene NOT saved) because the
+ *   v201 format cannot express void records (reload would silently
+ *   reinterpret them as material and recompose the body heavier). A
+ *   material-only composite still saves fine. The live scene is left
+ *   intact either way (SVF convention). */
+int mpe_t_scene_save_svf07 (void) {
+    mpe_test_t t;
+    mpe_test_begin (&t, "scene_save_svf07");
+    physics_world *w = physics_world_get_primary ();
+    physics_world_init (w);
+    constraint_pool_init (w);
+    const char *tmpd = getenv ("TMPDIR");
+    char path [512];
+    if (tmpd && tmpd [0])
+        snprintf (path, sizeof (path), "%s/mpe_suite_svf07.dat", tmpd);
+    else
+        snprintf (path, sizeof (path), "../../temp/mpe_suite_svf07.dat");
+
+    /* ---- void-bearing composite: save refused (SVF07) -------------- */
+    {
+        mig_part parts [2] = {
+            { mig_part_cube, 0.0f, 0.0f, {0.5f,0.5f,0.5f}, {0.0f,0.0f,0.0f},
+              {1.0f,0.0f,0.0f,0.0f}, mig_mass_mode_density, 1000.0f },
+            { mig_part_void_sphere, 0.25f, 0.0f, {0.0f,0.0f,0.0f},
+              {0.0f,0.0f,0.0f}, {1.0f,0.0f,0.0f,0.0f}, mig_mass_mode_density, 1000.0f },
+        };
+        const int cb = physics_world_add_composite (w, parts, 2);
+        MPE_CHECK (&t, cb == 0);
+        MPE_CHECK (&t, w -> bodies [cb].composite_part_count == 2);
+        /* scene save must refuse: void persistence not implemented. */
+        MPE_CHECK (&t, save_scene (path) == 0);
+        /* live scene still intact (SVF convention: fail at save, not load). */
+        MPE_CHECK (&t, w -> body_count == 1 &&
+                       w -> bodies [cb].composite_part_count == 2 &&
+                       w -> composite_parts [1].is_void == 1);
+    }
+
+    /* ---- material-only composite: save succeeds -------------------- */
+    {
+        /* clear the void-bearing body, spawn a material-only composite. */
+        physics_world_cleanup (w);
+        physics_world_init (w);
+        constraint_pool_init (w);
+        mig_part parts [2] = {
+            { mig_part_cube, 0.0f, 0.0f, {0.5f,0.5f,0.5f}, {0.0f,0.0f,0.0f},
+              {1.0f,0.0f,0.0f,0.0f}, mig_mass_mode_density, 1000.0f },
+            { mig_part_cube, 0.0f, 0.0f, {0.5f,0.5f,0.5f}, {1.0f,0.0f,0.0f},
+              {1.0f,0.0f,0.0f,0.0f}, mig_mass_mode_density, 1000.0f },
+        };
+        const int cb = physics_world_add_composite (w, parts, 2);
+        MPE_CHECK (&t, cb == 0);
+        MPE_CHECK (&t, save_scene (path) != 0); /* material-only saves fine */
+        /* round-trip still works. */
+        w -> bodies [cb].position = (vector3) {99.0f, 99.0f, 99.0f};
+        MPE_CHECK (&t, scene_loading (path) != 0);
+        MPE_CHECK (&t, w -> body_count == 1);
+        remove (path);
+    }
+
+    physics_world_cleanup (w);
+    mpe_test_end (&t);
+    return t.failures;
 } /* module: per-world cfg, registry dispatch, custom shapes, hooks, id cache,
  * pool growth, det counters. Condensed port of module_test.c. */
 static int mpe_mod_pre_calls = 0;

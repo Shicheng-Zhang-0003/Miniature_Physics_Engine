@@ -134,6 +134,24 @@ int save_scene (const char *file_destination_path) {
                      svf_i);
             return 0;
         }
+    }
+    /* MIG WP7 7.0b: void-bearing composites refuse persistence until the
+     * v202 per-part is_void flag (7.0d). A v201 file cannot express a
+     * void record — reload would treat every part as MATERIAL and
+     * silently recompose the body HEAVIER (the documented v201 trap).
+     * Refuse at save time, loud and counted by convention. */
+    for (int svf_i = 0; svf_i < world -> body_count; svf_i++) {
+        const rigidbody *svf_rb = &world -> bodies [svf_i];
+        if (svf_rb -> type != object_composite) { continue; }
+        for (int svf_p = 0; svf_p < svf_rb -> composite_part_count; svf_p++) {
+            const long svf_slot = (long) svf_rb -> part_base + (long) svf_p;
+            if ((svf_slot < 0) || (svf_slot >= (long) world -> composite_part_count)) { continue; }
+            if (world -> composite_parts [svf_slot].is_void) {
+                fprintf (stderr, "Error SVF07: body %d holds void parts; void persistence is not implemented (scene v202 pending); scene NOT saved\n",
+                         svf_i);
+                return 0;
+            }
+        }
     } char tmp_template [520];
     if (snprintf (tmp_template, sizeof (tmp_template), "%s.XXXXXX", file_destination_path) >=
         (int) sizeof (tmp_template)) {

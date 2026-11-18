@@ -46,6 +46,7 @@
 #define cad_editor_h
 #include "../core/math3d.h"
 #include "../core/mig_mass.h"
+#include "../core/mig_void.h"
 #include "../core/mig_spec.h"
 
 /* The design part ceiling. The spec parser caps at this same literal
@@ -77,9 +78,17 @@ typedef enum {
                           * snap cap too small, empty-name set, ... */
     cad_io = 11,         /* fopen/fwrite/close failed (save) */
     cad_empty = 12,      /* build/save with zero parts (compose would reject) */
-    cad_spec_reject = 13 /* load: the parser rejected the file; the raw
+    cad_spec_reject = 13,/* load: the parser rejected the file; the raw
                           * mig_spec_err lands in the caller's optional
                           * out-int and the design is untouched */
+    /* WP7 7.0b appends (append-only, the enum precedent): */
+    cad_bad_mass_mode = 14, /* explicit mass on a VOID record (density only) */
+    cad_nonpositive = 15,   /* compose totals non-positive after subtraction
+                             * (the void ate all the material) */
+    cad_not_pd = 16,        /* compose inertia not positive-definite
+                             * (mis-placed / oversized void) */
+    cad_void_grammar = 17   /* to_spec: the frozen v1 grammar cannot
+                             * express void records — design refused */
 } cad_err;
 
 /* The design record. Parts keep ASSEMBLY-frame poses — the frame the
@@ -116,6 +125,17 @@ int cad_add_sphere (cad_design *design, float radius, vector3 position);
 int cad_add_cube (cad_design *design, vector3 half_extensions, vector3 position);
 int cad_add_cylinder (cad_design *design, float radius, float half_length,
                       vector3 position);
+/* WP7 7.0b typed VOID adds (the subtractive family, same authoring
+ * rules as the material adds): identity orientation, the mass field
+ * authored at CAD_DEFAULT_DENSITY in DENSITY mode (a void has no
+ * explicit-kilogram meaning), caller pose. Validation is the twin's
+ * dims rules; the record is stored VOID-typed and the engine's signed
+ * compose path subtracts it. Write-on-success. */
+int cad_add_void_sphere (cad_design *design, float radius, vector3 position);
+int cad_add_void_cube (cad_design *design, vector3 half_extensions,
+                       vector3 position);
+int cad_add_void_cylinder (cad_design *design, float radius, float half_length,
+                           vector3 position);
 /* Generic add with the caller-built part: validates type/dims/pose/quat/
  * mass exactly as mig_compose will (the same named errors), refuses a
  * full design, appends at the END (never reorders existing parts). */
@@ -147,14 +167,19 @@ int cad_set_position (cad_design *design, int index, vector3 position);
  * rot_snap_deg > 0 rounds the request to its multiples FIRST. */
 int cad_rotate_degrees (cad_design *design, int index, int axis, float degrees);
 
-/* Rewrite either mass mode on a part (explicit kg or density kg/m^3). */
+/* Rewrite either mass mode on a part. WP7 7.0b: a VOID record refuses
+ * the explicit mode (cad_bad_mass_mode — a void has no kilogram
+ * meaning); its density stays rewritable. */
 int cad_set_mass (cad_design *design, int index, mig_mass_mode mode, float value);
 
 /* ---- dims resize (the window's scale verb) ----
  * Resize ONE part through the verb matching its type; a mismatch refuses
- * cad_bad_type (a sphere is not resized by the cube verb). Dims must be
- * finite and strictly positive (the mig_compose rule). Write-on-success:
- * a refused resize leaves the part untouched. */
+ * cad_bad_type (a sphere is not resized by the cube verb). WP7 7.0b: a
+ * VOID record is resized through the verb matching its GEOMETRY TWIN
+ * (void_sphere resizes via the sphere verb, etc.) — the same dim fields
+ * carry the void's geometry. Dims must be finite and strictly positive
+ * (the mig_compose rule). Write-on-success: a refused resize leaves the
+ * part untouched. */
 int cad_set_dims_sphere (cad_design *design, int index, float radius);
 int cad_set_dims_cube (cad_design *design, int index, vector3 half_extensions);
 int cad_set_dims_cylinder (cad_design *design, int index, float radius,
@@ -177,8 +202,10 @@ int cad_select (cad_design *design, int index);
 
 /* Design → mig_spec (name, `frame assembly`, per-part type/dims/pose/
  * mass; no material/colour — the engine stamps body defaults at build).
- * Refuses an empty design (the grammar rejects zero-part files) and a
- * name outside the grammar. Write-on-success. */
+ * Refuses an empty design (the grammar rejects zero-part files), a
+ * name outside the grammar, and — WP7 7.0b — a VOID-BEARING design
+ * (cad_void_grammar: the frozen v1 grammar cannot express void
+ * records; void persistence is the v202 brick). Write-on-success. */
 int cad_design_to_spec (const cad_design *design, mig_spec *out);
 
 /* Parsed spec → design: validates the part family/dims/quat/mass the
@@ -200,30 +227,38 @@ int cad_load (cad_design *design, const char *path, int max_parts, int *spec_err
 
 /* ---- the engine seam ---- */
 
-/* mig_make_bridge over the design: composed totals (mass, COM,
- * inertia about COM) + the COM-rebased part copy. WP4 4.6e hookup
- * semantics: the CAD window validates through this call, then hands
- * the RAW assembly-frame parts to physics_world_add_composite — the
- * engine composes and re-anchors internally and spawns the body at
- * the parts' COM, so the authored placement survives (the CAD frame
- * is the world frame; handing the pre-rebased copy would subtract the
- * COM twice and drop the body at the origin). The rebased copy still
- * serves callers that want COM-relative geometry. `out_parts` must
- * hold count slots and must NOT alias design->parts. Empty design
- * refuses with cad_empty (mig_compose's null rule). Compose errors
- * map to the same-named cad_err values verbatim. */
+/* mig_make_bridge over the design — WP7 7.0b: the routing is
+ * void-aware. A MATERIAL-ONLY design keeps the untouched
+ * mig_make_bridge path (bitwise); a VOID-BEARING design routes through
+ * mig_void_make_bridge (the tested signed compose, same rebase rule).
+ * WP4 4.6e hookup semantics: the CAD window validates through this
+ * call, then hands the RAW assembly-frame parts to
+ * physics_world_add_composite — the engine composes and re-anchors
+ * internally and spawns the body at the parts' COM, so the authored
+ * placement survives (the CAD frame is the world frame; handing the
+ * pre-rebased copy would subtract the COM twice and drop the body at
+ * the origin). The rebased copy still serves callers that want
+ * COM-relative geometry. `out_parts` must hold count slots and must
+ * NOT alias design->parts. Empty design refuses with cad_empty.
+ * Compose errors map to the same-named cad_err values verbatim, plus
+ * the signed-compose cases: non-positive totals → cad_nonpositive,
+ * not-positive-definite → cad_not_pd, explicit-on-void →
+ * cad_bad_mass_mode. */
 int cad_build (const cad_design *design, mig_part *out_parts, mig_bridge *out);
 
 /* ---- the ASCII workbench ---- */
 
 /* Top-down plan view (looking down -Y: +X right, +Z down), fixed scale
  * 1 cell = 0.25 m, 64 columns x 24 rows, origin cell (32, 12); part
- * glyphs 'o' (sphere), '#' (cube), '|' (cylinder, axle local X) at the
- * rounded cell of each part position (last part wins a shared cell).
+ * glyphs 'o' (sphere), '#' (cube), '|' (cylinder, axle local X) — WP7
+ * 7.0b adds the VOID glyphs 'O' (void sphere), '%' (void cube), '!'
+ * (void cylinder) at the rounded cell of each part position (last
+ * part wins a shared cell).
  * A header line carries name, part count, total mass (mig_part_mass
- * sum) and the count of parts outside the window; fully deterministic
- * — two calls on an unchanged design are byte-identical. Requires
- * cap >= CAD_PREVIEW_MIN_CAP (refuses cad_bad_arg otherwise). */
+ * sum — a void's NEGATIVE mass nets the header naturally, format
+ * unchanged) and the count of parts outside the window; fully
+ * deterministic — two calls on an unchanged design are byte-identical.
+ * Requires cap >= CAD_PREVIEW_MIN_CAP (refuses cad_bad_arg otherwise). */
 int cad_preview (const cad_design *design, char *buffer, int cap);
 
 #endif /* cad_editor_h */

@@ -38,6 +38,8 @@
 #include "mpe_test.h"
 #include "../cad/cad_editor.h"
 #include "../cad/cad_view_math.h"
+#include "../core/rigidbody.h"
+#include "../core/physics_world.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -760,6 +762,220 @@ int mpe_t_cad_view_math (void) {
         MPE_CHECK (&t, cad_view_ray_plane (ray, (vector3) {0.0f, 0.0f, 0.0f},
                                            (vector3) {0.0f, 1.0f, 0.0f},
                                            NULL) == 0);
+    }
+
+    mpe_test_end (&t);
+    return t.failures;
+}
+
+/* MIG WP7 7.0b gate (tests/mpe_suite_cad.c):
+ *   mpe_t_cad_void_model — the void side of the CAD design model:
+ *   void verbs author twin-typed density records, cad_set_mass refuses
+ *   explicit on void, dims verbs match the geometry twin, to_spec
+ *   refuses void-bearing designs (cad_void_grammar), cad_build routes
+ *   void-bearing designs through mig_void_make_bridge with the extended
+ *   error mapping, the plan view uses distinct void glyphs, and the
+ *   header nets negative void mass. Format-stability: a void-free
+ *   design's preview is byte-identical to before 7.0b.
+ *
+ * Oracle discipline: every expected mass/inertia is derived here from
+ * closed-form rigid-body geometry — never from the function under test.
+ */
+int mpe_t_cad_void_model (void) {
+    mpe_test_t t;
+    mpe_test_begin (&t, "cad_void_model");
+    mpe_clamp_counters_reset ();
+
+    /* ---- 1. void verbs author twin records at default density -------- */
+    {
+        cad_design d;
+        cad_design_init (&d);
+        MPE_CHECK (&t, cad_add_void_sphere (&d, 0.25f, (vector3) {0.0f, 0.0f, 0.0f}) == cad_ok);
+        MPE_CHECK (&t, cad_add_void_cube (&d, (vector3) {0.2f, 0.3f, 0.4f},
+                                          (vector3) {1.0f, 0.0f, 0.0f}) == cad_ok);
+        MPE_CHECK (&t, cad_add_void_cylinder (&d, 0.15f, 0.6f,
+                                              (vector3) {0.0f, 2.0f, 0.0f}) == cad_ok);
+        MPE_CHECK (&t, d.count == 3);
+        /* twin geometry, void type, density mode, identity quat, default density. */
+        MPE_CHECK (&t, d.parts [0].type == mig_part_void_sphere &&
+                       d.parts [0].radius == 0.25f &&
+                       d.parts [0].mass_mode == mig_mass_mode_density &&
+                       d.parts [0].mass == CAD_DEFAULT_DENSITY &&
+                       d.parts [0].orientation.w == 1.0f);
+        MPE_CHECK (&t, d.parts [1].type == mig_part_void_cube &&
+                       d.parts [1].half_extensions.x == 0.2f &&
+                       d.parts [1].mass_mode == mig_mass_mode_density);
+        MPE_CHECK (&t, d.parts [2].type == mig_part_void_cylinder &&
+                       d.parts [2].radius == 0.15f &&
+                       d.parts [2].cylinder_half_length == 0.6f);
+        /* void dims validation: negative dims refuse (twin rules). */
+        MPE_CHECK (&t, cad_add_void_sphere (&d, -0.1f, (vector3) {0.0f, 0.0f, 0.0f}) == cad_bad_dims);
+        MPE_CHECK (&t, cad_add_void_cube (&d, (vector3) {0.2f, 0.0f, 0.4f},
+                                          (vector3) {0.0f, 0.0f, 0.0f}) == cad_bad_dims);
+        MPE_CHECK (&t, cad_add_void_cylinder (&d, 0.15f, -0.6f,
+                                              (vector3) {0.0f, 0.0f, 0.0f}) == cad_bad_dims);
+        MPE_CHECK (&t, d.count == 3); /* refused adds leave the design untouched */
+    }
+
+    /* ---- 2. cad_set_mass: density-only on void ---------------------- */
+    {
+        cad_design d;
+        cad_design_init (&d);
+        MPE_CHECK (&t, cad_add_void_sphere (&d, 0.25f, (vector3) {0.0f, 0.0f, 0.0f}) == cad_ok);
+        /* explicit kg on a void is meaningless -> cad_bad_mass_mode. */
+        MPE_CHECK (&t, cad_set_mass (&d, 0, mig_mass_mode_explicit, 5.0f) == cad_bad_mass_mode);
+        /* density stays freely rewritable. */
+        MPE_CHECK (&t, cad_set_mass (&d, 0, mig_mass_mode_density, 2000.0f) == cad_ok);
+        MPE_CHECK (&t, d.parts [0].mass == 2000.0f &&
+                       d.parts [0].mass_mode == mig_mass_mode_density);
+    }
+
+    /* ---- 3. dims verbs match the geometry twin ---------------------- */
+    {
+        cad_design d;
+        cad_design_init (&d);
+        MPE_CHECK (&t, cad_add_void_sphere (&d, 0.25f, (vector3) {0.0f, 0.0f, 0.0f}) == cad_ok);
+        MPE_CHECK (&t, cad_add_void_cube (&d, (vector3) {0.2f, 0.2f, 0.2f},
+                                          (vector3) {0.0f, 0.0f, 0.0f}) == cad_ok);
+        /* void_sphere resizes via the sphere verb; wrong verb refuses. */
+        MPE_CHECK (&t, cad_set_dims_sphere (&d, 0, 0.5f) == cad_ok);
+        MPE_CHECK (&t, d.parts [0].radius == 0.5f);
+        MPE_CHECK (&t, cad_set_dims_cube (&d, 0, (vector3) {0.3f, 0.3f, 0.3f}) == cad_bad_type);
+        /* void_cube resizes via the cube verb. */
+        MPE_CHECK (&t, cad_set_dims_cube (&d, 1, (vector3) {0.3f, 0.3f, 0.3f}) == cad_ok);
+        MPE_CHECK (&t, d.parts [1].half_extensions.x == 0.3f);
+        MPE_CHECK (&t, cad_set_dims_sphere (&d, 1, 0.5f) == cad_bad_type);
+    }
+
+    /* ---- 4. cad_design_to_spec refuses void-bearing ----------------- */
+    {
+        cad_design d;
+        cad_design_init (&d);
+        MPE_CHECK (&t, cad_set_name (&d, "voidy") == cad_ok);
+        MPE_CHECK (&t, cad_add_void_sphere (&d, 0.25f, (vector3) {0.0f, 0.0f, 0.0f}) == cad_ok);
+        mig_spec spec;
+        memset (&spec, 0, sizeof (spec));
+        MPE_CHECK (&t, cad_design_to_spec (&d, &spec) == cad_void_grammar);
+        /* write-on-success: *out untouched on refusal (all zeros). */
+        MPE_CHECK (&t, spec.count == 0 && spec.name [0] == '\0');
+        /* material-only design still goes through (grammar unaffected). */
+        cad_design m;
+        cad_design_init (&m);
+        MPE_CHECK (&t, cad_set_name (&m, "mat") == cad_ok);
+        MPE_CHECK (&t, cad_add_sphere (&m, 0.5f, (vector3) {0.0f, 0.0f, 0.0f}) == cad_ok);
+        MPE_CHECK (&t, cad_design_to_spec (&m, &spec) == cad_ok);
+        MPE_CHECK (&t, spec.count == 1 &&
+                       spec.parts [0].type == (int) mig_part_sphere);
+    }
+
+    /* ---- 5. cad_build routes void-bearing through the void module --- */
+    {
+        cad_design d;
+        cad_design_init (&d);
+        MPE_CHECK (&t, cad_set_name (&d, "voidasm") == cad_ok);
+        MPE_CHECK (&t, cad_add_cube (&d, (vector3) {0.5f, 0.5f, 0.5f},
+                                     (vector3) {0.0f, 0.0f, 0.0f}) == cad_ok);
+        MPE_CHECK (&t, cad_add_void_sphere (&d, 0.25f, (vector3) {0.0f, 0.0f, 0.0f}) == cad_ok);
+        mig_part out_parts [16];
+        mig_bridge br;
+        memset (&br, 0xAB, sizeof (br));
+        int rc = cad_build (&d, out_parts, &br);
+        MPE_CHECK (&t, rc == cad_ok);
+        MPE_CHECK (&t, br.count == 2);
+        /* pool-inclusive: both records staged, void gets is_void=1 in the
+         * engine path; here the bridge carries the void record verbatim
+         * (negative effective mass comes from mig_part_mass at spawn). */
+        MPE_CHECK (&t, out_parts [0].type == mig_part_cube);
+        MPE_CHECK (&t, out_parts [1].type == mig_part_void_sphere);
+        /* net mass: box 1000 kg − sphere ~65.45 kg ≈ 934.55 kg. */
+        const double m_box = 1000.0 * 1.0 * 1.0 * 1.0;
+        const double m_void = 1000.0 * (4.0 / 3.0) * 3.14159265358979323846 * 0.25 * 0.25 * 0.25;
+        MPE_CHECK_NEAR (&t, br.totals.mass, m_box - m_void, 1e-9, "cad build nets void mass");
+        /* material-only design keeps the untouched mig_make_bridge path. */
+        cad_design m;
+        cad_design_init (&m);
+        MPE_CHECK (&t, cad_add_cube (&m, (vector3) {0.5f, 0.5f, 0.5f},
+                                     (vector3) {0.0f, 0.0f, 0.0f}) == cad_ok);
+        mig_part out_m [16]; mig_bridge br_m;
+        memset (&br_m, 0xAB, sizeof (br_m));
+        MPE_CHECK (&t, cad_build (&m, out_m, &br_m) == cad_ok);
+        MPE_CHECK_NEAR (&t, br_m.totals.mass, m_box, 1e-9, "material-only build == cube mass");
+    }
+
+    /* ---- 6. cad_build refusal mapping (void-only -> cad_empty) ------ */
+    {
+        cad_design d;
+        cad_design_init (&d);
+        MPE_CHECK (&t, cad_add_void_sphere (&d, 0.25f, (vector3) {0.0f, 0.0f, 0.0f}) == cad_ok);
+        mig_part out_parts [16]; mig_bridge br;
+        MPE_CHECK (&t, cad_build (&d, out_parts, &br) == cad_empty); /* void alone is no body */
+    }
+
+    /* ---- 7. plan view: void glyphs + net mass header --------------- */
+    {
+        cad_design d;
+        cad_design_init (&d);
+        MPE_CHECK (&t, cad_set_name (&d, "voidplan") == cad_ok);
+        MPE_CHECK (&t, cad_add_void_sphere (&d, 0.25f, (vector3) {1.0f, 0.0f, 2.0f}) == cad_ok);
+        MPE_CHECK (&t, cad_add_void_cube (&d, (vector3) {0.2f, 0.2f, 0.2f},
+                                          (vector3) {-1.0f, 0.0f, -2.0f}) == cad_ok);
+        MPE_CHECK (&t, cad_add_void_cylinder (&d, 0.15f, 0.6f,
+                                              (vector3) {3.0f, 0.0f, 0.0f}) == cad_ok);
+        char buf [CAD_PREVIEW_MIN_CAP];
+        memset (buf, 0, sizeof (buf));
+        MPE_CHECK (&t, cad_preview (&d, buf, sizeof (buf)) == cad_ok);
+        /* void glyphs O / % / ! at rounded cells (1 cell = 0.25 m, origin (32,12)).
+         * x=1.0 -> col 36; x=-1.0 -> col 28; z=3.0 -> row 12+12=24 (outside view,
+         * cylinder's z=3 puts it beyond the window -> counted outside). */
+        MPE_CHECK (&t, cad_gate_line (buf, 21)[36] == 'O');   /* void sphere */
+        MPE_CHECK (&t, cad_gate_line (buf, 5)[28] == '%');    /* void cube */
+        /* cylinder at z=3.0 -> grid row 24 >= gh=24 -> outside view (counted, no glyph). */
+        /* header nets the negative void mass. */
+        MPE_CHECK (&t, strstr (buf, "mass ") != NULL);
+        /* byte-identical on repeat (deterministic). */
+        char buf2 [CAD_PREVIEW_MIN_CAP];
+        memset (buf2, 0, sizeof (buf2));
+        MPE_CHECK (&t, cad_preview (&d, buf2, sizeof (buf2)) == cad_ok);
+        MPE_CHECK (&t, memcmp (buf, buf2, sizeof (buf)) == 0);
+        /* void-free design keeps material glyphs (format stability).
+         * Sphere at (0,0,0) -> grid row 12 -> buffer line 13, col 32. */
+        cad_design m;
+        cad_design_init (&m);
+        MPE_CHECK (&t, cad_add_sphere (&m, 0.5f, (vector3) {0.0f, 0.0f, 0.0f}) == cad_ok);
+        char bufm [CAD_PREVIEW_MIN_CAP];
+        memset (bufm, 0, sizeof (bufm));
+        MPE_CHECK (&t, cad_preview (&m, bufm, sizeof (bufm)) == cad_ok);
+        MPE_CHECK (&t, cad_gate_line (bufm, 13)[32] == 'o'); /* sphere glyph unchanged */
+    }
+
+    /* ---- 8. full chain: design → add_composite mass ---------------- */
+    {
+        cad_design d;
+        cad_design_init (&d);
+        MPE_CHECK (&t, cad_set_name (&d, "chain") == cad_ok);
+        MPE_CHECK (&t, cad_add_cube (&d, (vector3) {0.5f, 0.5f, 0.5f},
+                                     (vector3) {0.0f, 0.0f, 0.0f}) == cad_ok);
+        MPE_CHECK (&t, cad_add_void_sphere (&d, 0.25f, (vector3) {0.0f, 0.0f, 0.0f}) == cad_ok);
+        mig_part out_parts [16];
+        mig_bridge br;
+        MPE_CHECK (&t, cad_build (&d, out_parts, &br) == cad_ok);
+        physics_world w;
+        mpe_world_begin (&w);
+        const int cb = physics_world_add_composite (&w, out_parts, br.count);
+        MPE_CHECK (&t, cb == 0 && w.body_count == 1 && w.composite_part_count == 2);
+        if (cb >= 0) {
+            MPE_CHECK (&t, w.bodies [cb].type == object_composite);
+            /* engine nets the void's negative effective mass. */
+            const double m_box = 1000.0 * 1.0 * 1.0 * 1.0;
+            const double m_void = 1000.0 * (4.0 / 3.0) * 3.14159265358979323846 * 0.25 * 0.25 * 0.25;
+            MPE_CHECK_NEAR (&t, w.bodies [cb].mass, (float) (m_box - m_void), 1e-4f,
+                            "end-to-end net mass via cad build + spawn");
+            /* pool-inclusive is_void flag. */
+            MPE_CHECK (&t, w.composite_parts [1].is_void == 1);
+            MPE_CHECK_NEAR (&t, w.composite_parts [1].mass, (float) -m_void, 1e-6f,
+                            "pool void mass negative");
+        }
+        physics_world_cleanup (&w);
     }
 
     mpe_test_end (&t);

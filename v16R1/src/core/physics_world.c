@@ -1374,7 +1374,10 @@ static const composite_part *mpe_composite_part_at (const physics_world *world, 
 } /* Refresh the ghost from the parent, then override exactly the fields a
  * primitive pair function reads as geometry/material. The parent's motion
  * state is inherited (foreign handlers may read it); the composed-mass and
- * pool bookkeeping is cleared so a ghost can never be mistaken for a body. */
+ * pool bookkeeping is cleared so a ghost can never be mistaken for a body.
+ * WP7 7.0b: a VOID part never reaches this function — every caller (the
+ * floor batch, both iterate sides) skips is_void records before staging
+ * a ghost (no ghost → no collision is the subtraction's truth). */
 static void mpe_composite_ghost_refresh (rigidbody *ghost, const rigidbody *parent, const composite_part *part) {
     memcpy (ghost, parent, sizeof (*ghost));
     ghost -> type = part -> type;
@@ -1414,7 +1417,10 @@ static void mpe_composite_floor_detect (physics_world *world, rigidbody *rb, con
     if ((!world) || (!rb) || (!cfg) || (rb -> type != object_composite)) { return; }
     for (int slot = 0; slot < rb -> composite_part_count; slot++) {
         const composite_part *part = mpe_composite_part_at (world, rb, slot);
-        if ((!part) || (!part -> active)) { continue; }
+        /* WP7 7.0b: a void part gets NO ghost — its interior is
+         * unreachable by collision BY DEFINITION (no ghost → no
+         * collision is the subtraction's physical truth). */
+        if ((!part) || (!part -> active) || (part -> is_void)) { continue; }
         rigidbody ghost;
         mpe_composite_ghost_refresh (&ghost, rb, part);
         collision_data part_floor = {0};
@@ -1489,7 +1495,9 @@ static bool mpe_composite_iterate (physics_world *world, rigidbody *a, rigidbody
         rigidbody *ghost_a = a;
         if (a_composite) {
             const composite_part *part = mpe_composite_part_at (world, a, ia);
-            if ((!part) || (!part -> active)) { continue; }
+            /* WP7 7.0b: void parts are never admitted to a pair (no
+             * ghost, no contact — the interior is unreachable). */
+            if ((!part) || (!part -> active) || (part -> is_void)) { continue; }
             mpe_composite_ghost_refresh (&s_composite_ghosts.a, a, part);
             ghost_a = &s_composite_ghosts.a;
             part_index_a = part -> part_index;
@@ -1498,7 +1506,8 @@ static bool mpe_composite_iterate (physics_world *world, rigidbody *a, rigidbody
             rigidbody *ghost_b = b;
             if (b_composite) {
                 const composite_part *part = mpe_composite_part_at (world, b, ib);
-                if ((!part) || (!part -> active)) { continue; }
+                /* WP7 7.0b: same void skip on the B side. */
+                if ((!part) || (!part -> active) || (part -> is_void)) { continue; }
                 mpe_composite_ghost_refresh (&s_composite_ghosts.b, b, part);
                 ghost_b = &s_composite_ghosts.b;
                 part_index_b = part -> part_index;
@@ -1788,16 +1797,29 @@ static void physics_world_composite_part_from_mig (composite_part *dst, const mi
     dst -> local_orientation = src -> orientation;
     dst -> part_index = part_index;
     dst -> active = 1;
+    /* MIG WP7 7.0b: a void-typed record stages as its GEOMETRY TWIN with
+     * is_void = 1 — a REAL pool slice (indices stay design-aligned) that
+     * every consumer skips by the flag. The mass is the record's
+     * effective mass as mig_part_mass names it (NEGATIVE for a void —
+     * the subtraction carried, never re-negated); the field is inert
+     * because no ghost is ever built from a void record. */
+    mig_part_type geom_type = src -> type;
+    if (geom_type >= mig_part_void_sphere) {
+        dst -> is_void = 1;
+        if (geom_type == mig_part_void_sphere) { geom_type = mig_part_sphere; }
+        else if (geom_type == mig_part_void_cube) { geom_type = mig_part_cube; }
+        else { geom_type = mig_part_cylinder; }
+    }
     double effective_mass = 0.0;
     (void) mig_part_mass (src, &effective_mass); /* validated by the compose pass */
     dst -> mass = (float) effective_mass;
-    if (src -> type == mig_part_cube) {
+    if (geom_type == mig_part_cube) {
         dst -> type = object_cube;
         dst -> half_extensions = src -> half_extensions;
         dst -> friction_static = cfg -> body_defaults.cube_fric_s;
         dst -> friction_kinetic = cfg -> body_defaults.cube_fric_k;
         dst -> restitution = cfg -> body_defaults.cube_restitution;
-    } else if (src -> type == mig_part_cylinder) {
+    } else if (geom_type == mig_part_cylinder) {
         dst -> type = object_cylinder;
         dst -> radius = src -> radius;
         dst -> cylinder_half_length = src -> cylinder_half_length;
@@ -2456,6 +2478,16 @@ bool mpe_hull_collide_hull (rigidbody *a, rigidbody *b, void *out_p, mpe_world_t
     cp -> penetration = depth;
     return true;
 }
+/* MIG WP7 7.0b: does this assembly hold void-typed records? The single
+ * classification the compose routing, the over-cap validator walk and
+ * the bound walk all share (void types are >= mig_part_void_sphere by
+ * the append-only enum convention). */
+static bool mpe_composite_has_void (const mig_part *parts, int count) {
+    for (int i = 0; i < count; i++) {
+        if (parts [i].type >= mig_part_void_sphere) { return true; }
+    }
+    return false;
+}
 int physics_world_add_composite (physics_world *world, const mig_part *parts, int count) {
     if ((!world) || (!world -> bodies) || (!parts) || count <= 0) { return -1; }
     const int cap = physics_world_composite_cap (world);
@@ -2463,20 +2495,39 @@ int physics_world_add_composite (physics_world *world, const mig_part *parts, in
     /* Whole-assembly structural validation including any over-cap tail:
      * one malformed discarded part still refuses the whole assembly. The
      * stored slice is re-composed below because the body must not carry
-     * weight it does not store. */
+     * weight it does not store. WP7 7.0b: a void-bearing assembly
+     * validates per RECORD through the void module's own rules (no
+     * totals — the discarded tail must never be composed into anything);
+     * the material-only path keeps the untouched full-array compose
+     * (bitwise, refusal codes included). */
     if (stored < count) {
         mig_totals all;
-        if (mig_compose (parts, count, &all) != mig_compose_ok) { return -1; }
+        if (mpe_composite_has_void (parts, count)) {
+            for (int i = 0; i < count; i++) {
+                if (mig_void_validate_record (&parts [i]) != mig_void_ok) { return -1; }
+            }
+        } else if (mig_compose (parts, count, &all) != mig_compose_ok) { return -1; }
     }
     mig_part scratch [16];
     mig_bridge bridge;
-    if (mig_make_bridge (parts, stored, scratch, &bridge) != mig_compose_ok) { return -1; }
+    /* WP7 7.0b: the compose routes through the TESTED void module the
+     * moment the assembly holds a void record — materials and voids
+     * partition by type into mig_void_compose's two lists (a void-free
+     * assembly keeps the untouched mig_make_bridge path, bitwise). */
+    if (mpe_composite_has_void (parts, stored)) {
+        if (mig_void_make_bridge (parts, stored, scratch, &bridge) != mig_void_ok) { return -1; }
+    } else if (mig_make_bridge (parts, stored, scratch, &bridge) != mig_compose_ok) { return -1; }
     /* Engine policy windows, pre-validated so sanitize substitutes
      * nothing: mass [1e-4, 1e6], bound [0.01, 100]. */
     if (!(bridge.totals.mass >= 1e-4) || (bridge.totals.mass > 1e6)) { return -1; }
     float bound = 0.0f;
     for (int i = 0; i < stored; i++) {
         const mig_part *p = &bridge.parts [i];
+        /* WP7 7.0b: a void cannot extend the covering sphere — the bound
+         * is the MATERIAL envelope (a mis-placed void is the model
+         * layer's refusal from 7.0c; the compose's PD check already
+         * refuses the unphysical totals). */
+        if (p -> type >= mig_part_void_sphere) { continue; }
         float part_bound = 0.0f;
         if (p -> type == mig_part_sphere) { part_bound = p -> radius; }
         else if (p -> type == mig_part_cube) {

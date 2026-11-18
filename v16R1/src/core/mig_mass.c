@@ -214,11 +214,25 @@ void mig_rebase_parts (mig_part *parts, int count, vector3 delta) {
 
 int mig_part_mass (const mig_part *part, double *out_mass) {
     if ((!part) || (!out_mass)) { return mig_compose_null; }
+    /* WP7 7.0b: void-typed records validate by their twin's geometry rules,
+     * density interpretation ONLY (explicit mass on a void is meaningless —
+     * the same named rule mig_void_compose enforces), and the result is
+     * NEGATED: the effective mass of the REMOVED material. The tensor probe
+     * runs on a twin-typed copy so mig_part_tensor_local's primitive-only
+     * dispatch is untouched (mig_compose keeps refusing void types). */
+    mig_part probe = *part;
+    int negative = 0;
+    if (probe.type == mig_part_void_sphere) { probe.type = mig_part_sphere; negative = 1; }
+    else if (probe.type == mig_part_void_cube) { probe.type = mig_part_cube; negative = 1; }
+    else if (probe.type == mig_part_void_cylinder) { probe.type = mig_part_cylinder; negative = 1; }
+    if (negative && (part -> mass_mode != mig_mass_mode_density)) {
+        return mig_compose_bad_mass_mode;
+    }
     double m;
     double diag [3];
-    int err = mig_part_tensor_local (part, part -> mass_mode, &m, diag);
+    int err = mig_part_tensor_local (&probe, part -> mass_mode, &m, diag);
     if (err != mig_compose_ok) { return err; }
-    *out_mass = m;
+    *out_mass = negative ? -m : m;
     return mig_compose_ok;
 }
 

@@ -135,7 +135,10 @@ int mpe_t_mig_hull_analytic_ell (void);
 int mpe_t_mig_spawner_ell_default (void); /* MIG WP4 4.6s */
 int mpe_t_mig_rotor_spin_stability (void); /* MIG WP4 4.6t */
 int mpe_t_mig_void_compose_core (void); /* MIG WP7 7.0a */
+int mpe_t_mig_void_hook_composite (void); /* MIG WP7 7.0b */
 int mpe_t_cad_editor_model (void);
+int mpe_t_cad_void_model (void); /* MIG WP7 7.0b */
+int mpe_t_scene_save_svf07 (void); /* MIG WP7 7.0b */
 int mpe_t_cad_view_math (void);
 typedef struct {
     const char *name;
@@ -323,6 +326,11 @@ static const mpe_entry_t mpe_registry [] = {
      * the exact envelope, rotational energy never grows. */
     {"mig_rotor_spin_stability", mpe_t_mig_rotor_spin_stability, 0},
     {"mig_void_compose_core", mpe_t_mig_void_compose_core, 0},
+    /* MIG WP7 7.0b: the hook-in — engine consumption of the tested void
+     * core through add_composite: pool-inclusive is_void staging, negative
+     * void mass, bound skip, refusals (-1), over-cap tail handling, and
+     * the floor-rest skip (void below floor cannot phantom-contact). */
+    {"mig_void_hook_composite", mpe_t_mig_void_hook_composite, 0},
     /* MIG WP4 4.6: the miniature CAD editor's DESIGN MODEL (cad/cad_editor.c)
      * — typed adds + full refusal battery (write-on-success, memcmp
      * witness), snap/rotate/dup/array transforms with the left-composition
@@ -333,6 +341,14 @@ static const mpe_entry_t mpe_registry [] = {
      * regression. Standalone: nothing in the shipped GUI calls the model
      * yet — the terminal-style shell is the next brick. */
     {"cad_editor_model", mpe_t_cad_editor_model, 0},
+    /* MIG WP7 7.0b: the void side of the CAD design model — void verbs,
+     * density-only mass, twin-matching dims, to_spec grammar refusal,
+     * void-aware build routing, void glyphs, net-mass header. */
+    {"cad_void_model", mpe_t_cad_void_model, 0},
+    /* MIG WP7 7.0b: SVF07 — a void-bearing composite refuses scene save
+     * (v201 cannot express void records; reload would silently recompose
+     * it heavier). Material-only composites still save. */
+    {"scene_save_svf07", mpe_t_scene_save_svf07, 0},
     /* MIG WP4 4.6b: the CAD window's VIEW MATH (cad/cad_view_math.c) —
      * orbit-camera basis (orthonormal + eye-on-axis), perspective
      * unprojection (center/edge rays), ray-vs-sphere/box/cylinder

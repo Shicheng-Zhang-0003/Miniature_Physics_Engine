@@ -3,6 +3,7 @@
 #define physics_world_h
 #include "rigidbody.h"
 #include "mig_mass.h" /* WP1 1.4: mig_part/mig_totals for add_composite (allowed direction: engine includes the pure module) */
+#include "mig_void.h" /* WP7 7.0b: mig_void_compose/mig_void_make_bridge — the void-aware compose seam */
 #include "mig_hull.h" /* WP2.6 2.6.5: mig_hull_point records for the per-world hull vertex pool */
 #include "../config/mpe_constants.h" /* MFS_131 */
 #include "../config/mpe_config.h"
@@ -61,6 +62,16 @@ typedef struct {
     float friction_kinetic;
     float restitution;
     int part_index; /* per-body monotonic, never reused */
+    /* MIG WP7 7.0b (DESPOT-2026-11-17): SUBTRACTIVE record marker. Void
+     * parts get REAL pool slices (indices stay design-aligned for the
+     * contact-cache keys) and every consumer that must not see them
+     * checks this flag: the per-part iterate, the floor batch, the CCD
+     * support, the boundary extrema and the renderer all skip it — a
+     * void's interior is unreachable by collision and invisible to
+     * render BY DEFINITION, so the flag is the whole representation.
+     * The bound walk (add_composite) ignores the record too: a void
+     * cannot extend the covering sphere. */
+    int is_void;
     int active; /* 0 = deleted; every system skips inactive parts */
 } composite_part;
 typedef struct physics_world {

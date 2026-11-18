@@ -43,7 +43,17 @@
 typedef enum {
     mig_part_sphere = 0,
     mig_part_cube = 1,
-    mig_part_cylinder = 2
+    mig_part_cylinder = 2,
+    /* MIG WP7 7.0b (DESPOT-2026-11-17): SUBTRACTIVE records — append-only
+     * enum (the object_hull precedent). The same dim fields carry the
+     * void's geometry (the twin primitive's rules); the mass field carries
+     * its DENSITY (kg/m^3, interpretation only — explicit mass on a void is
+     * meaningless). Plain mig_compose REFUSES these (bad_type: a void is
+     * not material); mig_void_compose's voids list carries the subtraction
+     * (density-only, exact negative of the twin's contribution). */
+    mig_part_void_sphere = 3,
+    mig_part_void_cube = 4,
+    mig_part_void_cylinder = 5
 } mig_part_type;
 
 typedef enum {
@@ -103,7 +113,12 @@ void mig_rebase_parts (mig_part *parts, int count, vector3 delta);
  * primitive volume). WP2 2.2 uses this to store per-part kilograms in the
  * world pool without duplicating the density math. Write-on-success:
  * *out_mass is untouched unless mig_compose_ok is returned; malformed
- * parts return the same named compose errors as mig_compose. */
+ * parts return the same named compose errors as mig_compose. WP7 7.0b:
+ * a void-typed record (void_sphere/void_cube/void_cylinder) validates by
+ * its TWIN's geometry rules, density mode ONLY (explicit is
+ * mig_compose_bad_mass_mode), and returns the NEGATIVE effective mass —
+ * the subtraction itself. Callers that must not negate twice: this
+ * already carries the sign. */
 int mig_part_mass (const mig_part *part, double *out_mass);
 
 /* ---- WP1 1.2 bridge: the handoff contract WP2 will consume ----
