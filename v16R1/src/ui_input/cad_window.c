@@ -623,7 +623,7 @@ static void cw_mat_model (cw_mat4 m, vector3 position, vector4 orientation,
 /* ---- widget pixels -> the camera's aspect ------------------------------ */
 
 static int cw_widget_pixels (int *out_w, int *out_h) {
-    if (!cw_gl_area) { return 0; }
+    if (!cw_gl_area || !GTK_IS_WIDGET (cw_gl_area)) { return 0; }
     const int scale = gtk_widget_get_scale_factor (cw_gl_area);
     const int w = gtk_widget_get_width (cw_gl_area) * scale;
     const int h = gtk_widget_get_height (cw_gl_area) * scale;
@@ -2015,7 +2015,7 @@ static void cw_on_realize (GtkGLArea *area, gpointer user_data) {
 }
 
 static void cw_gl_release (void) {
-    if (!cw_gl_area) { return; }
+    if (!cw_gl_area || !GTK_IS_WIDGET (cw_gl_area)) { return; }
     if (gtk_widget_get_realized (cw_gl_area)) {
         gtk_gl_area_make_current (GTK_GL_AREA (cw_gl_area));
         if (gtk_gl_area_get_error (GTK_GL_AREA (cw_gl_area)) == NULL) {
@@ -2163,7 +2163,7 @@ static gboolean cw_tick (gpointer user_data) {
     } else if (cw_mode == CW_MODE_SETTLING) {
         cw_settle_tick (0.016f);
     }
-    if (cw_gl_area) {
+    if (cw_gl_area && GTK_IS_WIDGET (cw_gl_area)) {
         gtk_gl_area_queue_render (GTK_GL_AREA (cw_gl_area));
     }
     return G_SOURCE_CONTINUE;
@@ -2176,7 +2176,9 @@ static gboolean cw_tick (gpointer user_data) {
  * in the box and would otherwise own the keys on open. */
 static gboolean cw_focus_viewport_idle (gpointer user_data) {
     (void) user_data;
-    if (cw_gl_area) { gtk_widget_grab_focus (cw_gl_area); }
+    if (cw_gl_area && GTK_IS_WIDGET (cw_gl_area)) {
+        gtk_widget_grab_focus (cw_gl_area);
+    }
     return G_SOURCE_REMOVE;
 }
 
