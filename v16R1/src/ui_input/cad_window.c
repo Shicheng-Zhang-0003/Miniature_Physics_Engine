@@ -217,12 +217,16 @@ static float cw_drag_floor_y = 0.0f;
  * the nudge rides the ARROWS' event-driven discipline — no IJKL
  * latches exist (the fly latches remain). cw_nudge_dir is that
  * toggle (+1 increase, -1 decrease, shown as "mov +/-"). cw_place_type
- * is the shape RMB places (1/2/3 pick it; default cube);
+ * is the shape RMB places (1/2/3 pick it; default cube); key 8 cycles
+ * the same place-type menu the main engine's spawn gun uses, key 9
+ * toggles solid vs void placement (WP7 7.0b: a void is a subtractive
+ * record, density-only, drawn dimmer so a cavity reads as absence);
  * cw_resize_grow is the arrow-key resize DIRECTION the Left arrow
  * toggles (+1 grow, -1 shrink; the user's axis ruling: right/up/down
  * = x/y/z, left = the toggle). */
 static int cw_nudge_dir = 1;
-static int cw_place_type = mig_part_cube;
+static int cw_place_type = mig_part_cube; /* 0 sphere, 1 cube, 2 cylinder */
+static int cw_place_void = 0;             /* 0 solid, 1 void (key 9) */
 static int cw_resize_grow = 1;
 /* WP4 4.6i: the tick-driven carry recomputes the target EVERY frame
  * (the drag_weld_tick analog — the engine's carry also runs from the
@@ -694,9 +698,21 @@ static const char *cw_err_name (int err) {
 }
 
 static const char *cw_type_name (int type) {
-    static const char *names [3] = {"sphere", "cube", "cylinder"};
-    if ((type < 0) || (type > 2)) { return "?"; }
+    static const char *names [6] = {"sphere", "cube", "cylinder",
+                                    "void sphere", "void cube", "void cylinder"};
+    if ((type < 0) || (type > 5)) { return "?"; }
     return names [type];
+}
+
+/* WP7 7.0b: a void record shares its geometry TWIN (void_sphere uses the
+ * sphere's extent/radius, etc.). These helpers normalize a void record to
+ * its twin so extent/cover/dims math never mis-dispatches a cavity as a
+ * cylinder. */
+static mig_part_type cw_geom_twin (mig_part_type t) {
+    if (t == mig_part_void_sphere) { return mig_part_sphere; }
+    if (t == mig_part_void_cube)   { return mig_part_cube; }
+    if (t == mig_part_void_cylinder) { return mig_part_cylinder; }
+    return t;
 }
 
 static void cw_status_refresh (void) {
@@ -710,10 +726,10 @@ static void cw_status_refresh (void) {
     }
     char buf [256];
     snprintf (buf, sizeof (buf),
-              "parts %d/%d | sel %s | place %s | res %s | mov %s | "
+              "parts %d/%d | sel %s | place %s%s | res %s | mov %s | "
               "snap %.3g m | look %s | %s",
               cw_design.count, cw_design.max_parts, sel,
-              cw_type_name (cw_place_type),
+              cw_place_void ? "void " : "", cw_type_name (cw_place_type),
               (cw_resize_grow > 0) ? "+" : "-",
               (cw_nudge_dir > 0) ? "+" : "-",
               (double) cw_design.snap_step,
@@ -961,8 +977,9 @@ static void cw_spawn_to_world (void) {
  * geometry may still sit a little inside for elongated shapes, but can
  * never overlap). */
 static float cw_cover_radius (const mig_part *p) {
-    if (p -> type == mig_part_sphere) { return p -> radius; }
-    if (p -> type == mig_part_cube) {
+    const mig_part_type g = cw_geom_twin (p -> type);
+    if (g == mig_part_sphere) { return p -> radius; }
+    if (g == mig_part_cube) {
         return sqrtf (p -> half_extensions.x * p -> half_extensions.x +
                       p -> half_extensions.y * p -> half_extensions.y +
                       p -> half_extensions.z * p -> half_extensions.z);
@@ -976,11 +993,12 @@ static float cw_cover_radius (const mig_part *p) {
  * convention). Shared by the oriented-extent helpers below. */
 static void cw_local_dims (const mig_part *p, float *dx, float *dy,
                            float *dz) {
-    if (p -> type == mig_part_sphere) {
+    const mig_part_type g = cw_geom_twin (p -> type);
+    if (g == mig_part_sphere) {
         *dx = p -> radius; *dy = p -> radius; *dz = p -> radius;
         return;
     }
-    if (p -> type == mig_part_cube) {
+    if (g == mig_part_cube) {
         *dx = p -> half_extensions.x;
         *dy = p -> half_extensions.y;
         *dz = p -> half_extensions.z;
@@ -1355,8 +1373,9 @@ static void cw_crosshair_delete (void) {
  * its bound TOUCHES the hit surface exactly (the magnet's exact-touch
  * rule, which the weld-on-drop release honors). */
 static float cw_extent_along (const mig_part *p, vector3 normal) {
-    if (p -> type == mig_part_sphere) { return p -> radius; }
-    if (p -> type == mig_part_cube) {
+    const mig_part_type g = cw_geom_twin (p -> type);
+    if (g == mig_part_sphere) { return p -> radius; }
+    if (g == mig_part_cube) {
         return fabsf (normal.x) * p -> half_extensions.x +
                fabsf (normal.y) * p -> half_extensions.y +
                fabsf (normal.z) * p -> half_extensions.z;
@@ -1392,11 +1411,12 @@ static void cw_place_part (double px, double py) {
     const cad_view_ray ray = cad_view_ray_from_screen (&cw_camera, ndc_x, ndc_y);
     mig_part proto;
     memset (&proto, 0, sizeof (proto));
-    proto.type = (mig_part_type) cw_place_type;
+    const mig_part_type base = (mig_part_type) cw_place_type;
+    proto.type = cw_place_void ? (mig_part_type) (base + mig_part_void_sphere) : base;
     proto.orientation = (vector4) {1.0f, 0.0f, 0.0f, 0.0f};
-    if (proto.type == mig_part_sphere) {
+    if (base == mig_part_sphere) {
         proto.radius = 0.25f;
-    } else if (proto.type == mig_part_cube) {
+    } else if (base == mig_part_cube) {
         proto.half_extensions = (vector3) {0.25f, 0.25f, 0.25f};
     } else {
         proto.radius = 0.25f;
@@ -1423,9 +1443,18 @@ static void cw_place_part (double px, double py) {
     const float rest = cw_down_extent (&proto);
     if (center.y < rest) { center.y = rest; }
     int rc = cad_bad_type;
-    if (proto.type == mig_part_sphere) {
+    if (cw_place_void) {
+        if (base == mig_part_sphere) {
+            rc = cad_add_void_sphere (&cw_design, proto.radius, center);
+        } else if (base == mig_part_cube) {
+            rc = cad_add_void_cube (&cw_design, proto.half_extensions, center);
+        } else {
+            rc = cad_add_void_cylinder (&cw_design, proto.radius,
+                                        proto.cylinder_half_length, center);
+        }
+    } else if (base == mig_part_sphere) {
         rc = cad_add_sphere (&cw_design, proto.radius, center);
-    } else if (proto.type == mig_part_cube) {
+    } else if (base == mig_part_cube) {
         rc = cad_add_cube (&cw_design, proto.half_extensions, center);
     } else {
         rc = cad_add_cylinder (&cw_design, proto.radius,
@@ -1457,11 +1486,15 @@ static void cw_resize_selected (int axis) {
     }
     const int idx = cw_design.selected;
     const mig_part *p = &cw_design.parts [idx];
+    /* WP7 7.0b: a void record resizes through its geometry twin's verb
+     * (cad_set_dims_* accepts void_* types — the same dim fields carry
+     * the void's size). */
+    const mig_part_type g = cw_geom_twin (p -> type);
     const float step = CW_RESIZE_STEP * (float) cw_resize_grow;
     int rc = cad_bad_type;
-    if (p -> type == mig_part_sphere) {
+    if (g == mig_part_sphere) {
         rc = cad_set_dims_sphere (&cw_design, idx, p -> radius + step);
-    } else if (p -> type == mig_part_cube) {
+    } else if (g == mig_part_cube) {
         vector3 he = p -> half_extensions;
         if (axis == 0) { he.x += step; }
         else if (axis == 1) { he.y += step; }
@@ -1865,7 +1898,10 @@ static gboolean cw_on_key (GtkEventControllerKey *controller, guint keyval,
         default: break;
     }
     /* 1/2/3 PICK the shape RMB places (the user's "keep 1/2/3 as
-     * pickers" ruling — they no longer add parts directly). */
+     * pickers" ruling — they no longer add parts directly). Key 8 cycles
+     * the same place-type menu the main engine's spawn gun uses
+     * (sphere -> cube -> cylinder -> ...); key 9 toggles solid vs void
+     * placement (WP7 7.0b — a void is a subtractive record). */
     switch (keyval) {
         case GDK_KEY_1: cw_place_type = mig_part_sphere;
                         cw_status_refresh (); return TRUE;
@@ -1873,6 +1909,10 @@ static gboolean cw_on_key (GtkEventControllerKey *controller, guint keyval,
                         cw_status_refresh (); return TRUE;
         case GDK_KEY_3: cw_place_type = mig_part_cylinder;
                         cw_status_refresh (); return TRUE;
+        case GDK_KEY_8: cw_place_type = (cw_place_type + 1) % 3;
+                        cw_status_refresh (); return TRUE; /* menu: next type */
+        case GDK_KEY_9: cw_place_void = !cw_place_void;
+                        cw_status_refresh (); return TRUE; /* solid <-> void */
         default: break;
     }
     /* Arrows resize the SELECTED part (the user's axis ruling:
@@ -2035,16 +2075,21 @@ static gboolean cw_on_render (GtkGLArea *area, GdkGLContext *context,
     glUniform1f (cw_u_unlit, 0.0f);
     for (int i = 0; i < cw_design.count; i++) {
         const mig_part *p = &cw_design.parts [i];
+        /* WP7 7.0b: a void record shares its twin's geometry — draw the
+         * twin mesh/scale but dim the color so a cavity reads as
+         * absence, never as material. */
+        const int is_void = p -> type >= mig_part_void_sphere;
+        const mig_part_type g = cw_geom_twin (p -> type);
         vector3 scale = {1.0f, 1.0f, 1.0f};
         float color [3] = {0.5f, 0.5f, 0.5f};
         GLuint vao = cw_vao_sphere;
         int count = cw_count_sphere;
-        if (p -> type == mig_part_sphere) {
+        if (g == mig_part_sphere) {
             scale = (vector3) {p -> radius, p -> radius, p -> radius};
             vao = cw_vao_sphere;
             count = cw_count_sphere;
             color [0] = 0.36f; color [1] = 0.55f; color [2] = 0.90f;
-        } else if (p -> type == mig_part_cube) {
+        } else if (g == mig_part_cube) {
             scale = p -> half_extensions;
             vao = cw_vao_cube;
             count = cw_count_cube;
@@ -2055,6 +2100,9 @@ static gboolean cw_on_render (GtkGLArea *area, GdkGLContext *context,
             vao = cw_vao_cylinder;
             count = cw_count_cylinder;
             color [0] = 0.90f; color [1] = 0.60f; color [2] = 0.30f;
+        }
+        if (is_void) {
+            color [0] *= 0.45f; color [1] *= 0.45f; color [2] *= 0.45f;
         }
         const vector3 inv_scale = {1.0f / scale.x, 1.0f / scale.y, 1.0f / scale.z};
         cw_mat4 model;
