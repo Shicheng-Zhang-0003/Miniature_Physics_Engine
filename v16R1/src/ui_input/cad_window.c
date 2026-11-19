@@ -694,6 +694,10 @@ static const char *cw_err_name (int err) {
         case cad_io: return "io";
         case cad_empty: return "empty";
         case cad_spec_reject: return "spec-reject";
+        case cad_bad_mass_mode: return "bad-mass-mode";
+        case cad_nonpositive: return "nonpositive";
+        case cad_not_pd: return "not-pd";
+        case cad_void_grammar: return "void-grammar";
         default: return "?";
     }
 }
@@ -806,8 +810,14 @@ static void cw_save_design (void) {
     mig_spec spec;
     int rc = cad_design_to_spec (&cw_design, &spec);
     if (rc != cad_ok) {
-        char buf [128];
-        snprintf (buf, sizeof (buf), "save refused (%s)", cw_err_name (rc));
+        char buf [160];
+        if (rc == cad_void_grammar) {
+            snprintf (buf, sizeof (buf),
+                      "save refused (void-grammar: v1 spec cannot express voids "
+                      "— remove voids or undo with U; void persistence is 7.0d)");
+        } else {
+            snprintf (buf, sizeof (buf), "save refused (%s)", cw_err_name (rc));
+        }
         cw_status_err (buf);
         return;
     }
