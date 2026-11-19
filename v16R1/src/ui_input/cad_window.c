@@ -217,10 +217,11 @@ static float cw_drag_floor_y = 0.0f;
  * the nudge rides the ARROWS' event-driven discipline — no IJKL
  * latches exist (the fly latches remain). cw_nudge_dir is that
  * toggle (+1 increase, -1 decrease, shown as "mov +/-"). cw_place_type
- * is the shape RMB places (1/2/3 pick it; default cube); key 8 cycles
- * the same place-type menu the main engine's spawn gun uses, key 9
- * toggles solid vs void placement (WP7 7.0b: a void is a subtractive
- * record, density-only, drawn dimmer so a cavity reads as absence);
+ * is the shape RMB places (1/2/3 pick solid; 4/5/6 pick void sphere /
+ * cube / cylinder; default cube); key 8 cycles the same place-type menu
+ * the main engine's spawn gun uses, key 9 toggles solid vs void
+ * placement (WP7 7.0b: a void is a subtractive record, density-only,
+ * drawn dimmer so a cavity reads as absence);
  * cw_resize_grow is the arrow-key resize DIRECTION the Left arrow
  * toggles (+1 grow, -1 shrink; the user's axis ruling: right/up/down
  * = x/y/z, left = the toggle). */
@@ -1901,7 +1902,9 @@ static gboolean cw_on_key (GtkEventControllerKey *controller, guint keyval,
      * pickers" ruling — they no longer add parts directly). Key 8 cycles
      * the same place-type menu the main engine's spawn gun uses
      * (sphere -> cube -> cylinder -> ...); key 9 toggles solid vs void
-     * placement (WP7 7.0b — a void is a subtractive record). */
+     * placement (WP7 7.0b — a void is a subtractive record). Keys 4/5/6
+     * are the dedicated void pickers (WP7 7.0c): they set the solid type
+     * and flip placement to void mode in one press. */
     switch (keyval) {
         case GDK_KEY_1: cw_place_type = mig_part_sphere;
                         cw_status_refresh (); return TRUE;
@@ -1909,6 +1912,15 @@ static gboolean cw_on_key (GtkEventControllerKey *controller, guint keyval,
                         cw_status_refresh (); return TRUE;
         case GDK_KEY_3: cw_place_type = mig_part_cylinder;
                         cw_status_refresh (); return TRUE;
+        case GDK_KEY_4: cw_place_type = mig_part_sphere;
+                        cw_place_void = 1;
+                        cw_status_refresh (); return TRUE; /* void sphere */
+        case GDK_KEY_5: cw_place_type = mig_part_cube;
+                        cw_place_void = 1;
+                        cw_status_refresh (); return TRUE; /* void cube */
+        case GDK_KEY_6: cw_place_type = mig_part_cylinder;
+                        cw_place_void = 1;
+                        cw_status_refresh (); return TRUE; /* void cylinder */
         case GDK_KEY_8: cw_place_type = (cw_place_type + 1) % 3;
                         cw_status_refresh (); return TRUE; /* menu: next type */
         case GDK_KEY_9: cw_place_void = !cw_place_void;
@@ -1949,6 +1961,19 @@ static gboolean cw_on_key (GtkEventControllerKey *controller, guint keyval,
     if (cw_mode == CW_MODE_IDLE) {
         if ((keyval == GDK_KEY_g) || (keyval == GDK_KEY_G)) {
             cw_snap_selected ();
+            return TRUE;
+        }
+        /* WP7 7.0c: one-shot undo of the most recent destructive
+         * subtract (cad_undo restores the pre-subtract snapshot). IDLE
+         * only — a carry or a settle owns the part's pose. */
+        if ((keyval == GDK_KEY_u) || (keyval == GDK_KEY_U)) {
+            int rc = cad_undo (&cw_design);
+            if (rc == cad_ok) {
+                cw_status_ok ("undo: subtract reverted");
+            } else {
+                cw_status_err ("undo: nothing to revert");
+            }
+            cw_status_refresh ();
             return TRUE;
         }
     }

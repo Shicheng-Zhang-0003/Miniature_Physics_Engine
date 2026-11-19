@@ -23,6 +23,17 @@ static bool cad_finite3 (vector3 v) {
     return isfinite (v.x) && isfinite (v.y) && isfinite (v.z);
 }
 
+/* WP7 7.0c: one-level undo snapshot for the destructive subtract
+ * verbs. Taken automatically before each successful subtract; cad_undo
+ * restores it. Only one level is kept (a new subtract replaces it). */
+static cad_design cw_undo_snap;
+static int cw_undo_available = 0;
+
+static void cad_undo_snapshot (const cad_design *design) {
+    cw_undo_snap = *design;
+    cw_undo_available = 1;
+}
+
 /* mig_part_tensor_local's dims rules, mirrored for early refusal:
  * per-type subsets, every dimension finite and strictly positive.
  * WP7 7.0b: a VOID record validates by its GEOMETRY TWIN's rules —
@@ -381,6 +392,189 @@ int cad_set_dims_cylinder (cad_design *design, int index, float radius,
     }
     design -> parts [index].radius = radius;
     design -> parts [index].cylinder_half_length = half_length;
+    return cad_ok;
+}
+
+/* WP7 7.0c: destructive subtraction. A cube target is partitioned into
+ * up to 6 slabs around the subtracted void region; the target part is
+ * replaced by the slabs (zero-thickness slabs omitted). An undo
+ * snapshot is taken first (one level). The void region must lie
+ * entirely within the target cube's axis-aligned bounds and the target
+ * must be a cube (sphere/cylinder targets are refused). */
+static int cad_subtract_box_impl (cad_design *design, int target_index,
+                                  vector3 void_center, vector3 void_half) {
+    if (!design) { return cad_null; }
+    if ((target_index < 0) || (target_index >= design -> count)) {
+        return cad_bad_index;
+    }
+    mig_part *t = &design -> parts [target_index];
+    if (t -> type != mig_part_cube) { return cad_bad_type; }
+    if (!cad_finite3 (void_center) || !cad_finite3 (void_half)) {
+        return cad_bad_pose;
+    }
+    if ((void_half.x <= 0.0f) || (void_half.y <= 0.0f) || (void_half.z <= 0.0f)) {
+        return cad_bad_dims;
+    }
+    /* The void region must sit inside the target cube. */
+    if ((void_center.x + void_half.x > t -> half_extensions.x) ||
+        (void_center.x - void_half.x < -t -> half_extensions.x) ||
+        (void_center.y + void_half.y > t -> half_extensions.y) ||
+        (void_center.y - void_half.y < -t -> half_extensions.y) ||
+        (void_center.z + void_half.z > t -> half_extensions.z) ||
+        (void_center.z - void_half.z < -t -> half_extensions.z)) {
+        return cad_bad_dims; /* void region pokes out of the target cube */
+    }
+    cad_undo_snapshot (design);
+    /* Build up to 6 slabs around the void region within the target cube.
+     * Slabs are axis-aligned boxes; zero-thickness slabs are omitted so
+     * the actual slab count may be < 6 (an exactly-filling void removes
+     * the target entirely). */
+    mig_part slabs [6];
+    int n = 0;
+    float x_lo = -t -> half_extensions.x;
+    float x_hi = +t -> half_extensions.x;
+    float y_lo = -t -> half_extensions.y;
+    float y_hi = +t -> half_extensions.y;
+    float z_lo = -t -> half_extensions.z;
+    float z_hi = +t -> half_extensions.z;
+    float vx_lo = void_center.x - void_half.x;
+    float vx_hi = void_center.x + void_half.x;
+    /* Slab 1: x in [x_lo, vx_lo] (full Y, full Z). */
+    if (vx_lo > x_lo) {
+        mig_part s = *t;
+        s.type = mig_part_cube;
+        s.half_extensions = (vector3) {0.5f * (vx_lo - x_lo), 0.5f * (y_hi - y_lo),
+                                       0.5f * (z_hi - z_lo)};
+        s.position = (vector3) {0.5f * (x_lo + vx_lo), t -> position.y, t -> position.z};
+        slabs [n++] = s;
+    }
+    /* Slab 2: x in [vx_hi, x_hi] (full Y, full Z). */
+    if (x_hi > vx_hi) {
+        mig_part s = *t;
+        s.type = mig_part_cube;
+        s.half_extensions = (vector3) {0.5f * (x_hi - vx_hi), 0.5f * (y_hi - y_lo),
+                                       0.5f * (z_hi - z_lo)};
+        s.position = (vector3) {0.5f * (vx_hi + x_hi), t -> position.y, t -> position.z};
+        slabs [n++] = s;
+    }
+    /* Middle X strip [vx_lo, vx_hi], Y slabs outside void.y. */
+    float mx_lo = (vx_lo > x_lo) ? vx_lo : x_lo;
+    float mx_hi = (vx_hi < x_hi) ? vx_hi : x_hi;
+    if (mx_hi > mx_lo) {
+        if (void_center.y - void_half.y > y_lo) {
+            mig_part s = *t;
+            s.type = mig_part_cube;
+            s.half_extensions = (vector3) {0.5f * (mx_hi - mx_lo),
+                                           0.5f * (void_center.y - void_half.y - y_lo),
+                                           0.5f * (z_hi - z_lo)};
+            s.position = (vector3) {0.5f * (mx_lo + mx_hi),
+                                    0.5f * (y_lo + void_center.y - void_half.y),
+                                    t -> position.z};
+            slabs [n++] = s;
+        }
+        if (y_hi > void_center.y + void_half.y) {
+            mig_part s = *t;
+            s.type = mig_part_cube;
+            s.half_extensions = (vector3) {0.5f * (mx_hi - mx_lo),
+                                           0.5f * (y_hi - void_center.y - void_half.y),
+                                           0.5f * (z_hi - z_lo)};
+            s.position = (vector3) {0.5f * (mx_lo + mx_hi),
+                                    0.5f * (void_center.y + void_half.y + y_hi),
+                                    t -> position.z};
+            slabs [n++] = s;
+        }
+        /* Middle Y strip, Z slabs outside void.z. */
+        float my_lo = (void_center.y - void_half.y > y_lo) ?
+            (void_center.y - void_half.y) : y_lo;
+        float my_hi = (y_hi > void_center.y + void_half.y) ?
+            (void_center.y + void_half.y) : y_hi;
+        if (my_hi > my_lo) {
+            if (void_center.z - void_half.z > z_lo) {
+                mig_part s = *t;
+                s.type = mig_part_cube;
+                s.half_extensions = (vector3) {0.5f * (mx_hi - mx_lo),
+                                               0.5f * (my_hi - my_lo),
+                                               0.5f * (void_center.z - void_half.z - z_lo)};
+                s.position = (vector3) {0.5f * (mx_lo + mx_hi),
+                                        0.5f * (my_lo + my_hi),
+                                        0.5f * (z_lo + void_center.z - void_half.z)};
+                slabs [n++] = s;
+            }
+            if (z_hi > void_center.z + void_half.z) {
+                mig_part s = *t;
+                s.type = mig_part_cube;
+                s.half_extensions = (vector3) {0.5f * (mx_hi - mx_lo),
+                                               0.5f * (my_hi - my_lo),
+                                               0.5f * (z_hi - void_center.z - void_half.z)};
+                s.position = (vector3) {0.5f * (mx_lo + mx_hi),
+                                        0.5f * (my_lo + my_hi),
+                                        0.5f * (void_center.z + void_half.z + z_hi)};
+                slabs [n++] = s;
+            }
+        }
+    }
+    /* Replace the target part with the slabs. If n == 0 the void exactly
+     * fills the target: remove it (count-1). */
+    if (n == 0) {
+        /* Remove the target part. */
+        for (int i = target_index; i < (design -> count - 1); i++) {
+            design -> parts [i] = design -> parts [i + 1];
+        }
+        design -> count--;
+        design -> selected = (design -> selected >= design -> count) ?
+            design -> count - 1 : design -> selected;
+        return cad_ok;
+    }
+    /* Write slabs back starting at target_index, shifting subsequent
+     * parts down to make room (slabs replace one part with n parts). */
+    if (n > 1) {
+        /* Shift parts after target_index down by n-1 slots. */
+        if (design -> count + (n - 1) > design -> max_parts) {
+            return cad_full;
+        }
+        for (int i = design -> count - 1; i > target_index; i--) {
+            design -> parts [i + n - 1] = design -> parts [i];
+        }
+    }
+    for (int i = 0; i < n; i++) {
+        design -> parts [target_index + i] = slabs [i];
+    }
+    design -> count += n - 1;
+    /* Keep selection on the first slab. */
+    design -> selected = target_index;
+    return cad_ok;
+}
+
+int cad_subtract_box (cad_design *design, int target_index,
+                      vector3 void_center, vector3 void_half_extensions) {
+    return cad_subtract_box_impl (design, target_index, void_center, void_half_extensions);
+}
+
+int cad_subtract_sphere (cad_design *design, int target_index,
+                         vector3 void_center, float void_radius) {
+    /* Round void on a cube target: approximate by the inscribed cube
+     * (disclosed inscribed-envelope — removes less than authored,
+     * never more). The inscribed cube in a sphere of radius r has
+     * half-extent r/sqrt(3) so its corners touch the sphere; using r
+     * directly would poke the cube's corners outside the sphere and
+     * remove MORE than authored. */
+    if (!design) { return cad_null; }
+    if (!isfinite (void_center.x) || !isfinite (void_center.y) ||
+        !isfinite (void_center.z) || !isfinite (void_radius) ||
+        (void_radius <= 0.0f)) {
+        return cad_bad_dims;
+    }
+    /* Inscribed cube half-extent = r / sqrt(3); sqrt(3) ~= 1.7320508. */
+    float h = void_radius * 0.5773502691896258f;
+    vector3 he = {h, h, h};
+    return cad_subtract_box_impl (design, target_index, void_center, he);
+}
+
+int cad_undo (cad_design *design) {
+    if (!design) { return cad_null; }
+    if (!cw_undo_available) { return cad_bad_arg; }
+    *design = cw_undo_snap;
+    cw_undo_available = 0;
     return cad_ok;
 }
 

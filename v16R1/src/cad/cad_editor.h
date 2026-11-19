@@ -185,6 +185,25 @@ int cad_set_dims_cube (cad_design *design, int index, vector3 half_extensions);
 int cad_set_dims_cylinder (cad_design *design, int index, float radius,
                            float half_length);
 
+/* ---- WP7 7.0c open voids: destructive subtraction verbs -------------
+ * These modify an existing MATERIAL part IN PLACE: the target cube is
+ * partitioned into at most 6 slabs around the subtracted void region,
+ * replacing the original part with the slabs. A one-level undo snapshot
+ * is taken automatically before each subtract (cad_undo restores it).
+ * Write-on-success: a refused subtract leaves the design untouched.
+ * target_index must index an existing cube part; the void region must
+ * lie entirely within the target's bounds; slabs of zero thickness are
+ * omitted (so the actual slab count may be < 6). Round targets are
+ * refused — subtraction is cube-target-only. */
+int cad_subtract_box (cad_design *design, int target_index,
+                      vector3 void_center, vector3 void_half_extensions);
+int cad_subtract_sphere (cad_design *design, int target_index,
+                         vector3 void_center, float void_radius);
+/* Restore the design to the snapshot taken before the most recent
+ * successful subtract. Returns cad_ok if an undo snapshot exists,
+ * cad_bad_arg if nothing to undo. Only one level of undo is kept. */
+int cad_undo (cad_design *design);
+
 /* Snap every part position to snap_step multiples (axis-wise). A
  * no-op while snap_step is 0; refuses cad_bad_arg for step <= 0
  * through cad_set_snap (below). */

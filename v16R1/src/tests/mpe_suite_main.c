@@ -139,6 +139,7 @@ int mpe_t_mig_void_hook_composite (void); /* MIG WP7 7.0b */
 int mpe_t_cad_editor_model (void);
 int mpe_t_cad_void_model (void); /* MIG WP7 7.0b */
 int mpe_t_scene_save_svf07 (void); /* MIG WP7 7.0b */
+int mpe_t_cad_subtract_void (void); /* MIG WP7 7.0c */
 int mpe_t_cad_view_math (void);
 typedef struct {
     const char *name;
@@ -349,6 +350,11 @@ static const mpe_entry_t mpe_registry [] = {
      * (v201 cannot express void records; reload would silently recompose
      * it heavier). Material-only composites still save. */
     {"scene_save_svf07", mpe_t_scene_save_svf07, 0},
+    /* MIG WP7 7.0c: destructive subtract verbs — cad_subtract_box
+     * partitions a cube target into up to 6 slabs around a void region,
+     * cad_subtract_sphere uses the inscribed cube (disclosed envelope),
+     * cad_undo restores the one-level snapshot. */
+    {"cad_subtract_void", mpe_t_cad_subtract_void, 0},
     /* MIG WP4 4.6b: the CAD window's VIEW MATH (cad/cad_view_math.c) —
      * orbit-camera basis (orthonormal + eye-on-axis), perspective
      * unprojection (center/edge rays), ray-vs-sphere/box/cylinder

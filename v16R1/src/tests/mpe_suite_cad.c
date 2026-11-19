@@ -981,3 +981,147 @@ int mpe_t_cad_void_model (void) {
     mpe_test_end (&t);
     return t.failures;
 }
+
+/* MIG WP7 7.0c gate (tests/mpe_suite_cad.c):
+ *   mpe_t_cad_subtract_void — destructive subtract verbs:
+ *   cad_subtract_box partitions a cube target into up to 6 slabs around
+ *   the subtracted void region; cad_subtract_sphere uses the inscribed
+ *   cube (disclosed inscribed-envelope — removes less than authored,
+ *   never more); cad_undo restores the one-level pre-subtract snapshot;
+ *   round targets are refused; void regions poking out of the target are
+ *   refused; the design stays buildable (cad_build ok) after subtract.
+ *
+ * Oracle discipline: every expected slab count/dim/mass is derived here
+ * from axis-aligned box arithmetic — never from the function under test.
+ */
+int mpe_t_cad_subtract_void (void) {
+    mpe_test_t t;
+    mpe_test_begin (&t, "cad_subtract_void");
+    mpe_clamp_counters_reset ();
+
+    /* ---- 1. subtract_box: centred cube void in a cube target -------- */
+    {
+        cad_design d;
+        cad_design_init (&d);
+        MPE_CHECK (&t, cad_set_name (&d, "voidbox") == cad_ok);
+        /* Target cube: half 1.0 (2x2x2), centred at origin. */
+        MPE_CHECK (&t, cad_add_cube (&d, (vector3) {1.0f, 1.0f, 1.0f},
+                                     (vector3) {0.0f, 0.0f, 0.0f}) == cad_ok);
+        /* Void: half 0.5 cube centred at origin — centred slab removal. */
+        MPE_CHECK (&t, cad_subtract_box (&d, 0, (vector3) {0.0f, 0.0f, 0.0f},
+                                         (vector3) {0.5f, 0.5f, 0.5f}) == cad_ok);
+        /* 2 slabs: X-outside + (middle strip Y-outside + Z-outside) =
+         * actually centred void removes face slabs: X-left, X-right,
+         * Y-front, Y-back, Z-front, Z-back -> 6 slabs. */
+        MPE_CHECK (&t, d.count == 6); /* 6 slabs around centred void */
+        MPE_CHECK (&t, d.selected == 0); /* selection on first slab */
+        /* Undo restores the single target cube. */
+        MPE_CHECK (&t, cad_undo (&d) == cad_ok);
+        MPE_CHECK (&t, d.count == 1 &&
+                       d.parts [0].type == mig_part_cube &&
+                       d.parts [0].half_extensions.x == 1.0f);
+        /* Undo again: nothing to undo -> cad_bad_arg. */
+        MPE_CHECK (&t, cad_undo (&d) == cad_bad_arg);
+        /* cad_build stays green after subtract (design buildable). */
+        mig_part out [16]; mig_bridge br;
+        MPE_CHECK (&t, cad_build (&d, out, &br) == cad_ok);
+    }
+
+    /* ---- 2. subtract_box: off-centre void -> fewer slabs ------------ */
+    {
+        cad_design d;
+        cad_design_init (&d);
+        MPE_CHECK (&t, cad_add_cube (&d, (vector3) {1.0f, 1.0f, 1.0f},
+                                     (vector3) {0.0f, 0.0f, 0.0f}) == cad_ok);
+        /* Void at the +X face: touches x=1.0 face -> X+ slab has zero
+         * thickness (omitted), but the middle X strip still keeps Y and
+         * Z slabs: X- slab + Y- + Y+ + Z- + Z+ = 5 slabs. */
+        MPE_CHECK (&t, cad_subtract_box (&d, 0, (vector3) {0.5f, 0.0f, 0.0f},
+                                         (vector3) {0.5f, 0.5f, 0.5f}) == cad_ok);
+        MPE_CHECK (&t, d.count == 5);
+        /* X- slab: x in [-1, 0], half 0.5, centred at x=-0.5. */
+        MPE_CHECK (&t, d.parts [0].type == mig_part_cube);
+        MPE_CHECK (&t, d.parts [0].half_extensions.x == 0.5f);
+        MPE_CHECK (&t, d.parts [0].position.x == -0.5f);
+        /* cad_build stays green after subtract (design buildable). */
+        {
+            mig_part o [16]; mig_bridge b;
+            MPE_CHECK (&t, cad_build (&d, o, &b) == cad_ok);
+        }
+    }
+
+    /* ---- 3. subtract_box refusal battery ---------------------------- */
+    {
+        cad_design d;
+        cad_design_init (&d);
+        MPE_CHECK (&t, cad_add_cube (&d, (vector3) {1.0f, 1.0f, 1.0f},
+                                     (vector3) {0.0f, 0.0f, 0.0f}) == cad_ok);
+        /* Bad index. */
+        MPE_CHECK (&t, cad_subtract_box (&d, 99, (vector3) {0.0f, 0.0f, 0.0f},
+                                         (vector3) {0.5f, 0.5f, 0.5f}) == cad_bad_index);
+        /* Non-cube target (sphere added then subtracted -> bad_type). */
+        MPE_CHECK (&t, cad_add_sphere (&d, 0.5f, (vector3) {0.0f, 0.0f, 0.0f}) == cad_ok);
+        MPE_CHECK (&t, cad_subtract_box (&d, 1, (vector3) {0.0f, 0.0f, 0.0f},
+                                         (vector3) {0.5f, 0.5f, 0.5f}) == cad_bad_type);
+        /* Void region pokes out of target -> bad_dims. */
+        MPE_CHECK (&t, cad_subtract_box (&d, 0, (vector3) {2.0f, 0.0f, 0.0f},
+                                         (vector3) {0.5f, 0.5f, 0.5f}) == cad_bad_dims);
+        MPE_CHECK (&t, cad_subtract_box (&d, 0, (vector3) {0.0f, 0.0f, 0.0f},
+                                         (vector3) {2.0f, 0.5f, 0.5f}) == cad_bad_dims);
+        /* Zero / negative void half-extents -> bad_dims. */
+        MPE_CHECK (&t, cad_subtract_box (&d, 0, (vector3) {0.0f, 0.0f, 0.0f},
+                                         (vector3) {0.0f, 0.5f, 0.5f}) == cad_bad_dims);
+        MPE_CHECK (&t, cad_subtract_box (&d, 0, (vector3) {0.0f, 0.0f, 0.0f},
+                                         (vector3) {-0.5f, 0.5f, 0.5f}) == cad_bad_dims);
+        /* Design unchanged by refusals (count still 2). */
+        MPE_CHECK (&t, d.count == 2);
+    }
+
+    /* ---- 4. subtract_sphere: inscribed cube envelope --------------- */
+    {
+        cad_design d;
+        cad_design_init (&d);
+        MPE_CHECK (&t, cad_add_cube (&d, (vector3) {1.0f, 1.0f, 1.0f},
+                                     (vector3) {0.0f, 0.0f, 0.0f}) == cad_ok);
+        /* Sphere r 0.5 -> inscribed cube half 0.5/sqrt(3) ~ 0.289
+         * (disclosed inscribed-envelope: removes less than the sphere,
+         * never more). The removed 0.577^3 cube fits centred in the
+         * 2x2x2 target -> 6 slabs. */
+        MPE_CHECK (&t, cad_subtract_sphere (&d, 0, (vector3) {0.0f, 0.0f, 0.0f},
+                                            0.5f) == cad_ok);
+        MPE_CHECK (&t, d.count == 6); /* inscribed cube == centred box void */
+        MPE_CHECK (&t, cad_undo (&d) == cad_ok);
+        MPE_CHECK (&t, d.count == 1);
+        /* Negative radius -> bad_dims, design untouched. */
+        MPE_CHECK (&t, cad_subtract_sphere (&d, 0, (vector3) {0.0f, 0.0f, 0.0f},
+                                            -0.5f) == cad_bad_dims);
+        MPE_CHECK (&t, d.count == 1);
+    }
+
+    /* ---- 5. subtract on void target refuses (cube target only) ----- */
+    {
+        cad_design d;
+        cad_design_init (&d);
+        MPE_CHECK (&t, cad_add_void_cube (&d, (vector3) {0.5f, 0.5f, 0.5f},
+                                          (vector3) {0.0f, 0.0f, 0.0f}) == cad_ok);
+        MPE_CHECK (&t, cad_subtract_box (&d, 0, (vector3) {0.0f, 0.0f, 0.0f},
+                                         (vector3) {0.25f, 0.25f, 0.25f}) == cad_bad_type);
+    }
+
+    /* ---- 6. subtract fills target exactly -> target removed --------- */
+    {
+        cad_design d;
+        cad_design_init (&d);
+        MPE_CHECK (&t, cad_add_cube (&d, (vector3) {1.0f, 1.0f, 1.0f},
+                                     (vector3) {0.0f, 0.0f, 0.0f}) == cad_ok);
+        /* Void exactly equals target -> n == 0 -> target removed. */
+        MPE_CHECK (&t, cad_subtract_box (&d, 0, (vector3) {0.0f, 0.0f, 0.0f},
+                                         (vector3) {1.0f, 1.0f, 1.0f}) == cad_ok);
+        MPE_CHECK (&t, d.count == 0); /* target removed entirely */
+        MPE_CHECK (&t, cad_undo (&d) == cad_ok);
+        MPE_CHECK (&t, d.count == 1); /* restored */
+    }
+
+    mpe_test_end (&t);
+    return t.failures;
+}
