@@ -24,6 +24,12 @@ typedef struct {
     int capacity;           /* slots in the caller buffer */
 } mig_hull_point_set;
 
+/* Exact trigonometric literals shared by the hull catalog and ring builder. */
+#define MIG_HULL_SQRT2  1.41421356237309504880
+#define MIG_HULL_SQRT3  1.73205080756887729353
+#define MIG_HULL_SIN_PI_8 0.38268343236508977173 /* √(2−√2)/2 */
+#define MIG_HULL_COS_PI_8 0.92387953251128675613 /* √(2+√2)/2 */
+
 typedef enum {
     mig_hull_ok = 0,
     mig_hull_null = 1,       /* NULL set / NULL buf / NULL out */
@@ -254,6 +260,19 @@ extern const int mig_hull_icosahedron_faces [MIG_HULL_ICOSA_FACES * 3];
 mig_hull_err mig_hull_build_ellipsoid (double a, double b, double c,
                                        mig_hull_point_set *out);
 extern const int mig_hull_ell_faces [MIG_HULL_ELL_FACES * 3];
+
+/* ---- WP7 7.0e: hull ring pieces (n-gonal ring / washer) ----
+ * Builds points for a ring (annulus) in the z=0 plane: n_segs segments
+ * around the circumference, each contributing two points (inner and
+ * outer radius), for a total of 2*n_segs points. The points are NOT a
+ * convex hull by themselves (a ring has a hole); consumers partition
+ * them into convex slabs (e.g. one box per segment) for void
+ * subtraction. Vertices are ordered: inner_0, outer_0, inner_1,
+ * outer_1, ... around the ring. All dims finite and > 0, n_segs >= 3.
+ */
+mig_hull_err mig_hull_build_ring (double inner_r, double outer_r,
+                                  int n_segs, double h,
+                                  mig_hull_point_set *out);
 
 /* ---- WP4 4.6q: analytic ellipsoid SAT ----
  * The engine's ell hull kind is an ANALYTIC ellipsoid (semi-axes

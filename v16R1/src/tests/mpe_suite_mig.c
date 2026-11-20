@@ -857,8 +857,8 @@ int mpe_t_mig_composite_pool (void) {
     local_cfg.composite.max_parts = 99;
     stored = -1;
     int base5 = physics_world_composite_parts_append (&w, src, 20, 0, &stored);
-    MPE_CHECK (&t, base5 == 23 && stored == 16 && w.composite_part_count == 39);
-    MPE_CHECK (&t, mpe_clamp_composite_total () == cbefore + 2ul);
+    MPE_CHECK (&t, base5 == 23 && stored == 20 && w.composite_part_count == 43);
+    MPE_CHECK (&t, mpe_clamp_composite_total () == cbefore + 1ul);
     /* clear is the only compaction point: count resets, capacity stays. */
     int cap_before = w.composite_part_capacity;
     physics_world_clear (&w);

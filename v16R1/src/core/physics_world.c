@@ -924,24 +924,24 @@ int physics_world_grow_bodies (physics_world *world) {
     world -> body_capacity = want;
     return 0;
 }
-/* MIG WP2 2.1/2.2: the P2 cap in force for one world. Default 16, frozen
- * ceiling 16 (configuration can only lower the stored ceiling); a
+/* MIG WP2 2.1/2.2: the P2 cap in force for one world. Default 64, frozen
+ * ceiling 64 (configuration can only lower the stored ceiling); a
  * non-positive/garbage config value falls back to the default. */
 static int physics_world_composite_cap (const physics_world *world) {
     const mpe_config_t *cfg = mpe_world_cfg (world);
-    int cap = (cfg && cfg -> composite.max_parts > 0) ? cfg -> composite.max_parts : 16;
-    if (cap > 16) { cap = 16; }
+    int cap = (cfg && cfg -> composite.max_parts > 0) ? cfg -> composite.max_parts : 64;
+    if (cap > 64) { cap = 64; }
     return cap;
 }
 /* MIG WP2 2.1: composite part pool grower. Ceiling = mpe_max_bodies * the
- * frozen P2 cap (16) — the most parts any legal body population can own.
- * Doubles from 16; relocation is safe because bodies store part_base
+ * frozen P2 cap (64) — the most parts any legal body population can own.
+ * Doubles from 64; relocation is safe because bodies store part_base
  * indices, never pointers into this array. */
 static int physics_world_grow_composite_parts (physics_world *world) {
     if (!world) { return -1; }
-    const int ceiling = mpe_max_bodies * 16;
+    const int ceiling = mpe_max_bodies * 64;
     if (world -> composite_part_capacity >= ceiling) { return -1; }
-    int want = world -> composite_part_capacity > 0 ? world -> composite_part_capacity * 2 : 16;
+    int want = world -> composite_part_capacity > 0 ? world -> composite_part_capacity * 2 : 64;
     if (want > ceiling) { want = ceiling; }
     composite_part *grown =
         (composite_part *) realloc (world -> composite_parts, (size_t) want * sizeof (composite_part));
@@ -2508,7 +2508,7 @@ int physics_world_add_composite (physics_world *world, const mig_part *parts, in
             }
         } else if (mig_compose (parts, count, &all) != mig_compose_ok) { return -1; }
     }
-    mig_part scratch [16];
+    mig_part scratch [64];
     mig_bridge bridge;
     /* WP7 7.0b: the compose routes through the TESTED void module the
      * moment the assembly holds a void record — materials and voids

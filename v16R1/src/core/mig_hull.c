@@ -916,6 +916,90 @@ mig_hull_err mig_hull_build_ellipsoid (double a, double b, double c,
     return mig_hull_point_set_add (out, 0.0, 0.0, -c);
 }
 
+/* ---- WP7 7.0e: hull ring pieces ----
+ * Builds points for an n-gonal ring (washer) in the z=0 plane, extruded
+ * to height h. For each segment i around the circumference, four points
+ * are added: inner-bottom, outer-bottom, inner-top, outer-top, for a
+ * total of 4*n_segs points. Consumers partition these into convex slabs
+ * (one box per segment) for void subtraction.
+ *
+ * All dims finite and > 0, outer_r > inner_r, n_segs >= 3.
+ * Uses exact trigonometric literals for n_segs = 3, 4, 6, 8; computes
+ * at runtime (from a local PI literal) for other values. */
+mig_hull_err mig_hull_build_ring (double inner_r, double outer_r,
+                                  int n_segs, double h,
+                                  mig_hull_point_set *out) {
+    if (!out) { return mig_hull_null; }
+    if (!isfinite (inner_r) || !isfinite (outer_r) || !isfinite (h) ||
+        inner_r < 0.0 || outer_r <= inner_r || n_segs < 3 || h <= 0.0) {
+        return mig_hull_bad_point;
+    }
+    /* Required capacity: 4 points per segment (inner/outer x bottom/top). */
+    if (out -> capacity < 4 * n_segs) { return mig_hull_bad_count; }
+
+    const double pi = 3.14159265358979323846;
+    const double z_lo = -h / 2.0;
+    const double z_hi = +h / 2.0;
+
+    for (int i = 0; i < n_segs; i++) {
+        double ci, si;
+        /* Exact trigonometric literals for common segment counts. */
+        if (n_segs == 3) {
+            static const double c3 [3][2] = {
+                { 1.0,                0.0               },
+                {-0.5,                MIG_HULL_SQRT3 / 2},
+                {-0.5,               -MIG_HULL_SQRT3 / 2}
+            };
+            ci = c3 [i][0]; si = c3 [i][1];
+        } else if (n_segs == 4) {
+            static const double c4 [4][2] = {
+                { 1.0,  0.0 },
+                { 0.0,  1.0 },
+                {-1.0,  0.0 },
+                { 0.0, -1.0 }
+            };
+            ci = c4 [i][0]; si = c4 [i][1];
+        } else if (n_segs == 6) {
+            static const double c6 [6][2] = {
+                { 1.0,                0.0               },
+                { MIG_HULL_SQRT3 / 2,  0.5              },
+                { 0.5,                MIG_HULL_SQRT3 / 2},
+                {-0.5,                MIG_HULL_SQRT3 / 2},
+                {- MIG_HULL_SQRT3 / 2,  0.5              },
+                {-0.5,               -MIG_HULL_SQRT3 / 2}
+            };
+            ci = c6 [i][0]; si = c6 [i][1];
+        } else if (n_segs == 8) {
+            static const double c8 [8][2] = {
+                { 1.0,                0.0               },
+                { MIG_HULL_SQRT2 / 2,  MIG_HULL_SQRT2 / 2},
+                { 0.0,                1.0               },
+                {-MIG_HULL_SQRT2 / 2,  MIG_HULL_SQRT2 / 2},
+                {-1.0,                0.0               },
+                {-MIG_HULL_SQRT2 / 2, -MIG_HULL_SQRT2 / 2},
+                { 0.0,               -1.0               },
+                { MIG_HULL_SQRT2 / 2, -MIG_HULL_SQRT2 / 2}
+            };
+            ci = c8 [i][0]; si = c8 [i][1];
+        } else {
+            const double theta = 2.0 * pi * (double) i / (double) n_segs;
+            ci = cos (theta);
+            si = sin (theta);
+        }
+        /* Inner-bottom, outer-bottom, inner-top, outer-top. */
+        mig_hull_err e;
+        e = mig_hull_point_set_add (out, inner_r * ci, inner_r * si, z_lo);
+        if (e != mig_hull_ok) { return e; }
+        e = mig_hull_point_set_add (out, outer_r * ci, outer_r * si, z_lo);
+        if (e != mig_hull_ok) { return e; }
+        e = mig_hull_point_set_add (out, inner_r * ci, inner_r * si, z_hi);
+        if (e != mig_hull_ok) { return e; }
+        e = mig_hull_point_set_add (out, outer_r * ci, outer_r * si, z_hi);
+        if (e != mig_hull_ok) { return e; }
+    }
+    return mig_hull_ok;
+}
+
 /* ---- APPENDED WP4 4.6q: analytic ellipsoid SAT ----
  * See mig_hull.h for the contract. The ellipsoid A is axis-aligned at
  * the origin of its own frame; support math is the exact O(1) closed

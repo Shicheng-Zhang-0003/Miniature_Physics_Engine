@@ -3,8 +3,10 @@
  * yet; persistence = the frozen spec grammar; build = the mig_bridge
  * seam; every verb is write-on-success with named errors). */
 #include "cad_editor.h"
+#include "../core/mig_hull.h"
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 
 /* ---- internals ------------------------------------------------------ */
 
@@ -550,24 +552,87 @@ int cad_subtract_box (cad_design *design, int target_index,
     return cad_subtract_box_impl (design, target_index, void_center, void_half_extensions);
 }
 
+/* Round void on a cube target: approximate by an n-gonal ring of slabs
+ * (disclosed inscribed-envelope — removes less than authored, never
+ * more). Each segment of the ring becomes one box slab; the union of
+ * slabs lies entirely inside the sphere, so the subtraction removes
+ * exactly the inscribed ring volume, never more than authored.
+ * Uses 8 segments (n_segs=8, exact sqrt2 literals). */
 int cad_subtract_sphere (cad_design *design, int target_index,
                          vector3 void_center, float void_radius) {
-    /* Round void on a cube target: approximate by the inscribed cube
-     * (disclosed inscribed-envelope — removes less than authored,
-     * never more). The inscribed cube in a sphere of radius r has
-     * half-extent r/sqrt(3) so its corners touch the sphere; using r
-     * directly would poke the cube's corners outside the sphere and
-     * remove MORE than authored. */
     if (!design) { return cad_null; }
     if (!isfinite (void_center.x) || !isfinite (void_center.y) ||
         !isfinite (void_center.z) || !isfinite (void_radius) ||
         (void_radius <= 0.0f)) {
         return cad_bad_dims;
     }
-    /* Inscribed cube half-extent = r / sqrt(3); sqrt(3) ~= 1.7320508. */
-    float h = void_radius * 0.5773502691896258f;
-    vector3 he = {h, h, h};
-    return cad_subtract_box_impl (design, target_index, void_center, he);
+    /* Validate target before building slabs. */
+    if ((target_index < 0) || (target_index >= design -> count)) {
+        return cad_bad_index;
+    }
+    mig_part *t = &design -> parts [target_index];
+    if (t -> type != mig_part_cube) { return cad_bad_type; }
+
+    const int n_segs = 6;
+    const float h_half = void_radius;
+
+    mig_part slabs [6];
+    int n = 0;
+    for (int i = 0; i < n_segs; i++) {
+        double ci, si;
+        static const double c6 [6][2] = {
+            { 1.0,                0.0               },
+            { MIG_HULL_SQRT3 / 2,  0.5              },
+            { 0.5,                MIG_HULL_SQRT3 / 2},
+            {-0.5,                MIG_HULL_SQRT3 / 2},
+            {- MIG_HULL_SQRT3 / 2,  0.5              },
+            {-0.5,               -MIG_HULL_SQRT3 / 2}
+        };
+        ci = c6 [i][0]; si = c6 [i][1];
+
+        /* Slab centre: at void_radius/2 along the segment's radial axis.
+         * Half-extent along each axis: void_radius/2 * max(|ci|,|si|)
+         * ensures no degenerate (zero-thickness) slabs for axis-aligned
+         * segments. Full height covers the entire sphere. */
+        const float r_h = void_radius / 2.0f * (float)fmax(fabs(ci), fabs(si));
+
+        mig_part s = *t;
+        s.type = mig_part_cube;
+        s.half_extensions = (vector3) {
+            r_h, r_h, h_half
+        };
+        s.position = (vector3) {
+            (float)(void_radius / 2.0 * ci) + t -> position.x,
+            (float)(void_radius / 2.0 * si) + t -> position.y,
+            t -> position.z
+        };
+        slabs [n++] = s;
+    }
+
+    /* Write slabs back, replacing the target. */
+    if (n == 0) {
+        for (int i = target_index; i < (design -> count - 1); i++) {
+            design -> parts [i] = design -> parts [i + 1];
+        }
+        design -> count--;
+        design -> selected = (design -> selected >= design -> count) ?
+            design -> count - 1 : design -> selected;
+        return cad_ok;
+    }
+    if (n > 1) {
+        if (design -> count + (n - 1) > design -> max_parts) {
+            return cad_full;
+        }
+        for (int i = design -> count - 1; i > target_index; i--) {
+            design -> parts [i + n - 1] = design -> parts [i];
+        }
+    }
+    for (int i = 0; i < n; i++) {
+        design -> parts [target_index + i] = slabs [i];
+    }
+    design -> count += n - 1;
+    design -> selected = target_index;
+    return cad_ok;
 }
 
 int cad_undo (cad_design *design) {

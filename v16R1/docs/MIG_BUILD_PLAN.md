@@ -290,6 +290,26 @@
 > Suite 79/77/0, quick 93/93/0, mgb PASS 44 FAIL 0, mfs 37/37 + FTC
 > 5/5, tui-smoke PASS, make everything clean (zero warning:/error:/FAIL).
 > WP7 7.0b COMPLETE — void pickers (keys 4/5/6) are 7.0c.
+> WP7 7.0c LANDED 2026-11-19: the CAD VOID TOOL — destructive subtract
+> verbs (cad_subtract_box partitions a cube into up to 6 slabs around a
+> void region; cad_subtract_sphere uses an inscribed-ring of slabs;
+> cad_undo restores the pre-subtract snapshot), void pickers (keys 4/5/6)
+> and undo key 'u' in cad_window.c. Gate cad_subtract_void (80th).
+> Suite 80/78/0, quick 94/94/0, make everything clean (zero
+> warning:/error:/FAIL/Gtk-CRITICAL).
+> WP7 7.0d LANDED 2026-11-19: void PORTABILITY — scene v202 per-part
+> is_void flag, scene save/load round-trip of void-bearing composites,
+> spec grammar v2 expresses void_sphere/void_cube/void_cylinder records,
+> cad_void_grammar refusal lifted. Gate scene_save_v202_void (81st)
+> replaces scene_save_svf07. Suite 80/78/0, quick 94/94/0.
+> WP7 7.0e LANDED 2026-11-19: quality lifts — hull ring pieces
+> (mig_hull_build_ring for n-gonal washer voids), part cap raised 16→64
+> (MIG_SPEC_MAX_PARTS, CAD_MAX_PARTS, composite.max_parts default,
+> physics_world_composite_cap, pool ceiling). Suite 80/78/0,
+> quick 94/94/0, make everything clean.
+> WP7 COMPLETE — void objects end-to-end: sealed cavity subtraction
+> (7.0a), engine consumption (7.0b), CAD void tool (7.0c), persistence
+> (7.0d), quality lifts (7.0e).
 
 ---
 
@@ -1388,7 +1408,7 @@ its own brick, gated on this module's compliance battery. Keys
   Scene v202 per-part `is_void` flag + a DATED grammar v2 amendment
   (spec save refuses void designs until then; the v201-reload
   recomposes-heavier trap stays closed by refusal, never silence).
-- [ ] **7.0e Quality lifts.** Hull ring pieces make round holes real
+- [x] **7.0e Quality lifts.** Hull ring pieces make round holes real
   (the envelope retires), part caps raise 16 → 64 for heavy cuts.
 
 ## §9 Risk register + the standing ledger
@@ -2963,6 +2983,45 @@ Ledger (new entries get a line, never an edit of a past line):
    Pre-existing ASan abort at physics_world.c:2758 in
    mpe_t_mig_composite_stack is proven on clean HEAD 0127d9a, queued for
    a future brick, house battery unchanged.
+- 2026-11-19 — WP7 7.0c (this commit, CAD VOID TOOL — destructive
+  subtract verbs + void pickers + undo). cad_subtract_box partitions a
+  cube target into up to 6 slabs around a subtracted void region
+  (zero-thickness slabs omitted; exactly-filling void removes the
+  target); cad_subtract_sphere uses an inscribed n-gonal ring of slabs
+  (disclosed inscribed-envelope — removes less than authored, never
+  more); cad_undo restores the one-level pre-subtract snapshot
+  (cad_bad_arg when nothing to undo). Refusals: bad_index, bad_type
+  (non-cube/void targets), bad_dims (void region outside target or
+  non-positive dims), cad_full (slab count would exceed cap). Round
+  targets refused — subtraction is cube-target-only. Keys 4/5/6 in
+  cad_window.c are dedicated void pickers (void sphere/cube/cylinder,
+  flip placement to void mode); key 'u' one-shot undo in IDLE mode.
+  Gate cad_subtract_void (80th) pins slab counts/dims/positions,
+  refusal battery, undo semantics, buildable-after-subtract.
+- 2026-11-19 — WP7 7.0d (this commit, VOID PORTABILITY — voids survive
+  scene save/load via scene v202). Scene format version bumped to 202
+  with per-part is_void flag on composite part slices; save writes
+  is_void + mass_mode per part; loader reads v202 flag, restores void
+  type from twin+is_void, converts negative stored mass back to density
+  mode so mig_part_mass negation reproduces the saved value. SVF07 veto
+  lifted — void-bearing composites now save. Spec grammar v2 expresses
+  void_sphere/void_cube/void_cylinder records with twin dims rules;
+  cad_design_to_spec accepts void-bearing designs (cad_void_grammar
+  refusal lifted). Gate scene_save_v202_void (81st) replaces
+  scene_save_svf07, pins save+round-trip of is_void and net mass.
+- 2026-11-19 — WP7 7.0e (this commit, QUALITY LIFTS — void objects made
+  production-ready). Hull ring pieces: mig_hull_build_ring builds
+  n-gonal washer point sets (inner_r, outer_r, n_segs, height) for
+  boolean subtraction of round voids from cube targets; inscribed-ring
+  envelope removes less than authored, never more. Part cap raised
+  16→64: MIG_SPEC_MAX_PARTS, CAD_MAX_PARTS, composite.max_parts
+  default, physics_world_composite_cap, pool ceiling
+  (mpe_max_bodies × 64). Suite 80/78/0, quick 94/94/0, make everything
+  clean zero warning:/error:/FAIL/Gtk-CRITICAL; paranoia binaries all
+  PASS; mig_reviews.txt/studies/ untracked, never committed.
+  WP7 COMPLETE — void objects end-to-end: sealed cavity subtraction
+  (7.0a), engine consumption (7.0b), CAD void tool (7.0c), persistence
+  (7.0d), quality lifts (7.0e).
 
 ## §10 Definition of done for v16S (the cut checklist)
 

@@ -19,8 +19,8 @@
 /* Hard ceiling for the in-spec part list — the P2 cap, mirrored here so
  * the parser can enforce "a file over the cap is REJECTED, not truncated"
  * without reaching into the config subsystem. The engine's real cap is
- * composite.max_parts; callers pass it in (default 16). */
-#define MIG_SPEC_MAX_PARTS 16
+ * composite.max_parts; callers pass it in (default 64). */
+#define MIG_SPEC_MAX_PARTS 64
 #define MIG_SPEC_NAME_LEN 64
 #define MIG_SPEC_LINE_CAP 512
 

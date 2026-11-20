@@ -161,21 +161,21 @@ int mpe_t_cad_editor_model (void) {
     MPE_CHECK (&t, cad_add_part (&d, &bad) == cad_bad_mass);
     bad.mass = (float) NAN;
     MPE_CHECK (&t, cad_add_part (&d, &bad) == cad_bad_mass);
-    /* cap: the design refuses to grow past max_parts (3 + 19 > 16) */
+    /* cap: the design refuses to grow past max_parts (3 + 65 > 64) */
     bad.mass = 1000.0f;
     MPE_CHECK (&t, cad_add_part (&d, &bad) == cad_ok); /* count 4 — inside the cap */
-    MPE_CHECK (&t, cad_array (&d, 0, 20, (vector3) {0.1f, 0.0f, 0.0f}) == cad_full);
+    MPE_CHECK (&t, cad_array (&d, 0, 65, (vector3) {0.1f, 0.0f, 0.0f}) == cad_full);
     MPE_CHECK (&t, cad_delete (&d, 3) == cad_ok); /* back to 3 for the witness */
     /* index refusals across every indexed verb */
     MPE_CHECK (&t, cad_delete (&d, 3) == cad_bad_index);
     MPE_CHECK (&t, cad_delete (&d, -1) == cad_bad_index);
     MPE_CHECK (&t, cad_duplicate (&d, 99, (vector3) {0.0f, 0.0f, 0.0f}) == cad_bad_index);
     MPE_CHECK (&t, cad_array (&d, -1, 2, (vector3) {0.0f, 0.0f, 0.0f}) == cad_bad_index);
-    MPE_CHECK (&t, cad_move (&d, 7, (vector3) {0.0f, 0.0f, 0.0f}) == cad_bad_index);
-    MPE_CHECK (&t, cad_set_position (&d, 7, (vector3) {0.0f, 0.0f, 0.0f}) == cad_bad_index);
-    MPE_CHECK (&t, cad_rotate_degrees (&d, 7, 1, 30.0f) == cad_bad_index);
-    MPE_CHECK (&t, cad_set_mass (&d, 7, mig_mass_mode_explicit, 5.0f) == cad_bad_index);
-    MPE_CHECK (&t, cad_select (&d, 7) == cad_bad_index);
+    MPE_CHECK (&t, cad_move (&d, 64, (vector3) {0.0f, 0.0f, 0.0f}) == cad_bad_index);
+    MPE_CHECK (&t, cad_set_position (&d, 64, (vector3) {0.0f, 0.0f, 0.0f}) == cad_bad_index);
+    MPE_CHECK (&t, cad_rotate_degrees (&d, 64, 1, 30.0f) == cad_bad_index);
+    MPE_CHECK (&t, cad_set_mass (&d, 64, mig_mass_mode_explicit, 5.0f) == cad_bad_index);
+    MPE_CHECK (&t, cad_select (&d, 64) == cad_bad_index);
     MPE_CHECK (&t, cad_select (&d, -2) == cad_bad_index);
     /* NaN/infinite deltas and steps */
     MPE_CHECK (&t, cad_move (&d, 0, (vector3) {NAN, 0.0f, 0.0f}) == cad_bad_pose);
@@ -283,7 +283,7 @@ int mpe_t_cad_editor_model (void) {
     MPE_CHECK (&t, d.parts [4].orientation.w == d.parts [0].orientation.w &&
                    d.parts [5].orientation.w == d.parts [0].orientation.w);
     /* array overflow refuses BEFORE appending anything (staged-validate) */
-    MPE_CHECK (&t, cad_array (&d, 0, 12, (vector3) {0.5f, 0.0f, 0.0f}) == cad_full);
+    MPE_CHECK (&t, cad_array (&d, 0, 65, (vector3) {0.5f, 0.0f, 0.0f}) == cad_full);
     MPE_CHECK (&t, d.count == 6);
     /* delete shifts indices down; selection FOLLOWS the same part */
     MPE_CHECK (&t, cad_select (&d, 2) == cad_ok);
@@ -506,7 +506,7 @@ int mpe_t_cad_editor_model (void) {
     /* grid geometry: header line 0, grid rows = lines 1..24 (row r is line
      * r+1), legend line 25; 1 cell = 0.25 m, origin cell (col 32, row 12). */
     MPE_CHECK (&t, strncmp (cad_gate_line (pv, 0), "CAD plan_view", 13) == 0);
-    MPE_CHECK (&t, strstr (cad_gate_line (pv, 0), "parts 3/16") != NULL);
+    MPE_CHECK (&t, strstr (cad_gate_line (pv, 0), "parts 3/64") != NULL);
     MPE_CHECK (&t, strstr (cad_gate_line (pv, 25), "1 cell = 0.25 m") != NULL);
     /* sphere at the origin covers the axis '+' (parts draw last) */
     MPE_CHECK (&t, cad_gate_line (pv, 13) [32] == 'o');
