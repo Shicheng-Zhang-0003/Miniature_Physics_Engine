@@ -138,7 +138,7 @@ int mpe_t_mig_void_compose_core (void); /* MIG WP7 7.0a */
 int mpe_t_mig_void_hook_composite (void); /* MIG WP7 7.0b */
 int mpe_t_cad_editor_model (void);
 int mpe_t_cad_void_model (void); /* MIG WP7 7.0b */
-int mpe_t_scene_save_svf07 (void); /* MIG WP7 7.0b */
+int mpe_t_scene_save_v202_void (void); /* MIG WP7 7.0d */
 int mpe_t_cad_subtract_void (void); /* MIG WP7 7.0c */
 int mpe_t_cad_view_math (void);
 typedef struct {
@@ -349,7 +349,7 @@ static const mpe_entry_t mpe_registry [] = {
     /* MIG WP7 7.0b: SVF07 — a void-bearing composite refuses scene save
      * (v201 cannot express void records; reload would silently recompose
      * it heavier). Material-only composites still save. */
-    {"scene_save_svf07", mpe_t_scene_save_svf07, 0},
+    {"scene_save_v202_void", mpe_t_scene_save_v202_void, 0},
     /* MIG WP7 7.0c: destructive subtract verbs — cad_subtract_box
      * partitions a cube target into up to 6 slabs around a void region,
      * cad_subtract_sphere uses the inscribed cube (disclosed envelope),

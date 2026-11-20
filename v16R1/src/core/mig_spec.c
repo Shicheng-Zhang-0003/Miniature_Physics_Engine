@@ -2,6 +2,7 @@
  * See mig_spec.h for the contract and docs/MIG_SPEC.md for the grammar. */
 #include "core/mig_spec.h"
 #include "core/mpe_diag.h"
+#include "core/mig_mass.h" /* WP7 7.0d: mig_part_void_sphere/cube/cylinder enum values */
 #include <ctype.h>
 #include <errno.h>
 #include <math.h>
@@ -166,7 +167,13 @@ static int tokenize_line (char *line, mig_spec_toks *toks) {
 /* ---- part field parsing ------------------------------------------- */
 
 static int parse_dims (mig_spec_toks *t, mig_spec_part *part) {
-    if (part -> type == 0) { /* sphere: dims radius r */
+    /* WP7 7.0d: void types share their twin's dims rules. Normalize to
+     * the twin type for dims parsing. */
+    int twin = part -> type;
+    if (twin == (int) mig_part_void_sphere) { twin = (int) mig_part_sphere; }
+    else if (twin == (int) mig_part_void_cube) { twin = (int) mig_part_cube; }
+    else if (twin == (int) mig_part_void_cylinder) { twin = (int) mig_part_cylinder; }
+    if (twin == 0) { /* sphere: dims radius r */
         if (t -> count != 3 || strcmp (t -> toks [1], "radius") != 0) {
             return mig_spec_bad_dims;
         }
@@ -299,7 +306,8 @@ static int parse_colour (mig_spec_toks *t, mig_spec_part *part) {
 
 /* ---- normalized emit ---------------------------------------------- */
 
-static const char *types [] = {"sphere", "cube", "cylinder"};
+static const char *types [] = {"sphere", "cube", "cylinder",
+                               "void_sphere", "void_cube", "void_cylinder"};
 
 /* End the current statement line: trailing space -> newline. */
 static size_t emit_stmt_end (char *buf, size_t cap, size_t off) {
@@ -362,14 +370,14 @@ size_t mig_spec_emit_normalized (const mig_spec *spec, char *buf, size_t cap) {
         if (off >= cap) { return cap; }
         off = emit_stmt_end (buf, cap, off);
         if (off >= cap) { return cap; }
-        /* dims */
-        if (p -> type == 0) {
+        /* dims — void types share their twin's dims. */
+        if (p -> type == 0 || p -> type == (int) mig_part_void_sphere) {
             off = emit_word ("dims", buf, cap, off);
             if (off >= cap) { return cap; }
             off = emit_word ("radius", buf, cap, off);
             if (off >= cap) { return cap; }
             off = emit_number (p -> radius, buf, cap, off);
-        } else if (p -> type == 1) {
+        } else if (p -> type == 1 || p -> type == (int) mig_part_void_cube) {
             off = emit_word ("dims", buf, cap, off);
             if (off >= cap) { return cap; }
             off = emit_word ("hx", buf, cap, off);
@@ -572,6 +580,11 @@ int mig_spec_parse_file (const char *path, int max_parts, mig_spec *out) {
             if (strcmp (t.toks [3], "sphere") == 0) { pt = 0; }
             else if (strcmp (t.toks [3], "cube") == 0) { pt = 1; }
             else if (strcmp (t.toks [3], "cylinder") == 0) { pt = 2; }
+            /* MIG WP7 7.0d (grammar v2): void types share their twin's
+             * dims rules; the engine's signed compose subtracts them. */
+            else if (strcmp (t.toks [3], "void_sphere") == 0) { pt = (int) mig_part_void_sphere; }
+            else if (strcmp (t.toks [3], "void_cube") == 0) { pt = (int) mig_part_void_cube; }
+            else if (strcmp (t.toks [3], "void_cylinder") == 0) { pt = (int) mig_part_void_cylinder; }
             else { diag (&c, mig_spec_bad_type, t.toks [3], ""); break; }
             current = (int) idx;
             mig_spec_part *p = &spec.parts [current];

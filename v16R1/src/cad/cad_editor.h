@@ -221,10 +221,10 @@ int cad_select (cad_design *design, int index);
 
 /* Design → mig_spec (name, `frame assembly`, per-part type/dims/pose/
  * mass; no material/colour — the engine stamps body defaults at build).
- * Refuses an empty design (the grammar rejects zero-part files), a
- * name outside the grammar, and — WP7 7.0b — a VOID-BEARING design
- * (cad_void_grammar: the frozen v1 grammar cannot express void
- * records; void persistence is the v202 brick). Write-on-success. */
+ * Refuses an empty design (the grammar rejects zero-part files) and a
+ * name outside the grammar. WP7 7.0d: void-bearing designs CAN be
+ * persisted — the v2 spec grammar expresses void records and the scene
+ * v202 format carries the per-part is_void flag. Write-on-success. */
 int cad_design_to_spec (const cad_design *design, mig_spec *out);
 
 /* Parsed spec → design: validates the part family/dims/quat/mass the

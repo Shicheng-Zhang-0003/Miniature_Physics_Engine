@@ -854,27 +854,25 @@ int mpe_t_composite_roundtrip (void) {
     return t.failures;
 }
 
-/* MIG WP7 7.0b gate (tests/mpe_suite_c.c):
- *   mpe_t_scene_save_svf07 — the void persistence veto: a void-bearing
- *   composite refuses scene save (SVF07, scene NOT saved) because the
- *   v201 format cannot express void records (reload would silently
- *   reinterpret them as material and recompose the body heavier). A
- *   material-only composite still saves fine. The live scene is left
- *   intact either way (SVF convention). */
-int mpe_t_scene_save_svf07 (void) {
+/* MIG WP7 7.0d gate (tests/mpe_suite_c.c):
+ *   mpe_t_scene_save_v202_void — void persistence round trip through the
+ *   scene v202 format. A void-bearing composite saves with the per-part
+ *   is_void flag and reloads with is_void intact — the v201 recomposes-
+ *   heavier trap is closed by the v202 per-part flag, not by refusal. */
+int mpe_t_scene_save_v202_void (void) {
     mpe_test_t t;
-    mpe_test_begin (&t, "scene_save_svf07");
+    mpe_test_begin (&t, "scene_save_v202_void");
     physics_world *w = physics_world_get_primary ();
     physics_world_init (w);
     constraint_pool_init (w);
     const char *tmpd = getenv ("TMPDIR");
     char path [512];
     if (tmpd && tmpd [0])
-        snprintf (path, sizeof (path), "%s/mpe_suite_svf07.dat", tmpd);
+        snprintf (path, sizeof (path), "%s/mpe_suite_v202_void.dat", tmpd);
     else
-        snprintf (path, sizeof (path), "../../temp/mpe_suite_svf07.dat");
+        snprintf (path, sizeof (path), "../../temp/mpe_suite_v202_void.dat");
 
-    /* ---- void-bearing composite: save refused (SVF07) -------------- */
+    /* ---- void-bearing composite: save succeeds (v202) -------------- */
     {
         mig_part parts [2] = {
             { mig_part_cube, 0.0f, 0.0f, {0.5f,0.5f,0.5f}, {0.0f,0.0f,0.0f},
@@ -885,33 +883,34 @@ int mpe_t_scene_save_svf07 (void) {
         const int cb = physics_world_add_composite (w, parts, 2);
         MPE_CHECK (&t, cb == 0);
         MPE_CHECK (&t, w -> bodies [cb].composite_part_count == 2);
-        /* scene save must refuse: void persistence not implemented. */
-        MPE_CHECK (&t, save_scene (path) == 0);
-        /* live scene still intact (SVF convention: fail at save, not load). */
+        MPE_CHECK (&t, w -> composite_parts [1].is_void == 1);
+        /* scene save succeeds: void persistence is implemented (v202). */
+        MPE_CHECK (&t, save_scene (path) != 0);
+        /* live scene intact. */
         MPE_CHECK (&t, w -> body_count == 1 &&
                        w -> bodies [cb].composite_part_count == 2 &&
                        w -> composite_parts [1].is_void == 1);
     }
 
-    /* ---- material-only composite: save succeeds -------------------- */
+    /* ---- round-trip: is_void survives save/load -------------------- */
     {
-        /* clear the void-bearing body, spawn a material-only composite. */
-        physics_world_cleanup (w);
-        physics_world_init (w);
-        constraint_pool_init (w);
-        mig_part parts [2] = {
-            { mig_part_cube, 0.0f, 0.0f, {0.5f,0.5f,0.5f}, {0.0f,0.0f,0.0f},
-              {1.0f,0.0f,0.0f,0.0f}, mig_mass_mode_density, 1000.0f },
-            { mig_part_cube, 0.0f, 0.0f, {0.5f,0.5f,0.5f}, {1.0f,0.0f,0.0f},
-              {1.0f,0.0f,0.0f,0.0f}, mig_mass_mode_density, 1000.0f },
-        };
-        const int cb = physics_world_add_composite (w, parts, 2);
-        MPE_CHECK (&t, cb == 0);
-        MPE_CHECK (&t, save_scene (path) != 0); /* material-only saves fine */
-        /* round-trip still works. */
-        w -> bodies [cb].position = (vector3) {99.0f, 99.0f, 99.0f};
+        /* Reload and verify is_void + mass net survive. Body is at its
+         * COM near origin, so parts are near origin and the bound check
+         * in add_composite passes. */
         MPE_CHECK (&t, scene_loading (path) != 0);
         MPE_CHECK (&t, w -> body_count == 1);
+        rigidbody *rb = physics_world_body_by_id (w, w -> bodies [0].object_id);
+        MPE_CHECK (&t, rb != NULL && rb -> type == object_composite &&
+                       rb -> composite_part_count == 2);
+        if (rb) {
+            MPE_CHECK (&t, w -> composite_parts [rb -> part_base + 0].is_void == 0);
+            MPE_CHECK (&t, w -> composite_parts [rb -> part_base + 1].is_void == 1);
+            /* Net mass: cube (1000 kg) − void sphere (~65.45 kg). */
+            const double m_box = 1000.0 * 1.0 * 1.0 * 1.0;
+            const double m_void = 1000.0 * (4.0 / 3.0) * 3.14159265358979323846 * 0.25 * 0.25 * 0.25;
+            MPE_CHECK_NEAR (&t, rb -> mass, (float) (m_box - m_void), 1e-4f,
+                            "net mass survives round trip");
+        }
         remove (path);
     }
 

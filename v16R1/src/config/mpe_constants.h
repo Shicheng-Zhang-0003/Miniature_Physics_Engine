@@ -45,10 +45,7 @@
  * ------------------------------------------------------------------ */
 #define mpe_magic 0x4D504533 /* "MPE3" */
 #define mpe_version                                                                                                    \
-    201 /* v201: v200 + composite-bodies section (MIG WP3). v200 files
-                         * keep loading through the same sectioned reader (no
-                         * composite section; type 4 still vetoed). v153 and
-                         * older keep their native-order legacy reader. */
+    202 /* v202: v201 + per-part is_void flag on composite part slices            * (MIG WP7 7.0d). v201 and v200 files keep loading through the            * same sectioned reader (no is_void field; all parts material).           * v202 saves void-bearing composites faithfully. */
 /* ------------------------------------------------------------------
  * VALIDATION — built-in test durations
  * ------------------------------------------------------------------ */

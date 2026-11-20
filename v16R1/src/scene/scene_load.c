@@ -14,6 +14,7 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 /* DESPOT-2026-09-26: legacy (<=v153) structs were written native-order.
  * This is LE-exact because scene_saving.c hard-fails compilation on
  * big-endian hosts (#error), so native == LE on every buildable target.
@@ -587,17 +588,52 @@ static int scene_loading_sectioned (FILE *f, uint32_t header_crc, int32_t versio
                 comps_ok = comps_ok && scene_rfloat (f, &crc, &p_fs);
                 comps_ok = comps_ok && scene_rfloat (f, &crc, &p_fk);
                 comps_ok = comps_ok && scene_rfloat (f, &crc, &p_rest);
+                /* MIG WP7 7.0d (scene v202): per-part is_void flag.
+                 * v201 and older files have no such field; reading it
+                 * here keeps the stream aligned for v202+. The type
+                 * field already encodes void-ness (void_* >= 3), so
+                 * the flag is a consistency copy, not the source of
+                 * truth. */
+                uint32_t p_void = 0u;
+                if (version >= 202) {
+                    comps_ok = comps_ok && scene_r32 (f, &crc, &p_void);
+                    }
+                /* WP7 7.0d: restore void type from the is_void flag — the
+                 * save writes the twin type (sphere/cube/cylinder) with
+                 * is_void=1 for void records. */
+                if (version >= 202 && p_void) {
+                    if (pt_u == (uint32_t) mig_part_sphere) { pt_u = (uint32_t) mig_part_void_sphere; }
+                    else if (pt_u == (uint32_t) mig_part_cube) { pt_u = (uint32_t) mig_part_void_cube; }
+                    else if (pt_u == (uint32_t) mig_part_cylinder) { pt_u = (uint32_t) mig_part_void_cylinder; }
+                }
                 if (!comps_ok) { break; }
                 double pq2 = (double) p_ori.w * p_ori.w + (double) p_ori.x * p_ori.x +
                              (double) p_ori.y * p_ori.y + (double) p_ori.z * p_ori.z;
                 bool dims_ok = false;
+                bool is_void_type = (pt_u >= (uint32_t) mig_part_void_sphere);
                 if (pt_u == (uint32_t) mig_part_sphere) { dims_ok = (p_radius > 0.0f); }
                 else if (pt_u == (uint32_t) mig_part_cylinder) { dims_ok = (p_radius > 0.0f) && (p_half_len > 0.0f); }
                 else if (pt_u == (uint32_t) mig_part_cube) {
                     dims_ok = (p_he.x > 0.0f) && (p_he.y > 0.0f) && (p_he.z > 0.0f);
                 }
-                if ((pt_u > (uint32_t) mig_part_cylinder) || !dims_ok || (pq2 <= 1e-12) ||
-                    !isfinite (p_mass) || (p_mass < 0.0f) || !isfinite (p_fs) || !isfinite (p_fk) ||
+                else if (is_void_type) {
+                    /* Void types share their twin's dims rules. */
+                    uint32_t twin = pt_u - (uint32_t) mig_part_void_sphere;
+                    if (twin == 0u) { dims_ok = (p_radius > 0.0f); }                 /* void_sphere */
+                    else if (twin == 1u) { dims_ok = (p_he.x > 0.0f) && (p_he.y > 0.0f) && (p_he.z > 0.0f); } /* void_cube */
+                    else if (twin == 2u) { dims_ok = (p_radius > 0.0f) && (p_half_len > 0.0f); } /* void_cylinder */
+                    else { dims_ok = false; }
+                }
+                /* v202 accepts void types (3-5); v201 and older reject
+                 * anything outside the primitive family (0-2). */
+                uint32_t max_type = (version >= 202) ? (uint32_t) mig_part_void_cylinder : (uint32_t) mig_part_cylinder;
+                /* Void parts carry NEGATIVE effective mass (the
+                 * subtraction), so allow negative mass only for void
+                 * types; material parts must stay non-negative. */
+                if (pt_u > max_type || !dims_ok || (pq2 <= 1e-12) ||
+                    !isfinite (p_mass) ||
+                    (!is_void_type && p_mass < 0.0f) ||
+                    !isfinite (p_fs) || !isfinite (p_fk) ||
                     !isfinite (p_rest) || fabsf (p_pos.x) > 1e6f || fabsf (p_pos.y) > 1e6f ||
                     fabsf (p_pos.z) > 1e6f) {
                     comps_ok = 0;
@@ -610,8 +646,30 @@ static int scene_loading_sectioned (FILE *f, uint32_t header_crc, int32_t versio
                 mp -> half_extensions = p_he;
                 mp -> position = p_pos;
                 mp -> orientation = vector4_normalisation (p_ori);
-                mp -> mass_mode = mig_mass_mode_explicit;
-                mp -> mass = p_mass;
+                /* WP7 7.0d: void parts carry NEGATIVE effective mass in
+                 * the pool. mig_part_mass requires density mode for void
+                 * types and returns -density * volume, so restore density
+                 * = |mass| / volume so the negated effective mass matches
+                 * the saved value. Material parts use explicit mode with
+                 * the saved mass directly. */
+                if (is_void_type) {
+                    float volume;
+                    uint32_t twin = pt_u - (uint32_t) mig_part_void_sphere;
+                    if (twin == 0u) { /* void_sphere */
+                        volume = 4.0f / 3.0f * 3.14159265358979323846f *
+                                 p_radius * p_radius * p_radius;
+                    } else if (twin == 1u) { /* void_cube */
+                        volume = 8.0f * p_he.x * p_he.y * p_he.z;
+                    } else { /* void_cylinder */
+                        volume = 3.14159265358979323846f *
+                                 p_radius * p_radius * (2.0f * p_half_len);
+                    }
+                    mp -> mass_mode = mig_mass_mode_density;
+                    mp -> mass = volume > 0.0f ? fabsf (p_mass) / volume : 1.0f;
+                } else {
+                    mp -> mass_mode = mig_mass_mode_explicit;
+                    mp -> mass = p_mass;
+                }
                 sc -> fric_s [pi] = p_fs;
                 sc -> fric_k [pi] = p_fk;
                 sc -> rest_e [pi] = p_rest;
@@ -869,9 +927,11 @@ int scene_loading (const char *file_source_path) {
         return 0;
     } int32_t version = (int32_t) version_le;
     int32_t count = 0;
-    if ((version == 200) || (version == 201)) {
+    if ((version == 200) || (version == 201) || (version == 202)) {
         /* v200 and v201 share the sectioned reader; 201 adds the
-         * composite-bodies section and accepts type tag 4. */
+         * composite-bodies section and accepts type tag 4. 202 adds the
+         * per-part is_void flag on composite part slices and void part
+         * types (void_sphere/cube/cylinder). */
         int sectioned_result = scene_loading_sectioned (f, header_crc, version);
         fclose (f);
         return sectioned_result;

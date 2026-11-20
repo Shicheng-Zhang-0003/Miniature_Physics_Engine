@@ -616,17 +616,10 @@ int cad_design_to_spec (const cad_design *design, mig_spec *out) {
     if ((!design) || (!out)) { return cad_null; }
     if (design -> count <= 0) { return cad_empty; }
     if (!cad_name_legal (design -> name)) { return cad_bad_name; }
-    /* WP7 7.0b: the frozen v1 grammar cannot express void records (the
-     * parser refuses any type outside the primitive family), so a
-     * void-bearing design must not go NEAR the emitter — a silent
-     * material reinterpretation would be the exact v201 trap the scene
-     * veto guards. Refuse loudly, write-on-success holds (nothing was
-     * written). */
-    for (int i = 0; i < design -> count; i++) {
-        if (design -> parts [i].type >= mig_part_void_sphere) {
-            return cad_void_grammar;
-        }
-    }
+    /* WP7 7.0d: void-bearing designs CAN now be persisted — the v2 spec
+     * grammar expresses void records (void_sphere/void_cube/void_cylinder)
+     * and the scene v202 format carries the per-part is_void flag. The
+     * cad_void_grammar refusal from 7.0b is lifted. */
     /* Write-on-success: build the whole spec in a local first — a late
      * part refusal in the loop must leave *out untouched, not hand the
      * caller a half-written spec. */

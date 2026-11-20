@@ -847,7 +847,7 @@ int mpe_t_cad_void_model (void) {
         MPE_CHECK (&t, cad_set_dims_sphere (&d, 1, 0.5f) == cad_bad_type);
     }
 
-    /* ---- 4. cad_design_to_spec refuses void-bearing ----------------- */
+    /* ---- 4. cad_design_to_spec accepts void-bearing (v2 grammar) ------ */
     {
         cad_design d;
         cad_design_init (&d);
@@ -855,10 +855,14 @@ int mpe_t_cad_void_model (void) {
         MPE_CHECK (&t, cad_add_void_sphere (&d, 0.25f, (vector3) {0.0f, 0.0f, 0.0f}) == cad_ok);
         mig_spec spec;
         memset (&spec, 0, sizeof (spec));
-        MPE_CHECK (&t, cad_design_to_spec (&d, &spec) == cad_void_grammar);
-        /* write-on-success: *out untouched on refusal (all zeros). */
-        MPE_CHECK (&t, spec.count == 0 && spec.name [0] == '\0');
-        /* material-only design still goes through (grammar unaffected). */
+        /* WP7 7.0d: void-bearing designs can now be persisted — the v2
+         * grammar expresses void records. */
+        MPE_CHECK (&t, cad_design_to_spec (&d, &spec) == cad_ok);
+        /* Written spec carries the void record. */
+        MPE_CHECK (&t, spec.count == 1 &&
+                       spec.parts [0].type == (int) mig_part_void_sphere &&
+                       spec.parts [0].radius == 0.25);
+        /* Material-only design still goes through (grammar unaffected). */
         cad_design m;
         cad_design_init (&m);
         MPE_CHECK (&t, cad_set_name (&m, "mat") == cad_ok);
