@@ -141,6 +141,7 @@ int mpe_t_cad_void_model (void); /* MIG WP7 7.0b */
 int mpe_t_scene_save_v202_void (void); /* MIG WP7 7.0d */
 int mpe_t_cad_subtract_void (void); /* MIG WP7 7.0c */
 int mpe_t_cad_view_math (void);
+int mpe_t_cad_wp8_model (void); /* MIG WP8 */
 typedef struct {
     const char *name;
     int (*fn) (void);
@@ -366,6 +367,7 @@ static const mpe_entry_t mpe_registry [] = {
      * precedent) — the math that decides which part you clicked must
      * not be. */
     {"cad_view_math", mpe_t_cad_view_math, 0},
+    {"cad_wp8_model", mpe_t_cad_wp8_model, 0},
 };
 #define MPE_NTESTS ((int) (sizeof (mpe_registry) / sizeof (mpe_registry [0])))
 /* Returns 0 pass, 1 fail, 2 skipped.

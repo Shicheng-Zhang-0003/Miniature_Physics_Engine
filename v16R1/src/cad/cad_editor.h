@@ -41,7 +41,22 @@
  * coordinate trig ban is untouched. The suite gate pins every contract
  * below, including the round-trip bitwise rule (float→spec double→
  * shortest-round-trip text→double→float is lossless).
+ *
+ * WP8 additions:
+ *   - Multi-level undo/redo stack (CAD_UNDO_DEPTH snapshots).
+ *   - Selection groups: each part carries a group_id; parts sharing a
+ *     group id are operated on together by group-aware verbs (move,
+ *     set_position, rotate_degrees, set_mass, set_dims_*, mirror,
+ *     etc.). Groups are created by cad_group() and destroyed by
+ *     cad_ungroup().
+ *   - Mirror: mirror parts across XY/YZ/XZ planes through the origin.
+ *   - Alignment: align selected parts along an axis (min/center/max),
+ *     distribute evenly between min and max.
+ *   - Copy/paste: clipboard holds a part list; paste appends copies.
+ *   - Part properties: per-part color (vector3), per-part name tag.
+ *   - Measurement: distance between two parts' centers.
  */
+
 #ifndef cad_editor_h
 #define cad_editor_h
 #include "../core/math3d.h"
@@ -54,6 +69,11 @@
  * caller's max_parts through, so a world configured for a smaller cap
  * can refuse oversized designs at load time, not at build time. */
 #define CAD_MAX_PARTS MIG_SPEC_MAX_PARTS
+
+/* Undo/redo depth. One snapshot per mutating verb; the stack is
+ * caller-owned (static storage in cad_editor.c), so the design struct
+ * itself stays small. */
+#define CAD_UNDO_DEPTH 16
 
 /* Typed adds (sphere/cube/cylinder) author parts at water density;
  * cad_set_mass rewrites either mode. The model never reads g_cfg. */
@@ -87,8 +107,14 @@ typedef enum {
                              * (the void ate all the material) */
     cad_not_pd = 16,        /* compose inertia not positive-definite
                              * (mis-placed / oversized void) */
-    cad_void_grammar = 17   /* to_spec: the frozen v1 grammar cannot
+    cad_void_grammar = 17, /* to_spec: the frozen v1 grammar cannot
                              * express void records — design refused */
+    /* WP8 appends (append-only): */
+    cad_undo_empty = 18,    /* undo stack empty — nothing to undo */
+    cad_redo_empty = 19,    /* redo stack empty — nothing to redo */
+    cad_clipboard_empty = 20, /* clipboard empty — nothing to paste */
+    cad_group_empty = 21,   /* selected part's group has no members */
+    cad_group_full = 22,    /* too many distinct groups (cap 32) */
 } cad_err;
 
 /* The design record. Parts keep ASSEMBLY-frame poses — the frame the
@@ -104,12 +130,25 @@ typedef struct {
     int selected;    /* -1 = nothing selected */
     float snap_step; /* metres; 0 = position snapping off */
     float rot_snap_deg; /* degrees; 0 = free rotation */
+    /* WP8: per-part group id (-1 = ungrouped). Parts sharing a group id
+     * are operated on together by group-aware verbs (move,
+     * set_position, rotate_degrees, set_mass, set_dims_*, mirror,
+     * etc.). Groups are created by cad_group() and destroyed by
+     * cad_ungroup(). */
+    int group_id [CAD_MAX_PARTS];
+    /* WP8: per-part color (authoring only; the engine stamps body-level
+     * materials at build). Default is (0.5, 0.5, 0.5) gray. */
+    vector3 part_color [CAD_MAX_PARTS];
+    /* WP8: per-part name tag (empty string = unnamed). Used for
+     * identification in the plan view and status line. */
+    char part_name [CAD_MAX_PARTS][MIG_SPEC_NAME_LEN];
 } cad_design;
 
 /* ---- lifecycle ---- */
 
 /* Zeroes everything: count 0, max_parts CAD_MAX_PARTS, name "",
- * selected -1, both snaps 0 (free). No calloc needed — plain struct. */
+ * selected -1, both snaps 0 (free). All group_ids -1, all colors
+ * default gray, all part names empty. No calloc needed — plain struct. */
 void cad_design_init (cad_design *design);
 
 /* Design name: the spec grammar's charset ([A-Za-z0-9_-], 1..63 bytes)
@@ -142,7 +181,9 @@ int cad_add_void_cylinder (cad_design *design, float radius, float half_length,
 int cad_add_part (cad_design *design, const mig_part *part);
 
 /* Remove + shift down (count-1). selected adjusts to stay on the same
- * part (or drops to -1 past the end). */
+ * part (or drops to -1 past the end). If the removed part belongs to a
+ * group, the group id is cleared for all remaining members (group
+ * becomes empty if only member was removed). */
 int cad_delete (cad_design *design, int index);
 
 /* Copy part `index` to the END with `offset` (snapped) added to its
@@ -204,6 +245,73 @@ int cad_subtract_sphere (cad_design *design, int target_index,
  * cad_bad_arg if nothing to undo. Only one level of undo is kept. */
 int cad_undo (cad_design *design);
 
+/* ---- WP8: multi-level undo/redo ------------------------------------
+ * cad_undo_push saves the current design onto the undo stack (called
+ * automatically by every mutating verb). cad_undo_multi restores the
+ * most recent snapshot and pushes the current one onto the redo stack.
+ * cad_redo_multi restores the most recent redo snapshot and pushes the
+ * current one onto the undo stack. Both are write-on-success: the
+ * design is untouched on refusal. The undo stack depth is
+ * CAD_UNDO_DEPTH; pushing past the depth discards the oldest entry. */
+int cad_undo_push (cad_design *design);
+int cad_undo_multi (cad_design *design);
+int cad_redo_multi (cad_design *design);
+
+/* ---- WP8: selection groups -----------------------------------------
+ * Group operations let the shell act on multiple parts at once.
+ * cad_group assigns the selected part (via design->selected — only one
+ * selection at a time in the model; group membership is per-part) to a
+ * new group id and returns that id. cad_ungroup clears the group id
+ * from the selected part's group members. cad_group_members returns the
+ * count of parts sharing the same group as part `index`.
+ * Group id 0 is reserved (ungrouped = -1). Group ids are recycled. */
+int cad_group (cad_design *design);
+int cad_ungroup (cad_design *design);
+int cad_group_members (const cad_design *design, int index);
+
+/* ---- WP8: mirror ---------------------------------------------------
+ * Mirror selected parts across a cardinal plane through the origin:
+ * plane 0 = YZ (negate X), plane 1 = XZ (negate Y), plane 2 = XY
+ * (negate Z). Applies to the selected part and all its group members.
+ * Returns cad_ok if at least one part was mirrored, cad_bad_arg for
+ * invalid plane, cad_bad_index if nothing selected. */
+int cad_mirror (cad_design *design, int plane);
+
+/* ---- WP8: alignment ------------------------------------------------
+ * Align selected parts along axis (0=x,1=y,2=z) to mode:
+ *   0 = min (all parts' min face aligns to the global min)
+ *   1 = center (all parts' center aligns to the mean center)
+ *   2 = max (all parts' max face aligns to the global max)
+ * Distribute spaces parts evenly between the global min and max
+ * along axis. Both operate on the selected part and its group
+ * members. Returns cad_ok on success. */
+int cad_align (cad_design *design, int axis, int mode);
+int cad_distribute (cad_design *design, int axis);
+
+/* ---- WP8: copy/paste -----------------------------------------------
+ * cad_copy copies the selected part (and its group members) into the
+ * module's clipboard. cad_paste appends clipboard contents to the
+ * design, offset by `offset` (snapped). The clipboard persists across
+ * calls until overwritten by a new copy. */
+int cad_copy (cad_design *design);
+int cad_paste (cad_design *design, vector3 offset);
+
+/* ---- WP8: part properties ------------------------------------------
+ * Per-part color (authoring only; not persisted to spec grammar —
+ * engine stamps body-level materials at build). Default is (0.5,0.5,0.5).
+ * Per-part name tag (empty = unnamed). Both persist through the spec
+ * grammar as part-level fields (color as `color r g b`, name as
+ * `name <text>` — v2 grammar extension). */
+int cad_set_part_color (cad_design *design, int index, vector3 color);
+int cad_get_part_color (const cad_design *design, int index, vector3 *color);
+int cad_set_part_name (cad_design *design, int index, const char *name);
+int cad_get_part_name (const cad_design *design, int index, char *buf, int cap);
+
+/* ---- WP8: measurement ----------------------------------------------
+ * Returns the distance between the centers of parts `a` and `b`.
+ * Returns -1.0f on bad index. */
+float cad_measure_distance (const cad_design *design, int a, int b);
+
 /* Snap every part position to snap_step multiples (axis-wise). A
  * no-op while snap_step is 0; refuses cad_bad_arg for step <= 0
  * through cad_set_snap (below). */
@@ -244,7 +352,7 @@ int cad_save (const cad_design *design, const char *path);
  * passes spec_err_out). */
 int cad_load (cad_design *design, const char *path, int max_parts, int *spec_err_out);
 
-/* ---- the engine seam ---- */
+/* ---- the engine seam -------------------------------------------------- */
 
 /* mig_make_bridge over the design — WP7 7.0b: the routing is
  * void-aware. A MATERIAL-ONLY design keeps the untouched

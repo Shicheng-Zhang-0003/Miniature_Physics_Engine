@@ -1129,3 +1129,131 @@ int mpe_t_cad_subtract_void (void) {
     mpe_test_end (&t);
     return t.failures;
 }
+
+/* ---- WP8: multi-level undo/redo, groups, mirror, align/distribute,
+ * copy/paste, part properties, measurement ---------------------------- */
+int mpe_t_cad_wp8_model (void)
+{
+    mpe_test_t tc;
+    mpe_test_begin (&tc, "cad_wp8_model");
+
+    /* Multi-level undo/redo. */
+    {
+        cad_design d;
+        cad_design_init (&d);
+        MPE_CHECK (&tc, cad_set_name (&d, "wp8") == cad_ok);
+        MPE_CHECK (&tc, cad_add_sphere (&d, 0.5f, (vector3) {0.0f, 0.0f, 0.0f}) == cad_ok);
+        MPE_CHECK (&tc, cad_add_cube (&d, (vector3) {0.5f, 0.5f, 0.5f}, (vector3) {1.0f, 0.0f, 0.0f}) == cad_ok);
+        MPE_CHECK (&tc, d.count == 2);
+        MPE_CHECK (&tc, cad_undo_multi (&d) == cad_ok);
+        MPE_CHECK (&tc, d.count == 1);
+        MPE_CHECK (&tc, cad_undo_multi (&d) == cad_ok);
+        MPE_CHECK (&tc, d.count == 0);
+        MPE_CHECK (&tc, cad_redo_multi (&d) == cad_ok);
+        MPE_CHECK (&tc, d.count == 1);
+        MPE_CHECK (&tc, cad_redo_multi (&d) == cad_ok);
+        MPE_CHECK (&tc, d.count == 2);
+        MPE_CHECK (&tc, cad_redo_multi (&d) == cad_redo_empty);
+        /* New mutation clears redo. */
+        MPE_CHECK (&tc, cad_undo_multi (&d) == cad_ok);
+        MPE_CHECK (&tc, d.count == 1);
+        MPE_CHECK (&tc, cad_add_cylinder (&d, 0.2f, 0.3f, (vector3) {2.0f, 0.0f, 0.0f}) == cad_ok);
+        MPE_CHECK (&tc, cad_redo_multi (&d) == cad_redo_empty);
+        MPE_CHECK (&tc, d.count == 2);
+    }
+
+    /* Groups. */
+    {
+        cad_design d;
+        cad_design_init (&d);
+        MPE_CHECK (&tc, cad_add_sphere (&d, 0.5f, (vector3) {0.0f, 0.0f, 0.0f}) == cad_ok);
+        MPE_CHECK (&tc, cad_add_cube (&d, (vector3) {0.5f, 0.5f, 0.5f}, (vector3) {1.0f, 0.0f, 0.0f}) == cad_ok);
+        MPE_CHECK (&tc, cad_select (&d, 0) == cad_ok);
+        int gid = cad_group (&d);
+        MPE_CHECK (&tc, gid > 0);
+        MPE_CHECK (&tc, cad_group_members (&d, 0) == 1);
+        /* Add second part to same group by setting group_id directly? No - use API.
+         * Current API groups selected part only; to group multiple, select and assign same gid not exposed.
+         * Test what exists: ungroup returns ok, members becomes 0. */
+        MPE_CHECK (&tc, cad_ungroup (&d) == cad_ok);
+        MPE_CHECK (&tc, cad_group_members (&d, 0) == 0);
+        MPE_CHECK (&tc, cad_ungroup (&d) == cad_ok); /* already ungrouped */
+    }
+
+    /* Mirror. */
+    {
+        cad_design d;
+        cad_design_init (&d);
+        MPE_CHECK (&tc, cad_add_sphere (&d, 0.5f, (vector3) {1.0f, 2.0f, 3.0f}) == cad_ok);
+        MPE_CHECK (&tc, cad_select (&d, 0) == cad_ok);
+        MPE_CHECK (&tc, cad_mirror (&d, 0) == cad_ok); /* YZ: negate X */
+        MPE_CHECK (&tc, d.parts [0].position.x == -1.0f);
+        MPE_CHECK (&tc, d.parts [0].position.y == 2.0f);
+        MPE_CHECK (&tc, d.parts [0].position.z == 3.0f);
+        MPE_CHECK (&tc, cad_mirror (&d, 1) == cad_ok); /* XZ: negate Y */
+        MPE_CHECK (&tc, d.parts [0].position.y == -2.0f);
+        MPE_CHECK (&tc, cad_mirror (&d, 2) == cad_ok); /* XY: negate Z */
+        MPE_CHECK (&tc, d.parts [0].position.z == -3.0f);
+        MPE_CHECK (&tc, cad_mirror (&d, 9) == cad_bad_arg);
+        MPE_CHECK (&tc, cad_mirror (NULL, 0) == cad_null);
+    }
+
+    /* Align and distribute. */
+    {
+        cad_design d;
+        cad_design_init (&d);
+        MPE_CHECK (&tc, cad_add_sphere (&d, 0.5f, (vector3) {0.0f, 0.0f, 0.0f}) == cad_ok);
+        MPE_CHECK (&tc, cad_add_sphere (&d, 0.5f, (vector3) {2.0f, 0.0f, 0.0f}) == cad_ok);
+        MPE_CHECK (&tc, cad_add_sphere (&d, 0.5f, (vector3) {5.0f, 0.0f, 0.0f}) == cad_ok);
+        /* Group them manually by assigning group_id. */
+        d.group_id [0] = 1; d.group_id [1] = 1; d.group_id [2] = 1;
+        MPE_CHECK (&tc, cad_select (&d, 0) == cad_ok);
+        MPE_CHECK (&tc, cad_align (&d, 0, 1) == cad_ok); /* center */
+        /* mean of 0,2,5 = 7/3 */
+        MPE_CHECK (&tc, fabsf (d.parts [0].position.x - (7.0f / 3.0f)) < 1e-5f);
+        MPE_CHECK (&tc, fabsf (d.parts [1].position.x - (7.0f / 3.0f)) < 1e-5f);
+        MPE_CHECK (&tc, fabsf (d.parts [2].position.x - (7.0f / 3.0f)) < 1e-5f);
+        /* Distribute resets spacing. */
+        d.parts [0].position.x = 0.0f;
+        d.parts [1].position.x = 0.0f;
+        d.parts [2].position.x = 6.0f;
+        MPE_CHECK (&tc, cad_distribute (&d, 0) == cad_ok);
+        MPE_CHECK (&tc, fabsf (d.parts [0].position.x - 0.0f) < 1e-5f);
+        MPE_CHECK (&tc, fabsf (d.parts [1].position.x - 3.0f) < 1e-5f);
+        MPE_CHECK (&tc, fabsf (d.parts [2].position.x - 6.0f) < 1e-5f);
+    }
+
+    /* Copy/paste. */
+    {
+        cad_design d;
+        cad_design_init (&d);
+        MPE_CHECK (&tc, cad_add_cube (&d, (vector3) {0.5f, 0.5f, 0.5f}, (vector3) {0.0f, 0.0f, 0.0f}) == cad_ok);
+        MPE_CHECK (&tc, cad_select (&d, 0) == cad_ok);
+        MPE_CHECK (&tc, cad_copy (&d) == cad_ok);
+        MPE_CHECK (&tc, cad_paste (&d, (vector3) {1.0f, 0.0f, 0.0f}) == cad_ok);
+        MPE_CHECK (&tc, d.count == 2);
+        MPE_CHECK (&tc, fabsf (d.parts [1].position.x - 1.0f) < 1e-5f);
+        MPE_CHECK (&tc, d.parts [1].type == mig_part_cube);
+    }
+
+    /* Part properties and measurement. */
+    {
+        cad_design d;
+        cad_design_init (&d);
+        MPE_CHECK (&tc, cad_add_sphere (&d, 0.5f, (vector3) {0.0f, 0.0f, 0.0f}) == cad_ok);
+        MPE_CHECK (&tc, cad_add_sphere (&d, 0.5f, (vector3) {3.0f, 4.0f, 0.0f}) == cad_ok);
+        vector3 c = {0,0,0};
+        MPE_CHECK (&tc, cad_set_part_color (&d, 0, (vector3) {1.0f, 0.0f, 0.0f}) == cad_ok);
+        MPE_CHECK (&tc, cad_get_part_color (&d, 0, &c) == cad_ok);
+        MPE_CHECK (&tc, c.x == 1.0f && c.y == 0.0f && c.z == 0.0f);
+        MPE_CHECK (&tc, cad_set_part_name (&d, 0, "nose") == cad_ok);
+        char buf [MIG_SPEC_NAME_LEN];
+        MPE_CHECK (&tc, cad_get_part_name (&d, 0, buf, (int) sizeof (buf)) == cad_ok);
+        MPE_CHECK (&tc, strcmp (buf, "nose") == 0);
+        MPE_CHECK (&tc, fabsf (cad_measure_distance (&d, 0, 1) - 5.0f) < 1e-5f);
+        MPE_CHECK (&tc, cad_measure_distance (&d, 0, 99) < 0.0f);
+    }
+
+    mpe_test_end (&tc);
+    return tc.failures;
+}

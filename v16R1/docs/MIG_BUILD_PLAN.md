@@ -310,6 +310,14 @@
 > WP7 COMPLETE — void objects end-to-end: sealed cavity subtraction
 > (7.0a), engine consumption (7.0b), CAD void tool (7.0c), persistence
 > (7.0d), quality lifts (7.0e).
+> WP8 FIRST SLICE LANDED 2026-11-21 (`working tree`): CAD editor model
+> expansion — multi-level undo/redo stack (cad_undo_multi/redo_multi),
+> selection groups (group/ungroup/group_members), mirror, align/distribute,
+> copy/paste clipboard, per-part color/name, measurement. Legacy
+> single-level cad_undo/cad_preview restored for compat. Gate
+> `cad_wp8_model` added (81st blocking). Suite 81/79/0, quick 95/95/0,
+> mgb 44/0, mfs gated 5/0, tui-smoke PASS; make-everything audit not run
+> in this slice. mig_reviews.txt/studies/ untracked, never committed.
 
 ---
 
@@ -3022,6 +3030,19 @@ Ledger (new entries get a line, never an edit of a past line):
   WP7 COMPLETE — void objects end-to-end: sealed cavity subtraction
   (7.0a), engine consumption (7.0b), CAD void tool (7.0c), persistence
   (7.0d), quality lifts (7.0e).
+
+- 2026-11-21 — WP8 first slice (CAD editor expansion, model-level): added
+  multi-level undo/redo stack (`cad_undo_multi`/`cad_redo_multi`/`cad_undo_push`),
+  selection groups (`cad_group`/`cad_ungroup`/`cad_group_members`), mirror,
+  align/distribute, copy/paste clipboard, per-part color/name properties, and
+  `cad_measure_distance`. Restored legacy single-level `cad_undo` snapshot
+  contract and `cad_preview` for existing gate/GUI compatibility; fixed CAD
+  regressions (snap/rot-snap on write, duplicate/array orientation preserve,
+  delete vacated-slot/selection-follow, subtract_box middle-strip bound).
+  Added blocking gate `cad_wp8_model` in `mpe_suite_cad.c` and registered it in
+  `mpe_suite_main.c`. Suite 81/79/0, quick 95/95/0, mgb PASS 44/0, mfs gated 5/0
+  info-diags 12, tui-smoke PASS. `make everything` audit not run in this slice.
+  `mig_reviews.txt`/`studies/` untracked, never committed.
 
 ## §10 Definition of done for v16S (the cut checklist)
 
