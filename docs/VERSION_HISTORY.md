@@ -1,5 +1,21 @@
 # Version History
 
+- **v16R1 head — 2026-11-21: WP8 CAD editor model first slice (active).**
+  Landed CAD model expansion in `v16R1/src/cad/`: multi-level undo/redo,
+  selection groups, mirror, align/distribute, copy/paste clipboard, per-part
+  color/name properties, and measurement. Restored legacy single-level
+  `cad_undo`/`cad_preview` compatibility and fixed CAD regressions
+  (snap/rot-snap, duplicate/array orientation, delete selection/follow,
+  subtract_box bound). Added blocking gate `cad_wp8_model`; suite 81/79/0,
+  quick 95/95/0, mgb 44/0, mfs gated 5/0, tui-smoke PASS. `make everything`
+  audit not run in this slice. See `v16R1/docs/MIG_BUILD_PLAN.md` STATUS LINE
+  and §9.
+
+- **v16R1 — 2026-11-19: WP7 void objects complete (7.0a–7.0e).**
+  Sealed cavity subtraction, engine consumption, CAD void tool, scene v202
+ /spec v2 void persistence, hull ring pieces, and part cap 16→64. See
+  MIG_BUILD_PLAN §9.
+
 - **v16R1 — 2026-10-25: train opened — the working head is officially v16R1.**
   The v15S official release committed the stable tree as-is; this head
   re-opens under the v16R1 train. The source tree itself is renamed

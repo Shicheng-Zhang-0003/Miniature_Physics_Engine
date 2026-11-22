@@ -143,6 +143,41 @@ Mass, radius, and friction open a text input dialog. Immovable objects have zero
 
 ---
 
+## CAD Editor (MIG Design Model)
+
+The CAD editor is a headless design model for MIG composite bodies in
+`v16R1/src/cad/`, with a GTK4 window in `v16R1/src/ui_input/cad_window.c` and
+page-driven numeric menus in `v16R1/src/ui_input/cad_menus.c` (model-level
+first).
+
+**Current capabilities (WP8 first slice, model/API + menu driver):**
+- Typed part adds (sphere/cube/cylinder, plus void subtraction verbs),
+  transforms (move/set_position, rotate degrees, snap, duplicate/array),
+  delete/selection semantics.
+- Multi-level undo/redo (`cad_undo_multi`/`cad_redo_multi`), selection
+  groups, mirror, align/distribute, copy/paste clipboard, per-part color/name
+  properties, and distance measurement.
+- Build seam: `cad_build` composes through MIG bridge; void-aware designs
+  route through `mig_void_make_bridge`.
+- Persistence: frozen MIG spec grammar save/load for supported spec fields.
+- Menus (first slice): keys 7/8/9 are CAD pages (engine derived — each number
+  can open a menu). 7 = selection/placement (1=next, 2=prev, 3=clear,
+  0=place@0, G/J/L move X/Y/Z, 4=del, 5=dup@0, 7=close);
+  8 = add/transform (1=sphere, 2=cube, 3=cylinder, 4-8 transform, 9=page 9,
+  0=root); 9 = group/clipboard (1=undo, 2=redo, 3=group, 4=ungroup, 5=members,
+  6=copy, 7=paste, 8=measure, 9=mass, 0=root). Numeric verbs are model/API;
+  GUI/TUI wiring for all menu rows follows later.
+
+**Current limits:**
+- WP8 model verbs are API-level in this slice; GUI/TUI wiring for
+  group/mirror/align/clipboard/properties/measurement is not complete.
+- Per-part color/name/group are not yet persisted by frozen spec grammar
+  (v2 void grammar exists; color/name/group need explicit format decision).
+- `make everything` audit not run in the WP8 first-slice commit.
+
+See `v16R1/docs/MIG_BUILD_PLAN.md`, `v16R1/docs/MIG_SPEC.md`, and
+`cad/cad_editor.h` for contracts.
+
 ## Debug Terminal
 
 In Debug Mode, press `1` to open the **POSIX-style debug terminal**. In Game Mode the terminal is read-only; mutating commands require Debug Mode.
@@ -655,18 +690,22 @@ vibration — because staged bodies are static and bonds carry `k = 0`. See
 pointer warping); the mouse locks via cursor capture and works under both
 Wayland and X11 sessions.
 
-**Scene format:** v201 saves bodies (stable IDs, sleep, damping) plus spring and revolute/fixed/distance/prismatic/rope joints and the WP3 composite part-slice section, with CRC32 footer and atomic write. Fixed/distance/prismatic/rope have no in-engine creation UI yet (solver + persistence + TUI only). Hull bodies are refused by scene save (SVF06). Files v130/v140/v150/v151/v152/v153/v200 load via the legacy/sectioned readers. Truth labels: `world.drag` is linear-viscous (not quadratic aero); `nice_value`/`angular_damping_scale` are NON-PHYSICAL settle tools (0/1.0 = truth); `sleep.enable=0` runs sleepless truth validation; boundary walls are a plastic safety net, not material contact.
+**Scene format:** v201 saves bodies (stable IDs, sleep, damping) plus spring and revolute/fixed/distance/prismatic/rope joints and composite part-slice section; v202 adds per-part `is_void` for void-bearing composites. CRC32 footer and atomic write. Fixed/distance/prismatic/rope have no in-engine creation UI yet (solver + persistence + TUI only). Hull bodies are refused by scene save (SVF06). Legacy v130/v140/v150/v151/v152/v153/v200 load via legacy/sectioned readers. Truth labels: `world.drag` is linear-viscous (not quadratic aero); `nice_value`/`angular_damping_scale` are NON-PHYSICAL settle tools (0/1.0 = truth); `sleep.enable=0` runs sleepless truth validation; boundary walls are a plastic safety net, not material contact.
+
+**CAD/WP8:** CAD editor model has WP8 model verbs, but GUI/TUI wiring for
+groups/mirror/align/distribute/clipboard/properties/measurement is incomplete
+in this slice. Per-part color/name/group are not yet persisted in frozen MIG
+spec grammar; treat them as model-level until a format decision lands.
 
 ---
 
 ## Object Types
-The engine supports four object types:
+The engine supports primitive, composite, and custom object types:
 - **Sphere** — spawned via `touch new.sph`, spawner menu, or `Enter`
 - **Cube** — spawned via `touch new.cube`, spawner menu, or `Enter`
 - **Cylinder** — spawned via `touch new.cyl`, spawner menu, or `Enter`; axle along local X, correct `I = ½·m·r²` inertia, exact flat-cap contacts, dedicated instanced mesh
-- **Custom** (`object_custom`, id ≥ 100) — foreign shapes via hot-plugged pair handlers. Example: capsule (`ecosystem/capsule/mpe_capsule.c`): segment + radius with the bounding invariant `radius = √(h²+rc²)` (the engine owns `radius` as the bounding radius for broadphase; `sanitize` preserves it). Custom bodies render as cubes.
-
-
+- **Composite (MIG)** — multi-part rigid bodies built via `physics_world_add_composite` / CAD build seam; parts/hulls/voids follow MIG rules. Scene v201/v202 persistence covers supported composite records; hull bodies remain scene-save refused (SVF06).
+- **Custom** (`object_custom`, id ≥ 100) — foreign shapes via hot-plugged pair handlers. Example: capsule (`ecosystem/capsule/mpe_capsule.c`): segment + radius with bounding invariant `radius = √(h²+rc²)` (engine owns `radius` for broadphase; `sanitize` preserves it). Custom bodies render as cubes.
 
 ---
 

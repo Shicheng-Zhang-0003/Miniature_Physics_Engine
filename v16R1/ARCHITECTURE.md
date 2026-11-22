@@ -35,6 +35,7 @@ debugger. Four priorities drive every design decision:
 | `ui_input` | `v16R1/src/ui_input/` | GTK4 UI, input handling, debug terminal, FTC drive, editor |
 | `tui` | `v16R1/src/tui/` | `mpe-tui`: ncurses inspector + pipeable state dumps |
 | `config` | `v16R1/src/config/` | Tunable registry, runtime config store |
+| `cad` | `v16R1/src/cad/` | Headless CAD design model, view math, spec/build seam for composite authoring |
 | `tests` | `v16R1/src/tests/` | Headless C test suite (canonical + paranoia) |
 | `ecosystem` | `v16R1/src/ecosystem/` | Hot-pluggable modules: capsule shape, MFS robotics, MGB S2 bridge |
 

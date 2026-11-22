@@ -4,6 +4,7 @@
 #include "input_state.h"
 #include "camera.h"
 #include "mouse_lock.h"
+#include "editor.h" /* MIG WP8: CAD_MENU_PAGE_* + cad_menus_* */
 #include <gdk/gdkkeysyms.h>
 extern camera main_camera_fov;
 extern int selected_object;
@@ -42,6 +43,7 @@ void initialize_input (input_status *s) {
     s -> menu_4_pressed = false;
     s -> menu_5_pressed = false;
     s -> menu_6_pressed = false;
+    s -> cad_menu_level = 0;
     s -> spawner_menu_level = 0;
     s -> velocity_menu_level = 0;
     s -> object_menu_level = 0;
@@ -201,6 +203,29 @@ gboolean on_keypress (GtkEventControllerKey *w, guint keyval, guint keycode, Gdk
         !st -> is_menu_open && st -> spawner_menu_level == 0 &&
         st -> velocity_menu_level == 0 && st -> object_menu_level == 0)
         st -> cad_window_pressed = true;
+    if ((keyval == GDK_KEY_7) && !st -> is_menu_open && !config_menu_is_open () &&
+        st -> spawner_menu_level == 0 && st -> velocity_menu_level == 0 && st -> object_menu_level == 0) {
+        st -> cad_menu_level = CAD_MENU_PAGE_SELECTION;
+        cad_menus_set_level (st -> cad_menu_level);
+    }
+    if ((keyval == GDK_KEY_8) && !st -> is_menu_open && !config_menu_is_open () &&
+        st -> spawner_menu_level == 0 && st -> velocity_menu_level == 0 && st -> object_menu_level == 0) {
+        st -> cad_menu_level = CAD_MENU_PAGE_ADD;
+        cad_menus_set_level (st -> cad_menu_level);
+    }
+    if ((keyval == GDK_KEY_9) && !st -> is_menu_open && !config_menu_is_open () &&
+        st -> spawner_menu_level == 0 && st -> velocity_menu_level == 0 && st -> object_menu_level == 0) {
+        st -> cad_menu_level = CAD_MENU_PAGE_GROUP_CLIPBOARD;
+        cad_menus_set_level (st -> cad_menu_level);
+    }
+    if ((keyval == GDK_KEY_0) && !st -> is_menu_open && st -> cad_menu_level > 0 && !config_menu_is_open () &&
+        st -> spawner_menu_level == 0 && st -> velocity_menu_level == 0 && st -> object_menu_level == 0) {
+        cad_menus_set_level (0);
+        st -> cad_menu_level = 0;
+    }
+    if (st -> cad_menu_level > 0) {
+        cad_menus_key_press (keyval);
+    }
     if (st -> is_menu_open) {
         if (keyval == GDK_KEY_1)
             st -> menu_1_pressed = true;

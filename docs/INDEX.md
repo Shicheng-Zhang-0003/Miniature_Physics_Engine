@@ -1,9 +1,8 @@
 # 📚 Documentation Index — v16R1
 
-Paths are relative to the repository root. **New in this revision:** the C
-API reference, the worked module tutorial, the glossary, the restored v15R3
-release notes (accidentally deleted by the v15S release commit while still
-referenced), and the MFS sub-document section.
+Paths are relative to the repository root unless noted. This index covers the
+active v16R1 head: GTK4 engine, modular kernel, MIG composite/hull/void train,
+and the CAD editor model (WP8 first slice).
 
 ## Start here (the five-minute path)
 
@@ -14,7 +13,7 @@ referenced), and the MFS sub-document section.
 | [`v16R1/BUILD.md`](../v16R1/BUILD.md) | Build instructions (Linux / MSYS2-MinGW / headless), make targets, `-Werror` |
 | [`v16R1/how_to_use.md`](../v16R1/how_to_use.md) | The using-the-engine manual: keys, menus, debug terminal, workflows |
 | [`docs/OVERVIEW.md`](OVERVIEW.md) | Design priorities, modular kernel |
-| [`docs/WHATS_NEW.md`](WHATS_NEW.md) | v15S feature highlights (v16R1 opens on these; inherited v15R3 features) |
+| [`docs/WHATS_NEW.md`](WHATS_NEW.md) | Current head highlights and recent WP7/WP8 changes |
 | [`docs/GLOSSARY.md`](GLOSSARY.md) | Project vocabulary + audit-tag decoder (DESPOT-…, E_BUSY, march, up-cell, …) |
 
 ## Write code (API & modules)
@@ -33,7 +32,10 @@ referenced), and the MFS sub-document section.
 | Document | Contents |
 |---|---|
 | [`v16R1/PHYSICS.md`](../v16R1/PHYSICS.md) | Every equation as implemented: integrator, solver, collision, joints |
-| [`v16R1/docs/MIG_SPEC.md`](../v16R1/docs/MIG_SPEC.md) | MIG object spec grammar v1 (FROZEN): file rules, keyword state machine, per-type dims subsets, assembly→COM round-trip, canonical normalized output, 26 named `mig_spec_*` diag codes |
+| [`v16R1/docs/NON_UNIFORM_BODY.md`](../v16R1/docs/NON_UNIFORM_BODY.md) | MIG design charter (what/why frozen) |
+| [`v16R1/docs/MIG_BUILD_PLAN.md`](../v16R1/docs/MIG_BUILD_PLAN.md) | MIG execution playbook, status line, and §9 ledger |
+| [`v16R1/docs/MIG_SPEC.md`](../v16R1/docs/MIG_SPEC.md) | MIG object spec grammar (frozen v1 core + v2 void extensions): parser/emitter rules, diag codes, round-trip contract |
+| [`v16R1/src/ui_input/cad_menus.{c,h}`](../v16R1/src/ui_input/cad_menus.c) | CAD editor model menus (numeric pages on 7/8/9): selection/placement, add/place, group/clipboard; model-level first |
 | [`v16R1/docs/NUMERICAL_GUARANTEES.md`](../v16R1/docs/NUMERICAL_GUARANTEES.md) | Precise numerical budgets — what holds, where, and what does not |
 | [`v16R1/MULTICORE.md`](../v16R1/MULTICORE.md) | Threading model, island parallelism, determinism guarantees |
 | [`v16R1/docs/DIAGNOSTICS.md`](../v16R1/docs/DIAGNOSTICS.md) | Self-reporting diagnostics & how to read them; S2 bridge transcript |

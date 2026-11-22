@@ -95,6 +95,7 @@ A change is done when:
 | World | `core/physics_world.h`, `core/physics_world.c` |
 | Rigid body | `core/rigidbody.h`, `core/rigidbody.c` |
 | MIG composite math (mass properties, convex hulls, spec grammar) | `core/mig_mass.c`, `core/mig_hull.c`, `core/mig_spec.c` (headers alongside) |
+| CAD editor model (design/edit/build seam, view math) | `cad/cad_editor.c`, `cad/cad_view_math.c`, `ui_input/cad_window.c` |
 | Rendering | `render/` |
 | Scene I/O | `scene/` |
 | UI / input / terminal | `ui_input/` |

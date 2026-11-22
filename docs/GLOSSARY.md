@@ -56,12 +56,20 @@
 | **MGB / S2** | The S2 molecular bridge (registry name `s2-bridge`): display-only one-way S2→MPE rendering of a live `s2tui` child process. |
 | **shell verb** | A `mpe-tui` shell command (e.g. `ftc spawn`, `ftc aim`, `mod load`) — the headless “remote control” of the engine. |
 
+## CAD / MIG
+
+| Term | Meaning |
+|---|---|
+| **CAD editor model** | Headless composite design model in `v16R1/src/cad/` (`cad_design`/`cad_editor.c`). Edits parts in assembly frame, validates like `mig_compose`, and builds via `mig_make_bridge`/`mig_void_make_bridge`. GUI window: `v16R1/src/ui_input/cad_window.c`. |
+| **MIG** | MPE-Infinity-Generator: composite rigid bodies authored as parts (mass properties, hulls, voids), with spec grammar and CAD/editor surfaces. |
+| **void part** | A negative-mass/density cavity record (`mig_part` with `is_void`) subtracted during MIG composition; authored in CAD as void primitives. |
+
 ## Verification & audits
 
 | Term | Meaning |
 |---|---|
 | **profiles (quick / physics / full)** | The test-runner scopes: contracts + canonical suite; + legacy & paranoia bins; + sanitizers, MFS, TUI, build gates. |
-| **canonical suite** | The C regression suite (`v16R1/src/tests/mpe_suite_main.c`): registry floors prevent entries silently disappearing (currently 68 entries, 2 informational). |
+| **canonical suite** | The C regression suite (`v16R1/src/tests/mpe_suite_main.c`): registry floors prevent entries silently disappearing (currently 81 entries, 79 blocking + 2 informational). |
 | **registry floor** | The minimum entry-count contract in the runner (`MIN_SUITE_ENTRIES` etc.) — deleting a test fails verification rather than quietly greening it. |
 | **QA run artifacts** | Timestamped per-run logs/JSON/JUnit under `temp/qa_runs/<UTC-stamp>/` (newest 10 kept). |
 | **paranoia suites** | The adversarial suite family (`tests/paranoia_*.c`): FP edges, integration corners, UAF/lifetime traps, determinism. |

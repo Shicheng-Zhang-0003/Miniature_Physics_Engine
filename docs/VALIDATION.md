@@ -1,5 +1,9 @@
 # MPE External Validation
 
+> Current head note (2026-11-21): core verification remains green (quick 95/95,
+> suite 81/79+2, MFS gated 5/0, MGB 44/0, tui-smoke PASS). This document is the
+> external-reference validation ledger; it complements the regression gates.
+
 How the engine's physics is checked against authority that is **not this
 project**. Added 2026-10-02. Companion to `ecosystem/mfs/docs/VALIDATION.md`,
 which applies the same discipline to the MFS drivetrain layer.

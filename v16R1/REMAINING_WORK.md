@@ -11,8 +11,8 @@
 >
 ## 2026-11-13 — WP2.6 hull train: what landed, what stays open
 
-Landed (ledger detail in `docs/MIG_BUILD_PLAN.md` §9; suite now **70
-registered / 68 blocking**, quick 84/84):
+Landed (ledger detail in `docs/MIG_BUILD_PLAN.md` §9; current head as of
+2026-11-21: **81 registered / 79 blocking**, quick 95/95, mgb 44/0, mfs gated 5/0):
 
 - Hull spawn menu (8 spawn types, shared hull dials), hull collision
   consumption behind `composite.hull`, hull bodies RENDERING (five
@@ -28,16 +28,44 @@ Still open from this train:
 
 - **Scene-save hull veto (SVF06)** — hull bodies refuse to persist; a
   hull-aware scene format (v202?) is the candidate brick.
-- **`composite.max_parts` GUI-unreachable** — both 6-menu pages are
-  full; a config-menu page 3 (or a Composite page swap) is needed for
-  GUI reach of the part ceiling. `composite.hull` is covered by the
-  Hull Settings toggle.
+- **`composite.max_parts` GUI-unreachable / schema cap mismatch** — both 6-menu
+  pages are full; a config-menu page 3 (or Composite page swap) is needed for
+  GUI reach. Config schema currently clamps `composite.max_parts` to 1..16
+  default 16, while WP7 7.0e raised `MIG_SPEC_MAX_PARTS`/`CAD_MAX_PARTS` to 64;
+  align schema/default/validation and document the intended runtime cap.
 - **N-gonal ring family (2.6.2)** — pending the trig-exception ruling:
   (a) admit trig for ring generation with exact special cases gated
   separately, or (b) exact-literal subset (n=3, 4) only.
 - **Standing-spawn orientation** — hulls/polyhedra rest per the catalog's
   lying-flat convention; the pending user ruling touches 2.6.5's pinned
   rest heights (√3/3, h/4).
+
+## 2026-11-21 — WP8 CAD editor model first slice
+
+Landed (model-level, headless gate `cad_wp8_model`): multi-level
+undo/redo stack, selection groups, mirror, align/distribute, copy/paste
+clipboard, per-part color/name properties, and measurement.
+
+**Menus (2026-11-21, first slice, model/API):** numeric page menus on
+7/8/9: 7 = selection/placement (next/prev/clear/place@0/move G/J/L/delete/
+duplicate/close); 8 = add/place (sphere/cube/cylinder adds, mirror,
+align min/max/center, distribute); 9 = group/clipboard (undo/redo,
+group/ungroup/members, copy/paste, measure, density-mass). Menus are
+terminal/key-driven; GUI/TUI wiring pending.
+
+Still open:
+
+- **GUI/TUI wiring** — WP8 verbs are model/API level; GUI/TUI controls for
+  groups, mirror/align/distribute, clipboard, properties, and measurement
+  are not wired in this slice.
+- **Persistence format** — per-part color/name/group are not in frozen
+  MIG spec grammar v1/v2-void; scene/spec persistence for these fields
+  needs an explicit format decision before relying on them.
+- **Deeper WP8 gates** — group-aware move/rotate/mass/dims semantics,
+  undo/redo depth/overflow behavior, clipboard/group interactions,
+  and refusal/write-on-success contracts beyond `cad_wp8_model`.
+- **`make everything` audit** — not run in this slice; run before treating
+  the slice as release-clean.
 
 ## 2026-10-24 — F11 honesty fix
 

@@ -142,6 +142,8 @@ float open_numerical_input_dialog (GtkWidget *parent, const char *title, float c
 void editor_reset (void) {
     clear_selection ();
     main_inputs.is_menu_open = false;
+    cad_menus_set_level (0);
+    main_inputs.cad_menu_level = 0;
     main_inputs.spawner_menu_level = 0;
     main_inputs.velocity_menu_level = 0;
     main_inputs.object_menu_level = 0;

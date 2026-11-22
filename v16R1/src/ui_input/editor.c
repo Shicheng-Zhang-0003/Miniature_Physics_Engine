@@ -17,6 +17,13 @@ static rigidbody *editor_selected_object_or_null (void) {
     return &(physics_world_get_primary () -> bodies) [selected_object];
 }
 void editor_update_menus (GtkWidget *parent_window) {
+    if (main_inputs.cad_menu_level != CAD_MENU_PAGE_SELECTION &&
+        main_inputs.cad_menu_level != CAD_MENU_PAGE_ADD &&
+        main_inputs.cad_menu_level != CAD_MENU_PAGE_GROUP_CLIPBOARD) {
+        return;
+    }
+    if (editor_dialog_is_active ()) { return; }
+    cad_menus_update ();
     if ((selected_object < 0) || (selected_object >= (physics_world_get_primary () -> body_count))) {
         if (main_inputs.object_menu_level > 0) { main_inputs.object_menu_level = 0; }
     }

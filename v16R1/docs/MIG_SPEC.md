@@ -224,3 +224,23 @@ mesh import (charter §8, next train); principal-axis display (plan
 4.4's named TODO); units other than metres/kilograms/seconds; multiple
 objects per file (one file, one object — share by copying files, not by
 growing a container format).
+
+> **Amendment note:** WP7 7.0d added a dated v2 grammar extension for void
+> records (see §8). This does not change v1 parsing behavior for v1 files.
+
+## 8. v2 amendment (2026-11-19, WP7 7.0d) — void records
+
+Additive extension to v1 (v1 files remain valid and parse identically):
+
+- `part <index> type` accepts `void_sphere | void_cube | void_cylinder`.
+- Void records use the same twin dims subsets as their solid counterparts
+  (sphere: `dims r`; cube: `dims sx sy sz`; cylinder: `dims r h`).
+- Void records represent sealed cavity subtraction in MIG composition;
+  CAD/editor enforces void mass mode as density-only (`cad_bad_mass_mode`
+  for explicit mass on void records).
+- Normalized emit uses `void_sphere/void_cube/void_cylinder` type tokens.
+- Scene persistence for void-bearing composites uses scene v202 per-part
+  `is_void` (see MIG_BUILD_PLAN §9, 7.0d).
+
+Not in this amendment: per-part color/name/group persistence in spec grammar;
+those remain model-level CAD fields pending an explicit format decision.

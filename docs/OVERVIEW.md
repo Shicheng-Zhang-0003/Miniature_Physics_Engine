@@ -23,6 +23,12 @@ engine-managed, and force fields can be implemented through tick hooks; they
 are not separate replaceable pipeline stages. See [the module guide](../v16R1/MODULES.md)
 for the supported extension points and ABI rules.
 
+The MIG train adds composite rigid bodies (parts, hulls, voids), spec
+grammar/persistence, and a headless CAD editor model (`v16R1/src/cad/`) with
+GUI surface (`ui_input/cad_window.c`). See
+[MIG_BUILD_PLAN.md](../v16R1/docs/MIG_BUILD_PLAN.md) and
+[MIG_SPEC.md](../v16R1/docs/MIG_SPEC.md).
+
 The complete step order and data ownership are in
 [the architecture guide](../v16R1/ARCHITECTURE.md). Exact model equations,
 known approximations, and measured numerical budgets are in

@@ -406,14 +406,17 @@ free-fall/projectile ≤5e-5; inertias ≤2e-5 abs; rolling 4–14 m; angmom ≤
 
 ---
 
-## 9. Composite scene persistence (v201 `MIG1` record)
+## 9. Composite scene persistence (v201 `MIG1`, v202 void flag)
 
-### 9.1 Format contract (v200 → v201)
+### 9.1 Format contract (v200 → v201 → v202)
 
 The writer emits one dedicated section after revolutes carrying every composite
 body's ACTIVE part slice expanded to the WORLD frame (owner `object_id`, part
 count, then per part: type, radius, cylinder half length, half extents, world
-position, world orientation, mass, and per-part friction/restitution). The
+position, world orientation, mass, and per-part friction/restitution). Scene
+v202 adds per-part `is_void` so void-bearing composites persist; loader
+reconstructs void type from twin+is_void and restores density mode for void
+records so `mig_part_mass` negation reproduces the saved value. The
 CRC footer covers the section like every other byte; the saver's strict
 atomic-write path is untouched.
 
@@ -442,13 +445,14 @@ velocity/colour/materials, per-part materials from the FILE (not
 body_defaults), spring rewired to the preserved id; then a second save/load
 cycle proves the rebuilt body re-persists. Suite floor 57 → 58.
 
-### 9.2 The spec grammar (MIG_SPEC.md v1, frozen)
+### 9.2 The spec grammar (MIG_SPEC.md v1 + dated amendments)
 
 The authoring spec text is the single source of truth for composite objects.
-It is frozen at v1: post-freeze changes are dated v2 amendments, never silent
-extensions, because a v1 file must parse identically forever. The grammar is
-line-oriented, `#`-commented, whitespace-insensitive (structure is the
-keyword state machine, not indentation), C-locale decimal numbers.
+v1 is frozen; post-freeze changes are dated amendments, never silent
+extensions, because a v1 file must parse identically forever. v2 (WP7 7.0d)
+adds void record types. The grammar is line-oriented, `#`-commented,
+whitespace-insensitive (structure is the keyword state machine, not
+indentation), C-locale decimal numbers.
 
 `mig <name>` must come first and exactly once; `frame` is optional and v1
 accepts EXACTLY ONE value, `'assembly'` -- the reader never guesses a
@@ -491,12 +495,14 @@ authored), `mass`|`density`, `colour` (only if authored); single spaces;
 numbers in shortest round-trip form. Read + write must reproduce
 byte-identical normalized output -- gate 4.2 pins it.
 
-Frozen OUT of v1 (decisions, not omissions): joints between objects;
-per-part `no_collide` (stays body-level); velocity/sleep/static/kinematic
-authoring (WP3 scene persistence owns dynamic state); convex hulls and
-mesh import (hull BODIES exist in-engine since WP2.6 — mesh pools, spawn,
-render — but scene/spec files still do not carry them: `SVF06` refuses
-hulls at scene save); principal-axis display (plan 4.4 named TODO);
-units other than metres/kilograms/seconds; multiple objects per file (one
-file, one object -- share by copying files, not by growing a container
-format).
+Frozen OUT of v1 (decisions, not omissions; see MIG_SPEC.md for dated
+amendments): joints between objects; per-part `no_collide` (stays body-level);
+velocity/sleep/static/kinematic authoring (WP3 scene persistence owns dynamic
+state); convex hull mesh/scene portability still limited (`SVF06` refuses
+hulls at scene save); principal-axis display (plan 4.4 named TODO); units
+other than metres/kilograms/seconds; multiple objects per file.
+
+v2 amendment (WP7 7.0d): `void_sphere/void_cube/void_cylinder` part types with
+twin dims rules; void records are density-only in CAD/editor authoring path.
+Per-part color/name/group remain model-level CAD fields pending explicit spec
+format decision.

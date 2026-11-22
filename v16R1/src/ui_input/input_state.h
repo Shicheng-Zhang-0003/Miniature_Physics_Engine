@@ -38,6 +38,7 @@ typedef struct {
     bool is_menu_open;
     bool menu_1_pressed, menu_2_pressed, menu_3_pressed;
     bool menu_4_pressed, menu_5_pressed, menu_6_pressed;
+    int cad_menu_level; /* MIG WP8: CAD editor model menus on 7/8/9 (editor.h CAD_MENU_PAGE_*) */
     int spawner_menu_level;
     int velocity_menu_level;
     int object_menu_level;

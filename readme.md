@@ -6,17 +6,20 @@
 
 ## Vibe Coded Industries Production 1
 
-> **STATUS: STABLE — VERIFIED.** Quick profile 86/86, canonical C suite 72
-> green (70 blocking = 41 physics + 29 MIG/composite gates, plus 2
-> diag-informational), MFS unified suite 37
-> gates, determinism twins bitwise identical
-> at `MPE_THREADS=1/4/8`. Full-profile physics tests are green under
-> ASan/UBSan; the remaining reds are documented pre-existing limitations, not
+> **STATUS: STABLE — VERIFIED (active development).** Quick profile
+> 95/95 green, canonical C suite 81 total (79 blocking physics/MIG/CAD
+> gates + 2 diag-informational), MFS unified suite 37 gates (5 gated
+> pass / 0 fail, 12 info-diags), determinism twins bitwise identical at
+> `MPE_THREADS=1/4/8`. Full-profile physics tests are green under
+> ASan/UBSan; remaining reds are documented pre-existing limitations, not
 > regressions.
 >
-> **Active head:** `v16R1` (opened 2026-10-25 off the official v15S release) — GTK4 port with a modular kernel, per-world config,
-> and no kernel global simulation state. Build from `v16R1/src`; verify from the
-> repository root with `python3 tools/test_runner.py --profile full`.
+> **Active head:** `v16R1` — GTK4 port with a modular kernel, per-world
+> config, no kernel global simulation state, MIG composite/hull/void
+> train, CAD editor model expansion (WP8 first slice), and CAD editor
+> model menus (7/8/9 numeric pages). Build from
+> `v16R1/src`; verify from the repository root with
+> `python3 tools/test_runner.py --profile quick`.
 
 **License:** GPL-3.0 · **Language:** C · **UI:** GTK4 · **Renderer:** OpenGL
 3.3 Core (via libepoxy) · **Windowing:** GTK4 + X11/Wayland
@@ -68,7 +71,7 @@ terminal, `F5`–`F11` run validation scenes. Full table and platform notes:
 | [`docs/API_REFERENCE.md`](docs/API_REFERENCE.md) | Public C API for embedders and module authors |
 | [`docs/MODULE_TUTORIAL.md`](docs/MODULE_TUTORIAL.md) | Write, build, and hot-load your first module |
 | [`docs/GLOSSARY.md`](docs/GLOSSARY.md) | Project vocabulary and audit-tag decoder |
-| [`docs/WHATS_NEW.md`](docs/WHATS_NEW.md) | v15S feature highlights (the v16R1 head opens on this set) |
+| [`docs/WHATS_NEW.md`](docs/WHATS_NEW.md) | Current head highlights (v16R1, MIG/WP7/WP8 updates) |
 | [`docs/QUICKSTART.md`](docs/QUICKSTART.md) | Build, run, and controls |
 | [`docs/VERIFICATION.md`](docs/VERIFICATION.md) | Test profiles, gates, external validation |
 | [`docs/LIMITATIONS.md`](docs/LIMITATIONS.md) | Headline limitations |

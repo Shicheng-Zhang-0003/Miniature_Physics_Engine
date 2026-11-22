@@ -1,4 +1,4 @@
-# MPE Public API Reference — v15S
+# MPE Public API Reference — v16R1
 
 > Who this is for: **embedders** (code that owns a world in-process) and
 > **module authors** (code loaded over the MPI C ABI). This document
@@ -230,7 +230,67 @@ struct): `revolute`, `prismatic`, `fixed`, `distance`, `rope` —
 take the world's `mpe_config_t`. The equations they implement are derived
 step-by-step in [`v16R1/PHYSICS.md`](../v16R1/PHYSICS.md).
 
-## 8. Deterministic math — `core/det_math.h`
+## 8. CAD / MIG design model — `cad/cad_editor.h`, `core/mig_mass.h`, `core/mig_spec.h`
+
+The CAD editor is a headless design model for one composite body in assembly
+frame. It validates parts like `mig_compose`, supports edit/undo/group/model
+operations, and builds through MIG bridges. GUI surface: `ui_input/cad_window.c`
+(view math in `cad/cad_view_math.c`); WP8 model verbs are API-level first.
+
+### Design lifecycle / edit
+```c
+void cad_design_init (cad_design *design);
+int  cad_set_name (cad_design *design, const char *name);
+int  cad_add_sphere/cube/cylinder (...);
+int  cad_add_void_sphere/cube/cylinder (...);
+int  cad_add_part (cad_design *design, const mig_part *part);
+int  cad_delete/duplicate/array/move/set_position (...);
+int  cad_rotate_degrees (cad_design *design, int index, int axis, float degrees);
+int  cad_set_mass/set_dims_sphere/set_dims_cube/set_dims_cylinder (...);
+int  cad_subtract_box/cad_subtract_sphere (...);
+int  cad_select (cad_design *design, int index);
+```
+
+### WP8 model operations
+```c
+int   cad_undo_push/cad_undo_multi/cad_redo_multi (cad_design *design);
+int   cad_group/cad_ungroup/cad_group_members (...);
+int   cad_mirror (cad_design *design, int plane);          /* 0=XY,1=YZ,2=XZ */
+int   cad_align (cad_design *design, int axis, int mode); /* min/center/max */
+int   cad_distribute (cad_design *design, int axis);
+int   cad_copy (cad_design *design);
+int   cad_paste (cad_design *design, vector3 offset);
+int   cad_set_part_color/get_part_color/set_part_name/get_part_name (...);
+float cad_measure_distance (const cad_design *design, int a, int b);
+```
+
+### Persistence / build seam
+```c
+int cad_design_to_spec (const cad_design *design, mig_spec *out);
+int cad_design_from_spec (const mig_spec *spec, int max_parts, cad_design *out);
+int cad_save (const cad_design *design, const char *path);
+int cad_load (cad_design *design, const char *path, int max_parts, int *spec_err_out);
+int cad_build (const cad_design *design, mig_part *out_parts, mig_bridge *out);
+int cad_preview (const cad_design *design, char *buffer, int cap);
+```
+
+MIG/spec helpers:
+```c
+int    mig_compose (const mig_part *parts, int count, mig_totals *out);
+void   mig_rebase_parts (mig_part *parts, int count, vector3 delta);
+int    mig_make_bridge (const mig_part *src, int count, mig_part *out_parts, mig_bridge *out);
+int    mig_spec_parse_file (const char *path, int max_parts, mig_spec *out);
+size_t mig_spec_emit_normalized (const mig_spec *spec, char *buf, size_t cap);
+```
+
+Rules/limits:
+- `cad_err` is append-only; WP8 adds `cad_undo_empty/redo_empty/clipboard_empty/group_empty/group_full`.
+- Undo/redo is depth-bounded (`CAD_UNDO_DEPTH`); legacy `cad_undo()` remains for compatibility.
+- Group-aware verbs operate on selected part and same-group members; metadata is on `cad_design`, not `mig_part`.
+- Spec grammar v1 is frozen; v2 amendment adds void records. Per-part color/name/group are model-level and not yet spec-persisted.
+- `cad_build` never mutates a world; caller hands bridge parts to `physics_world_add_composite`/engine path.
+
+## 9. Deterministic math — `core/det_math.h`
 
 Deterministic modules must use this header; **bare `sin/cos/exp/log/pow`
 inside the tick make `deterministic = true` a lie.**
@@ -251,7 +311,7 @@ subset (rounding mode + x86/ARM denormal flushing). Bitwise-twin claims
 are scoped to GCC/Clang IEEE targets; MSVC `/fp:strict` is unproven
 (`v16R1/docs/NUMERICAL_GUARANTEES.md` has the precise budgets).
 
-## 9. Diagnostics & validation — `core/mpe_diag.h`, `core/event_log.h`
+## 10. Diagnostics & validation — `core/mpe_diag.h`, `core/event_log.h`
 
 ```c
 void event_log_init (void);
@@ -268,7 +328,7 @@ runtime values — rejections are never silent. Runtime self-audit:
 through `validation_report`. Details and the S2 bridge transcript:
 [`v16R1/docs/DIAGNOSTICS.md`](../v16R1/docs/DIAGNOSTICS.md).
 
-## 10. Threading contract (summary) — full model in [`v16R1/MULTICORE.md`](../v16R1/MULTICORE.md)
+## 11. Threading contract (summary) — full model in [`v16R1/MULTICORE.md`](../v16R1/MULTICORE.md)
 
 Parallel under `MPE_THREADS > 1`: per-body work, CCD sweeps, pair-local
 collision detection, narrowphase dispatch, solver sweeps **across
@@ -280,7 +340,7 @@ Determinism twins (headline from `docs/VALIDATION.md`): the multithreaded
 engine is **bitwise identical at `MPE_THREADS = 1/4/8`** on GCC/Clang IEEE
 targets.
 
-## 11. Ownership & lifetime cheat-sheet
+## 12. Ownership & lifetime cheat-sheet
 
 | Object | Owner | Rule |
 |---|---|---|

@@ -211,3 +211,22 @@ These are sometimes filed as bugs but are intentional:
   never scale velocities (CCD owns fast bodies).
 - **Spring pure-Hooke:** only exact when `max_acceleration=10000` +
   `k < k_stable` + no Courant warn; otherwise softened for stability.
+
+---
+
+## 4. CAD Editor / WP8 Model Slice
+
+- **Model-level first slice:** WP8 added undo/redo, groups, mirror,
+  align/distribute, copy/paste, per-part color/name, and measurement to
+  `v16R1/src/cad/cad_editor.{h,c}`. The GUI CAD window (`ui_input/cad_window.c`)
+  exists, but WP8 model verbs are not fully wired into GUI/TUI controls in
+  this slice.
+- **Persistence gap:** per-part color/name/group are stored on `cad_design`
+  runtime state; frozen MIG spec grammar does not yet persist them. Spec v2
+  covers void records; color/name/group require an explicit format amendment.
+- **Undo stack bound:** multi-level undo/redo is depth-bounded (`CAD_UNDO_DEPTH`).
+  Legacy single-level `cad_undo` snapshot remains for compatibility.
+- **Clipboard scope:** copy/paste clipboard is model-level and scoped by
+  current CAD model behavior; it is not a scene-wide/persistent clipboard.
+- **Verification:** `cad_wp8_model` gate covers the first-slice contracts;
+  deeper group/clipboard/overflow/refusal semantics still need dedicated gates.

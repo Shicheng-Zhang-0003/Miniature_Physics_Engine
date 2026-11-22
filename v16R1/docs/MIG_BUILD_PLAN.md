@@ -9,6 +9,9 @@
 >
 > ⏸ STATUS LINE (keep updated at every step): **WP0 landed and pushed
 > (181c2c0 charter, 0882935 WP0 code, 636b10e playbook — 2026-10-30).
+> 2026-11-22: WP8 CAD editor model menus landed (working tree): page-driven
+> numeric menus on keys 7/8/9 (selection/placement, add/place, group/clipboard).
+> Model-level first; GUI/TUI wiring follows.
 > WP1 step 1.1 landed 2026-10-30 (`b0e1cbb`): `mig_pendulum_physical`
 > first-run green on the UNMODIFIED engine — measured period 1.8188 s vs
 > the corrected closed form 1.8184 s, max_drift 0.0003 m, Steiner term
@@ -318,6 +321,16 @@
 > `cad_wp8_model` added (81st blocking). Suite 81/79/0, quick 95/95/0,
 > mgb 44/0, mfs gated 5/0, tui-smoke PASS; make-everything audit not run
 > in this slice. mig_reviews.txt/studies/ untracked, never committed.
+- 2026-11-22 — WP8 CAD editor model menus (CAD Menus, model/API): numeric
+  page menus on keys 7/8/9 (engine derived — each number can open a menu).
+  7 = selection/placement (1=next, 2=prev, 3=clear, 0=place@0, G/J/L move
+  X/Y/Z, 4=del, 5=dup@0, 7=close); 8 = add/place (1=sphere, 2=cube,
+  3=cylinder, 4-8 transform, 9=page 9, 0=root); 9 = group/clipboard
+  (1=undo, 2=redo, 3=group, 4=ungroup, 5=members, 6=copy, 7=paste, 8=measure,
+  9=mass, 0=root). Menus are key-driven/terminal-style; GUI/TUI wiring
+  follows. Files: `ui_input/cad_menus.{c,h}`, edits to `input_control.c`,
+  `input_state.h`, `editor.{c,h}`, `editor_dialog.c`. Makefile wildcard covers
+  new TU. Suites green after this slice.
 
 ---
 

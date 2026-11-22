@@ -8,9 +8,9 @@
 ## 1. Profiles
 
 ```bash
-python3 tools/test_runner.py --profile quick   # runner contracts + canonical C suite (72 cases)
-python3 tools/test_runner.py --profile physics # quick + isolated legacy (30) + paranoia (15)
-python3 tools/test_runner.py --profile full    # physics + ASan/UBSan + MFS (37 gated) + TUI snapshots (9) + engine build
+python3 tools/test_runner.py --profile quick   # runner contracts + canonical C suite (81 cases)
+python3 tools/test_runner.py --profile physics # quick + isolated legacy + paranoia
+python3 tools/test_runner.py --profile full    # physics + ASan/UBSan + MFS + TUI snapshots + engine build
 python3 tools/test_runner.py --list            # discover registered test cases
 ```
 
@@ -22,17 +22,17 @@ to change the limit. The runner uses only the Python standard library.
 - Suite cases that print `[SKIP]` fail the run unless `--allow-skip`.
 - `[XFAIL]` markers are surfaced in summary counts but never block.
 - Registry floors: `MIN_SUITE_ENTRIES=72`, `MIN_LEGACY_ENTRIES=30`,
-  `MIN_PARANOIA_ENTRIES=15`.
+  `MIN_PARANOIA_ENTRIES=15`. The suite registry may grow above the floor;
+  `MIN_SUITE_ENTRIES` is a deletion guard, not a cap.
 - Summary contract: `Total == registry size` and `Blocking failures == 0`.
 
-The floor exists because a count floor that sits **below** the real registry
-size is worse than no floor — it reads as protection while silently
-covering deleted coverage (reproduced inside a week in 2026-09-29). The
-floor is now pinned at the exact registry size (72) with a contract test.
+The floor exists because a count floor below the real registry size can hide
+coverage deletion. The floor remains pinned and should only be lowered with an
+explicit, documented coverage removal.
 
 ---
 
-## 2. Canonical C Suite (72 cases)
+## 2. Canonical C Suite (81 cases, 79 blocking + 2 diag-informational)
 
 One binary `test_mpe_suite` (`make build_suite`), exact-name dispatch, one
 registry, no substring fan-out. Every test runs under a saved/restored

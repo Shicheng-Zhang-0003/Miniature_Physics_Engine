@@ -31,7 +31,7 @@ Categories:
 | `camera` | move_speed, mouse/steer_sensitivity, horizontal_friction, jump_height, ijkl_speed |
 | `render` | light_x/y/z, ambient_strength, specular_coeff/exponent |
 | `ui` | change_rate_game/debug, long_run_ticks, enter_spawn_delay/interval |
-| `composite` | max_parts (per-composite part ceiling, 1..16), hull (WP2.6 hull-consumption master flag, 0/1) |
+| `composite` | max_parts (per-composite part ceiling; config schema currently 1..16, default 16; MIG_SPEC/CAD cap 64 — see REMAINING_WORK/config consistency), hull (WP2.6 hull-consumption master flag, 0/1) |
 | `mfs` | robot.composite (WP5: build the FTC robot as one composite body, 0/1) |
 
 Counts per category (registry truth, `grep -o cat_ config/mpe_config_schema.c`):
@@ -50,7 +50,7 @@ pages' digit keys are routed; `6` is the close toggle):
   `7` Save, `8` Reset Defaults, `9`/`0` Back.
 
 `composite` and `mfs` have no menu page. Set them from the TUI shell
-(`export composite.hull=1`, `export composite.max_parts=16` — the
+(`export composite.hull=1`, `export composite.max_parts=16` (or configured max) — the
 snapshot/stream shells keep per-run config copies, but `--shell` binds the
 global registry so `export` reaches the live world) or via
 `status/engine.cfg` + `config load`. The one exception shape:

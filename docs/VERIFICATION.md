@@ -1,5 +1,9 @@
 # Verification Suite
 
+> Current snapshot (2026-11-21, WP8 first slice): quick 95/95 green; canonical
+> suite 81/79+2; MFS gated 5/0, 12 info-diags; MGB 44/0; tui-smoke PASS.
+> `make everything` audit not run in this slice.
+
 The unified test runner provides `quick`, `physics`, and `full` profiles:
 
 ```bash
