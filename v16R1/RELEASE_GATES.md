@@ -44,7 +44,7 @@ They should be recorded as post-stable work items.
 
 ### 3. Startup
 - [X] Engine starts using the documented workflow.
-- [X] Startup prints the correct version string (`MPE v16R1-dev (GTK4)` from `a3_version_string`; window title derives from it).
+- [X] Startup prints the correct version string (`MPE v16R1 (GTK4)` from `a3_version_string`; window title derives from it). Also, `a3_version_string` was raised from `v16R1-dev` to `v16R1` at the v16R1 release commit (2026-11-22).
 - [X] Config system initialises (prints `[config] loaded` or `[config] defaults active`).
 - [X] Shaders load successfully.
 - [X] The main window opens.

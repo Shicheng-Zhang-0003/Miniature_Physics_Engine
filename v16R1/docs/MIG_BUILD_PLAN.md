@@ -11,7 +11,9 @@
 > (181c2c0 charter, 0882935 WP0 code, 636b10e playbook — 2026-10-30).
 > 2026-11-22: WP8 CAD editor model menus landed (working tree): page-driven
 > numeric menus on keys 7/8/9 (selection/placement, add/place, group/clipboard).
-> Model-level first; GUI/TUI wiring follows.
+> Model-level first; GUI/TUI wiring follows. **v16R1 tagged + released
+> 2026-11-22** (a3_version_string raised v16R1-dev → v16R1; a3_release_freeze=1;
+> GitHub tag pushed).
 > WP1 step 1.1 landed 2026-10-30 (`b0e1cbb`): `mig_pendulum_physical`
 > first-run green on the UNMODIFIED engine — measured period 1.8188 s vs
 > the corrected closed form 1.8184 s, max_drift 0.0003 m, Steiner term

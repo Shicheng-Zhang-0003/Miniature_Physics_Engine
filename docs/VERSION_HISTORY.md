@@ -1,15 +1,12 @@
 # Version History
 
-- **v16R1 head — 2026-11-21: WP8 CAD editor model first slice (active).**
-  Landed CAD model expansion in `v16R1/src/cad/`: multi-level undo/redo,
-  selection groups, mirror, align/distribute, copy/paste clipboard, per-part
-  color/name properties, and measurement. Restored legacy single-level
-  `cad_undo`/`cad_preview` compatibility and fixed CAD regressions
-  (snap/rot-snap, duplicate/array orientation, delete selection/follow,
-  subtract_box bound). Added blocking gate `cad_wp8_model`; suite 81/79/0,
-  quick 95/95/0, mgb 44/0, mfs gated 5/0, tui-smoke PASS. `make everything`
-  audit not run in this slice. See `v16R1/docs/MIG_BUILD_PLAN.md` STATUS LINE
-  and §9.
+- **v16R1 — 2026-11-22: tag v16R1 pushed (release).** Full v16R1 head:
+  MIG composites (WP1–WP2), scene/spec persistence (WP3), CAD editor model
+  (WP4/WP8 first slice), CAD editor model menus (7/8/9 pages), voids (WP7
+  complete 7.0a–7.0e), MFS robotics, GTK4 port, module system. Verification
+  as of tag: suite 81/79 + 2 diag-informational, quick 95/95, mgb 44/0,
+  mfs gated 5/0 + 12 info-diags, tui-smoke PASS, make everything audit not run
+  in slice. See MIG_BUILD_PLAN STATUS LINE + §9 ledger.
 
 - **v16R1 — 2026-11-19: WP7 void objects complete (7.0a–7.0e).**
   Sealed cavity subtraction, engine consumption, CAD void tool, scene v202
