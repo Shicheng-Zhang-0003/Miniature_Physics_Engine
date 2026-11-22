@@ -14,7 +14,7 @@
 > ASan/UBSan; remaining reds are documented pre-existing limitations, not
 > regressions.
 >
-> **Active head:** `v16R1` — **tag v16R1 pushed (release, 2026-11-22).** GTK4
+> **Active head:** `v16R1` (external tag/release: `V1.6-RC1`, pushed 2026-11-22). GTK4
 > port with a modular kernel, per-world config, no kernel global
 > simulation state, MIG composite/hull/void train, CAD editor model
 > expansion (WP8 first slice), and CAD editor model menus (7/8/9 numeric

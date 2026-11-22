@@ -1,6 +1,6 @@
 # Version History
 
-- **v16R1 — 2026-11-22: tag v16R1 pushed (release).** Full v16R1 head:
+- **v16R1 — 2026-11-22: external tag V1.6-RC1 pushed (release; internal designation v16R1).** Full v16R1 head:
   MIG composites (WP1–WP2), scene/spec persistence (WP3), CAD editor model
   (WP4/WP8 first slice), CAD editor model menus (7/8/9 pages), voids (WP7
   complete 7.0a–7.0e), MFS robotics, GTK4 port, module system. Verification

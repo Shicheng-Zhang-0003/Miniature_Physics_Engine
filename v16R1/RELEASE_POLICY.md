@@ -1,6 +1,6 @@
 # MPE Release Policy (v15R3 record + v16R1 head)
 
-This tree carries the v15R3 release record in git history (tagged there with `a3_release_freeze = 1`). The v16R1 head is tagged and released as `v16R1` (tag pushed 2026-11-22, `a3_release_freeze = 1`, version string "v16R1") — acceptance changes are documented below. `a3_version_string` stayed `v16R1-dev` during development and was raised to `v16R1` at the release-cut commit. The v16S charter (MIG composites, spec grammar, editor WP4-5, doc sweep, release policy WP6) remains planned post-v16R1.
+This tree carries the v15R3 release record in git history (tagged there with `a3_release_freeze = 1`). The v16R1 head is tagged and released as **external tag `V1.6-RC1`** (tag pushed 2026-11-22, `a3_release_freeze = 1`, version string "v16R1"). **Internal designation remains `v16R1`**; external GitHub tag/release is `V1.6-RC1` (release notes: `V1.6-RC1_RELEASE_NOTES.md`). `a3_version_string` stayed `v16R1-dev` during development and was raised to `v16R1` at the release-cut commit. The v16S charter (MIG composites, spec grammar, editor WP4-5, doc sweep, release policy WP6) remains planned post-v16R1.
 Accepted changes from here on: correctness, stability, validation,
 documentation, and hygiene only — no new features.
 
